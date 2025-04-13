@@ -1,0 +1,99 @@
+.modal {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  transform: scale(0.9);
+  opacity: 0;
+}
+
+.modal.active {
+  transform: scale(1);
+  opacity: 1;
+}
+
+.gradient-bg {
+  background: linear-gradient(135deg, #6e8efb, #a777e3);
+}
+
+/* Estilos para los iconos */
+.fas {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+}
+
+.fa-edit:before {
+  content: "✏️";
+}
+
+.fa-trash:before {
+  content: "🗑️";
+}
+
+.fa-times:before {
+  content: "✖️";
+}
+
+.fa-plus:before {
+  content: "➕";
+}
+
+.calendar-day {
+    min-height: 120px;
+    transition: all 0.2s ease;
+}
+
+.calendar-day:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.subscription-item {
+    transition: all 0.2s ease;
+}
+
+.subscription-item:hover {
+    transform: translateX(4px);
+}
+
+.recurring-badge {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 0.8; }
+    50% { opacity: 1; }
+    100% { opacity: 0.8; }
+}
+
+.currency-selector {
+    position: relative;
+}
+
+.currency-selector::after {
+    content: "";
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid #4b5563;
+}
+
+.tabs input[type="radio"]:checked + label {
+    background-color: #3b82f6;
+    color: white;
+}
+
+.tabs input[type="radio"]:checked + label:hover {
+    background-color: #2563eb;
+}
+
+.fade-in {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+} 
