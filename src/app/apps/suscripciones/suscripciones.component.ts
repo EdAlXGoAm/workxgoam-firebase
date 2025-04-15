@@ -48,7 +48,8 @@ export class SuscripcionesComponent implements OnInit {
     currency: 'MXN',
     startDate: '',
     endDate: '',
-    isRecurring: false
+    isRecurring: false,
+    category: 'entertainment'
   };
   
   // Variables para resumen
@@ -118,22 +119,59 @@ export class SuscripcionesComponent implements OnInit {
     );
   }
   
+  // Utilidad para normalizar una fecha a YYYY-MM-DD sin tiempo ni zona horaria
+  normalizeDate(dateString: string): string {
+    // Extraer solo la parte de la fecha (YYYY-MM-DD) para evitar problemas de zona horaria
+    return dateString.split('T')[0];
+  }
+  
+  // Añadir días a una fecha representada como string 'YYYY-MM-DD'
+  addDaysToDateString(dateString: string, days: number): string {
+    // Crear fecha a partir del string, asegurándose de usar UTC para evitar problemas de zona horaria
+    const parts = dateString.split('-').map(part => parseInt(part, 10));
+    const date = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+    
+    // Añadir los días
+    date.setUTCDate(date.getUTCDate() + days);
+    
+    // Formatear a YYYY-MM-DD
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}`;
+  }
+  
   getSubscriptionsForDay(date: Date): Subscription[] {
+    // Convertir la fecha del día actual a string normalizado (YYYY-MM-DD)
     const dateString = this.formatDate(date);
     const dayOfMonth = date.getDate();
     
     return this.subscriptions.filter(sub => {
-      const subStartDate = new Date(sub.startDate);
-      const subStartString = this.formatDate(subStartDate);
-      
       // Si es recurrente, verificar si es el mismo día del mes
       if (sub.isRecurring) {
-        return subStartDate.getDate() === dayOfMonth;
+        const startDate = new Date(this.normalizeDate(sub.startDate));
+        return startDate.getDate() === dayOfMonth;
       }
       
-      // Si no es recurrente, verificar fecha exacta o rango
-      return subStartString === dateString || 
-             (sub.endDate && dateString >= sub.startDate && dateString <= sub.endDate);
+      // Para suscripciones no recurrentes
+      // Normalizar la fecha de inicio
+      const normalizedStartDate = this.normalizeDate(sub.startDate);
+      
+      // Si tiene fecha de fin, verificar si está en el rango
+      if (sub.endDate) {
+        // Normalizar la fecha de fin
+        const normalizedEndDate = this.normalizeDate(sub.endDate);
+        
+        // Calcular el día siguiente a la fecha de fin
+        const dayAfterEndDate = this.addDaysToDateString(normalizedEndDate, 1);
+        
+        // Verificar si la fecha actual está en el rango [inicio, fin+1)
+        return dateString >= normalizedStartDate && dateString < dayAfterEndDate;
+      } else {
+        // Para fechas únicas, solo mostrar en el día exacto
+        return dateString === normalizedStartDate;
+      }
     });
   }
   
@@ -177,8 +215,8 @@ export class SuscripcionesComponent implements OnInit {
           startDate: this.subscriptionForm.startDate,
           endDate: this.subscriptionForm.endDate || null,
           isRecurring: this.subscriptionForm.isRecurring,
-          category: this.getCategory(this.subscriptionForm.name),
-          color: this.getCategoryColor(this.getCategory(this.subscriptionForm.name))
+          category: this.subscriptionForm.category,
+          color: this.getCategoryColor(this.subscriptionForm.category)
         };
         
         this.showNotification('Suscripción actualizada correctamente', 'success');
@@ -199,8 +237,8 @@ export class SuscripcionesComponent implements OnInit {
         startDate: this.subscriptionForm.startDate,
         endDate: this.subscriptionForm.endDate || null,
         isRecurring: this.subscriptionForm.isRecurring,
-        category: this.getCategory(this.subscriptionForm.name),
-        color: this.getCategoryColor(this.getCategory(this.subscriptionForm.name))
+        category: this.subscriptionForm.category,
+        color: this.getCategoryColor(this.subscriptionForm.category)
       };
       
       this.subscriptions.push(newSubscription);
@@ -227,7 +265,8 @@ export class SuscripcionesComponent implements OnInit {
       currency: subscription.currency,
       startDate: subscription.startDate,
       endDate: subscription.endDate || '',
-      isRecurring: subscription.isRecurring
+      isRecurring: subscription.isRecurring,
+      category: subscription.category
     };
   }
   
@@ -254,7 +293,8 @@ export class SuscripcionesComponent implements OnInit {
       currency: 'MXN',
       startDate: '',
       endDate: '',
-      isRecurring: false
+      isRecurring: false,
+      category: 'entertainment'
     };
   }
   
@@ -288,6 +328,7 @@ export class SuscripcionesComponent implements OnInit {
   }
   
   formatDate(date: Date): string {
+    // Formatear a YYYY-MM-DD en UTC para evitar problemas de zona horaria
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
