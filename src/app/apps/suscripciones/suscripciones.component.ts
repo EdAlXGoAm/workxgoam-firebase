@@ -1,21 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-
-interface Subscription {
-  id: number;
-  name: string;
-  cost: number;
-  costMXN: number;
-  costUSD: number;
-  currency: string;
-  startDate: string;
-  endDate: string | null;
-  isRecurring: boolean;
-  category: string;
-  color: string;
-}
+import { Subscription as RxSubscription, Subscription as SubType, Subject, takeUntil } from 'rxjs';
+import { SubscriptionService, Subscription } from '../../services/subscription.service';
 
 @Component({
   selector: 'app-suscripciones',
@@ -24,7 +12,7 @@ interface Subscription {
   templateUrl: './suscripciones.component.html',
   styleUrls: ['./suscripciones.component.css']
 })
-export class SuscripcionesComponent implements OnInit {
+export class SuscripcionesComponent implements OnInit, OnDestroy {
   // Variables para el calendario
   currentDate: Date = new Date();
   monthNames: string[] = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -34,15 +22,16 @@ export class SuscripcionesComponent implements OnInit {
   // Variables para la gestión de suscripciones
   subscriptions: Subscription[] = [];
   isEditing: boolean = false;
-  currentEditId: number | null = null;
+  currentEditId: string | null = null;
   showConfirmModal: boolean = false;
-  
-  // Tasa de cambio fija
-  readonly EXCHANGE_RATE: number = 17.5;
+  isLoading: boolean = true;
+
+  // Para limpiar suscripciones cuando se destruye el componente
+  private destroy$ = new Subject<void>();
   
   // Formulario para suscripción
   subscriptionForm = {
-    id: null as number | null,
+    id: null as string | null,
     name: '',
     cost: 0,
     currency: 'MXN',
@@ -61,16 +50,24 @@ export class SuscripcionesComponent implements OnInit {
   // Variables para tabs
   activeTab: string = 'monthly';
   
+  constructor(private subscriptionService: SubscriptionService) {}
+
   ngOnInit(): void {
-    // Cargar datos guardados si existen
-    const savedSubscriptions = localStorage.getItem('subscriptions');
-    if (savedSubscriptions) {
-      this.subscriptions = JSON.parse(savedSubscriptions);
-    }
-    
-    // Inicializar componente
-    this.updateCalendar();
-    this.updateSummary();
+    // Suscribirse a los cambios en las suscripciones
+    this.subscriptionService.getSubscriptions()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(subs => {
+        this.subscriptions = subs;
+        this.isLoading = false;
+        this.updateCalendar();
+        this.updateSummary();
+      });
+  }
+
+  ngOnDestroy(): void {
+    // Limpieza al destruir el componente
+    this.destroy$.next();
+    this.destroy$.complete();
   }
   
   // Métodos para el manejo del calendario
@@ -186,72 +183,61 @@ export class SuscripcionesComponent implements OnInit {
   }
   
   // Métodos para gestión de suscripciones
-  submitForm(): void {
+  async submitForm(): Promise<void> {
     if (!this.subscriptionForm.name || this.subscriptionForm.cost <= 0 || !this.subscriptionForm.startDate) {
       this.showNotification('Por favor complete todos los campos requeridos', 'error');
       return;
     }
     
-    // Convertir a MXN si es necesario
-    const costMXN = this.subscriptionForm.currency === 'USD' 
-      ? this.subscriptionForm.cost * this.EXCHANGE_RATE 
-      : this.subscriptionForm.cost;
-      
-    const costUSD = this.subscriptionForm.currency === 'MXN' 
-      ? this.subscriptionForm.cost / this.EXCHANGE_RATE 
-      : this.subscriptionForm.cost;
-    
     if (this.isEditing && this.currentEditId) {
       // Editar suscripción existente
-      const index = this.subscriptions.findIndex(sub => sub.id === this.currentEditId);
-      if (index !== -1) {
-        this.subscriptions[index] = {
-          id: this.currentEditId,
-          name: this.subscriptionForm.name,
-          cost: this.subscriptionForm.cost,
-          costMXN: costMXN,
-          costUSD: costUSD,
-          currency: this.subscriptionForm.currency,
-          startDate: this.subscriptionForm.startDate,
-          endDate: this.subscriptionForm.endDate || null,
-          isRecurring: this.subscriptionForm.isRecurring,
-          category: this.subscriptionForm.category,
-          color: this.getCategoryColor(this.subscriptionForm.category)
-        };
-        
-        this.showNotification('Suscripción actualizada correctamente', 'success');
-      }
-    } else {
-      // Agregar nueva suscripción
-      const newId = this.subscriptions.length > 0 
-        ? Math.max(...this.subscriptions.map(s => s.id)) + 1 
-        : 1;
-      
-      const newSubscription: Subscription = {
-        id: newId,
+      const updateData = {
         name: this.subscriptionForm.name,
         cost: this.subscriptionForm.cost,
-        costMXN: costMXN,
-        costUSD: costUSD,
         currency: this.subscriptionForm.currency,
         startDate: this.subscriptionForm.startDate,
         endDate: this.subscriptionForm.endDate || null,
         isRecurring: this.subscriptionForm.isRecurring,
         category: this.subscriptionForm.category,
-        color: this.getCategoryColor(this.subscriptionForm.category)
+        color: this.subscriptionService.getCategoryColor(this.subscriptionForm.category)
       };
       
-      this.subscriptions.push(newSubscription);
-      this.showNotification('Suscripción agregada correctamente', 'success');
+      const success = await this.subscriptionService.updateSubscription(this.currentEditId, updateData);
+      
+      if (success) {
+        this.showNotification('Suscripción actualizada correctamente', 'success');
+        this.resetForm();
+      } else {
+        this.showNotification('Error al actualizar la suscripción', 'error');
+      }
+    } else {
+      // Añadir nueva suscripción
+      const newSubscription = {
+        name: this.subscriptionForm.name,
+        cost: this.subscriptionForm.cost,
+        costMXN: 0, // Se calcula en el servicio
+        costUSD: 0, // Se calcula en el servicio
+        currency: this.subscriptionForm.currency,
+        startDate: this.subscriptionForm.startDate,
+        endDate: this.subscriptionForm.endDate || null,
+        isRecurring: this.subscriptionForm.isRecurring,
+        category: this.subscriptionForm.category,
+        color: this.subscriptionService.getCategoryColor(this.subscriptionForm.category),
+        userId: '' // Se asigna en el servicio
+      };
+      
+      const id = await this.subscriptionService.addSubscription(newSubscription);
+      
+      if (id) {
+        this.showNotification('Suscripción agregada correctamente', 'success');
+        this.resetForm();
+      } else {
+        this.showNotification('Error al añadir la suscripción', 'error');
+      }
     }
-    
-    this.saveSubscriptions();
-    this.updateCalendar();
-    this.updateSummary();
-    this.resetForm();
   }
   
-  editSubscription(id: number): void {
+  editSubscription(id: string): void {
     const subscription = this.subscriptions.find(sub => sub.id === id);
     if (!subscription) return;
     
@@ -259,7 +245,7 @@ export class SuscripcionesComponent implements OnInit {
     this.currentEditId = id;
     
     this.subscriptionForm = {
-      id: subscription.id,
+      id: subscription.id || null,
       name: subscription.name,
       cost: subscription.cost,
       currency: subscription.currency,
@@ -270,22 +256,25 @@ export class SuscripcionesComponent implements OnInit {
     };
   }
   
-  deleteSubscription(id: number): void {
-    this.subscriptions = this.subscriptions.filter(sub => sub.id !== id);
-    this.saveSubscriptions();
-    this.updateCalendar();
-    this.updateSummary();
-    this.showNotification('Suscripción eliminada', 'info');
+  async deleteSubscription(id: string): Promise<void> {
+    const success = await this.subscriptionService.deleteSubscription(id);
     
-    // Si estábamos editando esta suscripción, resetear el formulario
-    if (this.isEditing && this.currentEditId === id) {
-      this.resetForm();
+    if (success) {
+      this.showNotification('Suscripción eliminada', 'info');
+      
+      // Si estábamos editando esta suscripción, resetear el formulario
+      if (this.isEditing && this.currentEditId === id) {
+        this.resetForm();
+      }
+    } else {
+      this.showNotification('Error al eliminar la suscripción', 'error');
     }
   }
   
   resetForm(): void {
     this.isEditing = false;
     this.currentEditId = null;
+    
     this.subscriptionForm = {
       id: null,
       name: '',
@@ -302,13 +291,15 @@ export class SuscripcionesComponent implements OnInit {
     this.showConfirmModal = true;
   }
   
-  clearAll(): void {
-    this.subscriptions = [];
-    this.saveSubscriptions();
-    this.updateCalendar();
-    this.updateSummary();
-    this.showConfirmModal = false;
-    this.showNotification('Todas las suscripciones han sido eliminadas', 'warning');
+  async clearAll(): Promise<void> {
+    const success = await this.subscriptionService.deleteAllSubscriptions();
+    
+    if (success) {
+      this.showConfirmModal = false;
+      this.showNotification('Todas las suscripciones han sido eliminadas', 'warning');
+    } else {
+      this.showNotification('Error al eliminar las suscripciones', 'error');
+    }
   }
   
   cancelClearAll(): void {
@@ -316,10 +307,6 @@ export class SuscripcionesComponent implements OnInit {
   }
   
   // Métodos de utilidad
-  saveSubscriptions(): void {
-    localStorage.setItem('subscriptions', JSON.stringify(this.subscriptions));
-  }
-  
   updateSummary(): void {
     this.totalSubscriptions = this.subscriptions.length;
     this.totalCostMXN = this.subscriptions.reduce((sum, sub) => sum + sub.costMXN, 0);
@@ -328,16 +315,16 @@ export class SuscripcionesComponent implements OnInit {
   }
   
   formatDate(date: Date): string {
-    // Formatear a YYYY-MM-DD en UTC para evitar problemas de zona horaria
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
+    
     return `${year}-${month}-${day}`;
   }
   
   formatDisplayDate(dateString: string): string {
     const date = new Date(dateString);
-    return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    return `${date.getDate()} ${this.monthNames[date.getMonth()]} ${date.getFullYear()}`;
   }
   
   getCategory(serviceName: string): string {
@@ -359,17 +346,6 @@ export class SuscripcionesComponent implements OnInit {
     } else {
       return 'other';
     }
-  }
-  
-  getCategoryColor(category: string): string {
-    const colors: {[key: string]: string} = {
-      'entertainment': 'bg-blue-500',
-      'productivity': 'bg-green-500',
-      'education': 'bg-purple-500',
-      'tools': 'bg-yellow-500',
-      'other': 'bg-red-500'
-    };
-    return colors[category] || 'bg-gray-500';
   }
   
   setActiveTab(tab: string): void {

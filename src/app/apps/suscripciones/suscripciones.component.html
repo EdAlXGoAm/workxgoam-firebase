@@ -1,259 +1,262 @@
 <!-- Subscription App Content -->
-<div class="container mx-auto px-4 py-8 max-w-6xl">
-  <div class="flex items-center justify-between mb-8">
-    <button routerLink="/" class="flex items-center text-indigo-600 hover:text-indigo-800 transition">
-      <span class="mr-2">←</span> Volver al inicio
-    </button>
+<div class="container mx-auto max-w-6xl p-4">
+
+  <!-- Encabezado -->
+  <div class="mb-6">
+    <h1 class="text-2xl md:text-3xl font-bold text-gray-800">Gestión de Suscripciones</h1>
+    <p class="text-gray-600">Maneja todas tus suscripciones en un solo lugar.</p>
   </div>
 
-  <div class="text-center mb-12">
-    <h2 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4">Administrar Suscripciones</h2>
-    <p class="text-gray-600 max-w-2xl mx-auto">Controla todos tus servicios recurrentes en un solo lugar.</p>
-  </div>
-
-  <div class="flex flex-col md:flex-row gap-6">
-    <!-- Panel izquierdo - Formulario y resumen -->
-    <div class="w-full md:w-1/3 space-y-6">
-      <div class="bg-white rounded-xl shadow-md p-6">
-        <h2 class="text-2xl font-bold text-gray-800 mb-4">{{ isEditing ? 'Editar' : 'Agregar' }} Suscripción</h2>
-        <form (submit)="submitForm()" class="space-y-4">
-          <div>
-            <label class="block text-gray-700 mb-2">Nombre del servicio</label>
-            <input type="text" [(ngModel)]="subscriptionForm.name" name="name" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
-          </div>
-          
-          <div class="flex gap-4">
-            <div class="w-2/3">
-              <label class="block text-gray-700 mb-2">Costo mensual</label>
-              <input type="number" [(ngModel)]="subscriptionForm.cost" name="cost" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" step="0.01" min="0" required>
-            </div>
-            <div class="w-1/3">
-              <label class="block text-gray-700 mb-2">Moneda</label>
-              <div class="currency-selector">
-                <select [(ngModel)]="subscriptionForm.currency" name="currency" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none">
-                  <option value="MXN">MXN</option>
-                  <option value="USD">USD</option>
-                </select>
-              </div>
-            </div>
-          </div>
-          
-          <div>
-            <label class="block text-gray-700 mb-2">Fecha de inicio</label>
-            <input type="date" [(ngModel)]="subscriptionForm.startDate" name="startDate" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
-          </div>
-          
-          <div>
-            <label class="block text-gray-700 mb-2">Fecha de término (opcional)</label>
-            <input type="date" [(ngModel)]="subscriptionForm.endDate" name="endDate" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-          </div>
-          
-          <div class="flex items-center">
-            <input type="checkbox" id="isRecurring" [(ngModel)]="subscriptionForm.isRecurring" name="isRecurring" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
-            <label for="isRecurring" class="ml-2 text-gray-700">Es una suscripción periódica</label>
-          </div>
-          
-          <div>
-            <label class="block text-gray-700 mb-2">Categoría</label>
-            <select [(ngModel)]="subscriptionForm.category" name="category" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none">
-              <option value="entertainment">Entretenimiento</option>
-              <option value="productivity">Productividad</option>
-              <option value="education">Educación</option>
-              <option value="tools">Herramientas</option>
-              <option value="other">Otros</option>
-            </select>
-          </div>
-          
-          <div class="flex gap-2">
-            <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 flex items-center justify-center gap-2">
-              <i class="fas fa-save"></i>
-              <span>{{ isEditing ? 'Actualizar' : 'Agregar' }}</span>
-            </button>
-            <button *ngIf="isEditing" type="button" (click)="resetForm()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition duration-200 flex items-center justify-center gap-2">
-              <i class="fas fa-times"></i>
-              Cancelar
-            </button>
-          </div>
-        </form>
+  <!-- Contenido Principal -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    
+    <!-- Columna izquierda: Calendario -->
+    <div class="lg:col-span-2 bg-white rounded-xl shadow-sm p-6">
+      <div class="flex justify-between items-center mb-4">
+        <button (click)="prevMonth()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full p-2 transition">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+            <path fill-rule="evenodd" d="M7.72 12.53a.75.75 0 010-1.06l7.5-7.5a.75.75 0 111.06 1.06L9.31 12l6.97 6.97a.75.75 0 11-1.06 1.06l-7.5-7.5z" clip-rule="evenodd" />
+          </svg>
+        </button>
+        <h2 class="text-xl font-semibold">{{ monthNames[currentDate.getMonth()] }} {{ currentDate.getFullYear() }}</h2>
+        <button (click)="nextMonth()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full p-2 transition">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+            <path fill-rule="evenodd" d="M16.28 11.47a.75.75 0 010 1.06l-7.5 7.5a.75.75 0 01-1.06-1.06L14.69 12 7.72 5.03a.75.75 0 011.06-1.06l7.5 7.5z" clip-rule="evenodd" />
+          </svg>
+        </button>
       </div>
       
-      <div class="bg-white rounded-xl shadow-md p-6">
-        <div class="tabs flex mb-4 rounded-lg overflow-hidden border border-gray-200">
-          <input type="radio" id="tab-monthly" name="tab" class="hidden" [checked]="activeTab === 'monthly'">
-          <label for="tab-monthly" (click)="setActiveTab('monthly')" class="flex-1 text-center py-2 cursor-pointer hover:bg-blue-100 transition">Mensual</label>
+      <!-- Días de la semana -->
+      <div class="grid grid-cols-7 gap-1 mb-2">
+        <div class="text-center font-medium text-gray-500 text-sm">Dom</div>
+        <div class="text-center font-medium text-gray-500 text-sm">Lun</div>
+        <div class="text-center font-medium text-gray-500 text-sm">Mar</div>
+        <div class="text-center font-medium text-gray-500 text-sm">Mié</div>
+        <div class="text-center font-medium text-gray-500 text-sm">Jue</div>
+        <div class="text-center font-medium text-gray-500 text-sm">Vie</div>
+        <div class="text-center font-medium text-gray-500 text-sm">Sáb</div>
+      </div>
+      
+      <!-- Calendario -->
+      <div class="grid grid-cols-7 gap-1" *ngIf="!isLoading; else calendarLoading">
+        <div *ngFor="let day of calendarDays" class="calendar-day aspect-square border rounded-md p-1 transition" 
+             [ngClass]="{'bg-gray-50': day.isEmpty, 'border-blue-300 bg-blue-50': day.isToday, 'hover:border-gray-300': !day.isEmpty}">
+          <div *ngIf="!day.isEmpty" class="h-full">
+            <div class="flex justify-between items-center mb-1">
+              <span class="text-sm font-medium" [ngClass]="{'text-blue-600': day.isToday}">{{ day.day }}</span>
+              <span *ngIf="day.subscriptions.length > 0" class="text-xs font-semibold text-gray-500">${{ day.totalCost.toFixed(0) }}</span>
+            </div>
+            <div class="subscription-dots">
+              <div *ngFor="let sub of day.subscriptions.slice(0, 3)" class="subscription-dot" [ngClass]="sub.color"></div>
+              <div *ngIf="day.subscriptions.length > 3" class="subscription-more">+{{ day.subscriptions.length - 3 }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <ng-template #calendarLoading>
+        <div class="grid grid-cols-7 gap-1 opacity-50">
+          <div *ngFor="let i of [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34]" 
+               class="calendar-day-skeleton aspect-square border rounded-md p-1 bg-gray-100 animate-pulse">
+          </div>
+        </div>
+      </ng-template>
+      
+      <!-- Configuración de pestañas -->
+      <div class="border-t mt-6 pt-4">
+        <div class="flex mb-4">
+          <button (click)="setActiveTab('monthly')" class="mr-4 text-sm font-medium pb-2 border-b-2 transition" 
+                  [ngClass]="{'text-indigo-600 border-indigo-600': activeTab === 'monthly', 'text-gray-500 border-transparent': activeTab !== 'monthly'}">
+            Resumen Mensual
+          </button>
+          <button (click)="setActiveTab('list')" class="mr-4 text-sm font-medium pb-2 border-b-2 transition" 
+                  [ngClass]="{'text-indigo-600 border-indigo-600': activeTab === 'list', 'text-gray-500 border-transparent': activeTab !== 'list'}">
+            Lista de Suscripciones
+          </button>
+        </div>
+        
+        <!-- Contenido de pestañas -->
+        <div [ngSwitch]="activeTab">
           
-          <input type="radio" id="tab-annual" name="tab" class="hidden" [checked]="activeTab === 'annual'">
-          <label for="tab-annual" (click)="setActiveTab('annual')" class="flex-1 text-center py-2 cursor-pointer hover:bg-blue-100 transition">Anual</label>
-        </div>
-        
-        <h2 class="text-2xl font-bold text-gray-800 mb-4">Resumen Financiero</h2>
-        <div class="space-y-3">
-          <div class="bg-blue-50 rounded-lg p-3">
-            <div class="flex justify-between items-center">
-              <span class="text-gray-600">Total suscripciones:</span>
-              <span class="font-bold text-blue-700">{{ totalSubscriptions }}</span>
+          <!-- Pestaña de Resumen Mensual -->
+          <div *ngSwitchCase="'monthly'" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition">
+              <div class="font-medium text-gray-500 text-sm mb-2">Total Suscripciones</div>
+              <div class="text-2xl font-bold text-gray-800">{{ totalSubscriptions }}</div>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition">
+              <div class="font-medium text-gray-500 text-sm mb-2">Costo Mensual MXN</div>
+              <div class="text-2xl font-bold text-gray-800">${{ totalCostMXN.toFixed(0) }}</div>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition">
+              <div class="font-medium text-gray-500 text-sm mb-2">Costo Mensual USD</div>
+              <div class="text-2xl font-bold text-gray-800">${{ totalCostUSD.toFixed(2) }}</div>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition">
+              <div class="font-medium text-gray-500 text-sm mb-2">Suscripciones Recurrentes</div>
+              <div class="text-2xl font-bold text-gray-800">{{ recurringCount }}</div>
             </div>
           </div>
-          <div class="bg-green-50 rounded-lg p-3">
-            <div class="flex justify-between items-center">
-              <span class="text-gray-600">Costo total (MXN):</span>
-              <span class="font-bold text-green-700">${{ totalCostMXN.toFixed(2) }} MXN</span>
+          
+          <!-- Pestaña de Lista de Suscripciones -->
+          <div *ngSwitchCase="'list'" class="overflow-auto max-h-96">
+            <div *ngIf="isLoading" class="py-4 text-center text-gray-500">
+              Cargando suscripciones...
             </div>
-          </div>
-          <div class="bg-purple-50 rounded-lg p-3">
-            <div class="flex justify-between items-center">
-              <span class="text-gray-600">Costo total (USD):</span>
-              <span class="font-bold text-purple-700">${{ totalCostUSD.toFixed(2) }} USD</span>
+            <div *ngIf="!isLoading && subscriptions.length === 0" class="py-4 text-center text-gray-500">
+              No hay suscripciones. Agrega una utilizando el formulario.
             </div>
+            <table *ngIf="!isLoading && subscriptions.length > 0" class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                  <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo</th>
+                  <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                  <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+                  <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                <tr *ngFor="let subscription of subscriptions" class="hover:bg-gray-50 transition-colors">
+                  <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{{ subscription.name }}</td>
+                  <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${{ subscription.cost.toFixed(2) }} {{ subscription.currency }}</td>
+                  <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">{{ formatDisplayDate(subscription.startDate) }}</td>
+                  <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">{{ subscription.isRecurring ? 'Recurrente' : 'Única vez' }}</td>
+                  <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">
+                    <button (click)="editSubscription(subscription.id!)" class="text-indigo-600 hover:text-indigo-900 mr-2">Editar</button>
+                    <button (click)="deleteSubscription(subscription.id!)" class="text-red-600 hover:text-red-900">Eliminar</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-          <div class="bg-yellow-50 rounded-lg p-3">
-            <div class="flex justify-between items-center">
-              <span class="text-gray-600">Suscripciones periódicas:</span>
-              <span class="font-bold text-yellow-700">{{ recurringCount }}</span>
-            </div>
-          </div>
-        </div>
-        
-        <div class="mt-6">
-          <div class="flex justify-between items-center mb-2">
-            <h3 class="text-lg font-semibold text-gray-700">Tus suscripciones</h3>
-            <button *ngIf="subscriptions.length > 0" (click)="confirmClearAll()" class="text-xs text-red-500 hover:text-red-700 flex items-center gap-1">
-              <i class="fas fa-trash-alt"></i>
-              Limpiar todo
-            </button>
-          </div>
-          <div class="space-y-2 max-h-64 overflow-y-auto">
-            <div *ngIf="subscriptions.length === 0" class="text-gray-500 text-center py-4">No hay suscripciones agregadas</div>
-            
-            <div *ngFor="let subscription of subscriptions" 
-                 class="subscription-item border border-gray-200 rounded-lg p-3 hover:shadow-sm transition fade-in cursor-pointer"
-                 [ngClass]="subscription.color"
-                 (click)="editSubscription(subscription.id)">
-              <div class="flex justify-between items-center mb-1">
-                <span class="font-medium truncate text-white">{{ subscription.name }}</span>
-                <span class="font-bold text-white">
-                  ${{ subscription.cost.toFixed(2) }} {{ subscription.currency }}
-                </span>
-              </div>
-              
-              <div class="text-xs flex justify-between items-center text-white">
-                <span>
-                  Inicio: {{ formatDisplayDate(subscription.startDate) }}
-                  <span *ngIf="subscription.endDate && !subscription.isRecurring">
-                    - Fin: {{ formatDisplayDate(subscription.endDate) }}
-                  </span>
-                </span>
-                
-                <div class="flex items-center">
-                  <span *ngIf="subscription.isRecurring" class="bg-yellow-500 text-white text-xs px-2 py-1 rounded-full flex items-center mr-2">
-                    <i class="fas fa-sync-alt mr-1 recurring-badge"></i> Periódica
-                  </span>
-                  
-                  <button (click)="deleteSubscription(subscription.id); $event.stopPropagation();" 
-                         class="text-red-300 hover:text-red-100 transition">
-                    <i class="fas fa-trash-alt"></i>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+          
         </div>
       </div>
     </div>
     
-    <!-- Panel derecho - Calendario -->
-    <div class="w-full md:w-2/3">
-      <div class="bg-white rounded-xl shadow-md p-6">
-        <div class="flex justify-between items-center mb-6">
-          <h2 class="text-2xl font-bold text-gray-800">Calendario de Suscripciones</h2>
-          <div class="flex items-center space-x-4">
-            <button (click)="prevMonth()" class="p-2 rounded-full hover:bg-gray-100 transition">
-              <i class="fas fa-chevron-left text-gray-600"></i>
-            </button>
-            <span class="font-semibold text-gray-700">{{ monthNames[currentDate.getMonth()] }} {{ currentDate.getFullYear() }}</span>
-            <button (click)="nextMonth()" class="p-2 rounded-full hover:bg-gray-100 transition">
-              <i class="fas fa-chevron-right text-gray-600"></i>
-            </button>
+    <!-- Columna derecha: Formulario y Lista -->
+    <div class="bg-white rounded-xl shadow-sm p-6">
+      <h3 class="text-xl font-semibold mb-4">{{ isEditing ? 'Editar Suscripción' : 'Agregar Suscripción' }}</h3>
+      
+      <form (ngSubmit)="submitForm()">
+        <!-- Nombre -->
+        <div class="mb-4">
+          <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Nombre del Servicio</label>
+          <input type="text" id="name" name="name" [(ngModel)]="subscriptionForm.name" placeholder="Netflix, Spotify, etc." 
+                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+        </div>
+        
+        <!-- Costo y Moneda -->
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label for="cost" class="block text-sm font-medium text-gray-700 mb-1">Costo</label>
+            <input type="number" id="cost" name="cost" [(ngModel)]="subscriptionForm.cost" min="0" step="0.01" placeholder="0.00" 
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+          </div>
+          <div>
+            <label for="currency" class="block text-sm font-medium text-gray-700 mb-1">Moneda</label>
+            <select id="currency" name="currency" [(ngModel)]="subscriptionForm.currency"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+              <option value="MXN">MXN</option>
+              <option value="USD">USD</option>
+            </select>
           </div>
         </div>
         
-        <div class="grid grid-cols-7 gap-1 mb-2">
-          <div class="text-center font-medium text-gray-500 py-2">Dom</div>
-          <div class="text-center font-medium text-gray-500 py-2">Lun</div>
-          <div class="text-center font-medium text-gray-500 py-2">Mar</div>
-          <div class="text-center font-medium text-gray-500 py-2">Mié</div>
-          <div class="text-center font-medium text-gray-500 py-2">Jue</div>
-          <div class="text-center font-medium text-gray-500 py-2">Vie</div>
-          <div class="text-center font-medium text-gray-500 py-2">Sáb</div>
+        <!-- Fecha de Inicio -->
+        <div class="mb-4">
+          <label for="startDate" class="block text-sm font-medium text-gray-700 mb-1">Fecha de Inicio</label>
+          <input type="date" id="startDate" name="startDate" [(ngModel)]="subscriptionForm.startDate"
+                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
         </div>
         
-        <div class="grid grid-cols-7 gap-1">
-          <div *ngFor="let day of calendarDays" class="calendar-day p-2" 
-               [ngClass]="day.isEmpty ? 'bg-gray-100 rounded-lg' : 'bg-white border border-gray-200 rounded-lg'">
-            <div *ngIf="!day.isEmpty" class="flex justify-between items-center mb-1">
-              <span [ngClass]="day.isToday ? 'font-bold text-white bg-blue-500 rounded-full w-6 h-6 flex items-center justify-center' : 'font-semibold text-gray-700'">
-                {{ day.day }}
-              </span>
-              
-              <span *ngIf="day.subscriptions.length > 0" class="text-xs bg-gray-100 text-gray-700 px-1 rounded">
-                ${{ day.totalCost.toFixed(2) }}
-              </span>
-            </div>
-            
-            <div *ngIf="!day.isEmpty" class="space-y-1">
-              <div *ngFor="let sub of day.subscriptions" 
-                   class="text-xs p-1 rounded truncate text-white cursor-pointer"
-                   [ngClass]="sub.color"
-                   [title]="sub.name + ' - $' + sub.cost.toFixed(2) + ' ' + sub.currency"
-                   (click)="editSubscription(sub.id)">
-                <div class="flex items-center justify-between">
-                  <span class="truncate">{{ sub.name }}</span>
-                  <i *ngIf="sub.isRecurring" class="fas fa-sync-alt recurring-badge text-white text-xs ml-1"></i>
-                </div>
-              </div>
-            </div>
+        <!-- Fecha de Fin (opcional) -->
+        <div class="mb-4">
+          <label for="endDate" class="block text-sm font-medium text-gray-700 mb-1">Fecha de Fin (opcional)</label>
+          <input type="date" id="endDate" name="endDate" [(ngModel)]="subscriptionForm.endDate"
+                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+        </div>
+        
+        <!-- Es Recurrente -->
+        <div class="mb-4">
+          <div class="flex items-center">
+            <input type="checkbox" id="isRecurring" name="isRecurring" [(ngModel)]="subscriptionForm.isRecurring"
+                   class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+            <label for="isRecurring" class="ml-2 block text-sm text-gray-700">Suscripción Recurrente</label>
           </div>
+          <p class="text-xs text-gray-500 mt-1">Marca esta opción si la suscripción se renueva automáticamente cada mes.</p>
         </div>
         
-        <div class="mt-6 pt-4 border-t border-gray-200">
-          <h3 class="text-lg font-semibold text-gray-700 mb-3">Leyenda</h3>
-          <div class="flex flex-wrap gap-2">
-            <div class="flex items-center">
-              <div class="w-3 h-3 rounded-full bg-blue-500 mr-1"></div>
-              <span class="text-xs text-gray-600">Entretenimiento</span>
+        <!-- Categoría -->
+        <div class="mb-4">
+          <label for="category" class="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+          <select id="category" name="category" [(ngModel)]="subscriptionForm.category"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+            <option value="entertainment">Entretenimiento</option>
+            <option value="productivity">Productividad</option>
+            <option value="education">Educación</option>
+            <option value="tools">Herramientas</option>
+            <option value="other">Otros</option>
+          </select>
+        </div>
+        
+        <!-- Botones -->
+        <div class="flex justify-between mt-6">
+          <button *ngIf="isEditing" type="button" (click)="resetForm()" 
+                  class="px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            Cancelar
+          </button>
+          <button type="submit" 
+                  class="w-full px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  [class.ml-2]="isEditing">
+            {{ isEditing ? 'Actualizar' : 'Agregar' }} Suscripción
+          </button>
+        </div>
+      </form>
+      
+      <!-- Lista de Suscripciones -->
+      <div class="mt-6">
+        <div class="flex justify-between items-center mb-2">
+          <h3 class="text-lg font-semibold text-gray-700">Tus suscripciones</h3>
+          <button *ngIf="!isLoading && subscriptions.length > 0" (click)="confirmClearAll()" class="text-xs text-red-500 hover:text-red-700 flex items-center gap-1">
+            <i class="fas fa-trash-alt"></i>
+            Limpiar todo
+          </button>
+        </div>
+        <div class="space-y-2 max-h-64 overflow-y-auto">
+          <div *ngIf="isLoading" class="text-gray-500 text-center py-4">
+            <div class="inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-indigo-600 mr-2"></div>
+            Cargando suscripciones...
+          </div>
+          
+          <div *ngIf="!isLoading && subscriptions.length === 0" class="text-gray-500 text-center py-4">No hay suscripciones agregadas</div>
+          
+          <div *ngFor="let subscription of subscriptions" 
+               class="subscription-item border border-gray-200 rounded-lg p-3 hover:shadow-sm transition fade-in cursor-pointer"
+               [ngClass]="subscription.color"
+               (click)="editSubscription(subscription.id!)">
+            <div class="flex justify-between items-center mb-1">
+              <span class="font-medium truncate text-white">{{ subscription.name }}</span>
+              <span class="font-bold text-white">
+                ${{ subscription.cost.toFixed(2) }} {{ subscription.currency }}
+              </span>
             </div>
-            <div class="flex items-center">
-              <div class="w-3 h-3 rounded-full bg-green-500 mr-1"></div>
-              <span class="text-xs text-gray-600">Productividad</span>
-            </div>
-            <div class="flex items-center">
-              <div class="w-3 h-3 rounded-full bg-purple-500 mr-1"></div>
-              <span class="text-xs text-gray-600">Educación</span>
-            </div>
-            <div class="flex items-center">
-              <div class="w-3 h-3 rounded-full bg-yellow-500 mr-1"></div>
-              <span class="text-xs text-gray-600">Herramientas</span>
-            </div>
-            <div class="flex items-center">
-              <div class="w-3 h-3 rounded-full bg-red-500 mr-1"></div>
-              <span class="text-xs text-gray-600">Otros</span>
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-white text-opacity-80">{{ formatDisplayDate(subscription.startDate) }}</span>
+              <span class="bg-white bg-opacity-20 rounded-full px-2 py-0.5 text-white text-xs">
+                {{ subscription.isRecurring ? 'Recurrente' : 'Única vez' }}
+              </span>
             </div>
           </div>
         </div>
       </div>
       
-      <!-- Gráfico de gastos -->
-      <div class="bg-white rounded-xl shadow-md p-6 mt-6">
-        <h2 class="text-2xl font-bold text-gray-800 mb-4">Resumen de Gastos</h2>
-        <div class="flex items-center justify-center h-64">
-          <p class="text-gray-500">Gráfico de gastos por categoría (próximamente)</p>
-        </div>
-      </div>
     </div>
   </div>
 </div>
 
-<!-- Modal para confirmar eliminación -->
+<!-- Modal de confirmación -->
 <div *ngIf="showConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 modal">
   <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 fade-in">
     <h3 class="text-xl font-bold text-gray-800 mb-4">Confirmar eliminación</h3>
