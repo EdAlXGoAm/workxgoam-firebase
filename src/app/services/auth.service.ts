@@ -10,25 +10,43 @@ export class AuthService {
   private user = new BehaviorSubject<User | null>(null);
   public user$ = this.user.asObservable();
   private authStateReady = false;
+  private authStatePromise: Promise<void>;
+  private authStateResolver!: () => void;
 
   constructor(
     private auth: Auth,
     private router: Router
   ) {
+    // Inicializar la promesa
+    this.authStatePromise = new Promise<void>((resolve) => {
+      this.authStateResolver = resolve;
+    });
+
     // Observar cambios en el estado de autenticación
     this.auth.onAuthStateChanged(user => {
       this.user.next(user);
       this.authStateReady = true;
+      this.authStateResolver(); // Resolver la promesa cuando el estado esté listo
+      
+      // Evitar redirecciones automáticas para rutas específicas
+      const currentPath = window.location.pathname;
       
       // Redirigir según el estado de autenticación
       if (user) {
-        // Si estamos en login, redirigir a home
-        if (window.location.pathname === '/login') {
+        // Solo redirigir a home si estamos explícitamente en la página de login
+        if (currentPath === '/login') {
           this.router.navigate(['/home']);
         }
+        // No hacer ninguna redirección para otras rutas cuando el usuario está autenticado
       } else {
         // Si estamos en una ruta protegida, redirigir a login
-        if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
+        // Excluir las rutas específicas y las rutas de apps
+        const isProtectedRoute = 
+          currentPath !== '/login' && 
+          currentPath !== '/' && 
+          !currentPath.startsWith('/apps/');
+
+        if (isProtectedRoute) {
           this.router.navigate(['/login']);
         }
       }
@@ -69,11 +87,10 @@ export class AuthService {
 
   // Comprobar si el usuario está logueado (asincrónicamente)
   async isLoggedInAsync(): Promise<boolean> {
-    // Si el estado de autenticación aún no está listo, esperar por el primer valor
-    if (!this.authStateReady) {
-      return await firstValueFrom(this.user$.pipe(map(user => !!user)));
-    }
-    // Si ya está listo, devolver el valor actual
+    // Esperar a que el estado de autenticación esté listo
+    await this.authStatePromise;
+    
+    // Una vez que el estado está listo, devolver el valor actual
     return !!this.auth.currentUser;
   }
 } 

@@ -9,10 +9,8 @@ export const rootRedirectGuard: CanActivateFn = async (route, state) => {
   const isLoggedIn = await authService.isLoggedInAsync();
   
   if (isLoggedIn) {
-    // Si el usuario está autenticado, redirigir a home
     return router.parseUrl('/home');
   } else {
-    // Si no está autenticado, redirigir a login
     return router.parseUrl('/login');
   }
 }; 
