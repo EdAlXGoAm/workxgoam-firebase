@@ -184,42 +184,40 @@
       <span class="mr-3">🚀</span>
       WorkXGoAm
     </h1>
-    <button id="user-menu" class="flex items-center space-x-2 focus:outline-none">
-      <span class="hidden md:inline">Usuario</span>
-      <div class="w-10 h-10 rounded-full bg-white text-purple-600 flex items-center justify-center font-bold">
-        <span>👤</span>
+    
+    <ng-container *ngIf="authService.isLoggedIn(); else loginButton">
+      <div class="flex items-center space-x-3 user-menu-container">
+        <span class="hidden md:inline">{{ getUserName() }}</span>
+        <div id="user-profile-button" class="w-10 h-10 rounded-full bg-white text-purple-600 flex items-center justify-center font-bold cursor-pointer" (click)="toggleUserMenu($event)">
+          <span *ngIf="getUserPhotoUrl()">
+            <img [src]="getUserPhotoUrl()" alt="Foto de perfil" class="w-10 h-10 rounded-full">
+          </span>
+          <span *ngIf="!getUserPhotoUrl()">{{ getInitials() }}</span>
+        </div>
+        
+        <!-- Menú desplegable del usuario -->
+        <div *ngIf="isUserMenuOpen" class="absolute top-20 right-4 bg-white text-gray-800 shadow-lg rounded-lg py-2 w-48 user-menu-container">
+          <a class="block px-4 py-2 hover:bg-gray-100 cursor-pointer" routerLink="/home">Mi Cuenta</a>
+          <a class="block px-4 py-2 hover:bg-gray-100 cursor-pointer" routerLink="/apps/suscripciones">Suscripciones</a>
+          <div class="border-t border-gray-200 my-1"></div>
+          <a class="block px-4 py-2 hover:bg-gray-100 text-red-600 cursor-pointer" (click)="logout()">Cerrar sesión</a>
+        </div>
       </div>
-    </button>
+    </ng-container>
+    
+    <ng-template #loginButton>
+      <button 
+        (click)="navigateToLogin($event)"
+        class="px-4 py-2 rounded-lg bg-white text-purple-600 hover:bg-gray-100 transition-colors font-medium cursor-pointer">
+        Iniciar sesión
+      </button>
+    </ng-template>
   </div>
 </header>
 
 <!-- Main Content -->
-<main class="container mx-auto px-4 py-8 flex flex-col space-y-6">
-  <div class="text-center w-full">
-    <h2 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4">Tus Aplicaciones</h2>
-    <p class="text-gray-600 max-w-2xl mx-auto text-center">Selecciona una aplicación para comenzar. Todas tus herramientas en un solo lugar.</p>
-  </div>
-
-  <!-- Floating Cards Grid -->
-  <div class="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-    <!-- Tarjetas dinámicas -->
-    <div *ngFor="let card of appCards" class="floating-card rounded-2xl overflow-hidden bg-white">
-      <div class="h-full flex flex-col">
-        <div class="bg-{{card.color}}-500 p-6 text-white">
-          <div class="text-4xl mb-4">{{card.emoji}}</div>
-          <h3 class="text-xl font-bold">{{card.title}}</h3>
-        </div>
-        <div class="p-6 flex-grow">
-          <p class="text-gray-600 mb-4">{{card.description}}</p>
-          <button 
-            (click)="card.route ? navigateTo(card.route) : null" 
-            class="w-full bg-{{card.color}}-500 hover:bg-{{card.color}}-600 text-white py-2 px-4 rounded-lg transition">
-            {{card.route ? 'Abrir' : 'Administrar'}}
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
+<main class="container mx-auto px-4 py-8">
+  <router-outlet></router-outlet>
 </main>
 
 <!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->
@@ -230,5 +228,4 @@
 <!-- * * * * * * * * * * End of Placeholder  * * * * * * * * * * * * -->
 <!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->
 
-
-<router-outlet />
+<app-nav></app-nav>

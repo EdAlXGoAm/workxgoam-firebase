@@ -1,104 +1,67 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
-
-interface AppCard {
-  id: string;
-  emoji: string;
-  title: string;
-  description: string;
-  color: string;
-  route?: string;
-}
+import { RouterModule } from '@angular/router';
+import { AuthService } from '../services/auth.service';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RouterModule],
   template: `
-    <!-- Main Content -->
-    <main class="container mx-auto px-4 py-8 flex flex-col space-y-6">
-      <div class="text-center w-full">
-        <h2 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4">Tus Aplicaciones</h2>
-        <p class="text-gray-600 max-w-2xl mx-auto text-center">Selecciona una aplicación para comenzar. Todas tus herramientas en un solo lugar.</p>
+    <div class="max-w-5xl mx-auto">
+      <div class="text-center mb-12">
+        <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4">Bienvenido, {{ getUserName() }}</h1>
+        <p class="text-gray-600 max-w-2xl mx-auto">Todas tus aplicaciones en un solo lugar. Gestiona tus suscripciones y más de forma fácil y eficiente.</p>
       </div>
-
-      <!-- Floating Cards Grid -->
-      <div class="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-        <!-- Tarjetas dinámicas -->
-        <div *ngFor="let card of appCards" class="floating-card rounded-2xl overflow-hidden bg-white">
-          <div class="h-full flex flex-col">
-            <div class="bg-{{card.color}}-500 p-6 text-white">
-              <div class="text-4xl mb-4">{{card.emoji}}</div>
-              <h3 class="text-xl font-bold">{{card.title}}</h3>
-            </div>
-            <div class="p-6 flex-grow">
-              <p class="text-gray-600 mb-4">{{card.description}}</p>
-              <button 
-                (click)="card.route ? navigateTo(card.route) : null" 
-                class="w-full bg-{{card.color}}-500 hover:bg-{{card.color}}-600 text-white py-2 px-4 rounded-lg transition">
-                {{card.route ? 'Abrir' : 'Administrar'}}
-              </button>
-            </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Card Suscripciones -->
+        <div class="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+          <div class="bg-blue-500 p-5 text-white">
+            <h3 class="text-xl font-bold">Suscripciones</h3>
+          </div>
+          <div class="p-5">
+            <p class="text-gray-600 mb-4">Gestiona todas tus suscripciones en un calendario fácil de usar.</p>
+            <a routerLink="/apps/suscripciones" class="block w-full text-center bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg transition-colors">
+              Abrir
+            </a>
+          </div>
+        </div>
+        
+        <!-- Más cards de aplicaciones -->
+        <div class="bg-white rounded-xl shadow-md overflow-hidden opacity-60">
+          <div class="bg-purple-500 p-5 text-white">
+            <h3 class="text-xl font-bold">Finanzas</h3>
+          </div>
+          <div class="p-5">
+            <p class="text-gray-600 mb-4">Próximamente: Gestiona tus finanzas personales.</p>
+            <button disabled class="block w-full text-center bg-gray-300 text-gray-500 py-2 rounded-lg cursor-not-allowed">
+              Próximamente
+            </button>
+          </div>
+        </div>
+        
+        <div class="bg-white rounded-xl shadow-md overflow-hidden opacity-60">
+          <div class="bg-green-500 p-5 text-white">
+            <h3 class="text-xl font-bold">Notas</h3>
+          </div>
+          <div class="p-5">
+            <p class="text-gray-600 mb-4">Próximamente: Toma notas y guarda información importante.</p>
+            <button disabled class="block w-full text-center bg-gray-300 text-gray-500 py-2 rounded-lg cursor-not-allowed">
+              Próximamente
+            </button>
           </div>
         </div>
       </div>
-    </main>
+    </div>
   `,
   styles: []
 })
 export class HomeComponent {
-  appCards: AppCard[] = [
-    {
-      id: 'calendario',
-      emoji: '📅',
-      title: 'Calendario',
-      description: 'Organiza tus eventos y citas importantes con nuestro calendario interactivo.',
-      color: 'blue'
-    },
-    {
-      id: 'finanzas',
-      emoji: '💰',
-      title: 'Finanzas',
-      description: 'Controla tus gastos e ingresos con nuestra herramienta financiera.',
-      color: 'purple'
-    },
-    {
-      id: 'noticias',
-      emoji: '📰',
-      title: 'Noticias',
-      description: 'Mantente informado con las últimas noticias de tus fuentes favoritas.',
-      color: 'green'
-    },
-    {
-      id: 'tareas',
-      emoji: '📋',
-      title: 'Tareas',
-      description: 'Organiza tus proyectos y tareas diarias con nuestro gestor de productividad.',
-      color: 'yellow'
-    },
-    {
-      id: 'fitness',
-      emoji: '💪',
-      title: 'Fitness',
-      description: 'Registra tus entrenamientos y sigue tu progreso físico.',
-      color: 'red'
-    },
-    {
-      id: 'suscripciones',
-      emoji: '💳',
-      title: 'Suscripciones',
-      description: 'Administra todas tus suscripciones y servicios recurrentes.',
-      color: 'indigo',
-      route: '/suscripciones'
-    }
-  ];
-  
-  constructor(private router: Router) {}
-  
-  navigateTo(route: string): void {
-    if (route) {
-      this.router.navigate([route]);
-    }
+  constructor(private authService: AuthService) {}
+
+  getUserName(): string {
+    const user = this.authService.getCurrentUser();
+    return user?.displayName?.split(' ')[0] || 'Usuario';
   }
 } 
