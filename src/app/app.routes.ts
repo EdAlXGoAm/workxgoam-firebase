@@ -22,6 +22,11 @@ export const routes: Routes = [
     canActivate: [authGuard]
   },
   { 
+    path: 'apps/mesero', 
+    loadComponent: () => import('./apps/mesero/mesero.component').then(m => m.MeseroComponent),
+    canActivate: [authGuard]
+  },
+  { 
     path: '', 
     canActivate: [rootRedirectGuard],
     component: HomeComponent

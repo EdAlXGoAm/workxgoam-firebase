@@ -1,0 +1,151 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+
+body {
+    font-family: 'Poppins', sans-serif;
+    background-color: #FFF5E1;
+}
+
+.game-container {
+    perspective: 1000px;
+    transform-style: preserve-3d;
+    background-color: #F8E8CC;
+    background-image: 
+        linear-gradient(#E3C9A8 1px, transparent 1px),
+        linear-gradient(90deg, #E3C9A8 1px, transparent 1px);
+    background-size: 40px 40px;
+    border: 8px solid #D4A76A;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+.table {
+    transition: all 0.3s ease;
+    transform: rotateX(10deg);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    background-color: #FFD700;
+    border: 4px solid #D4A76A;
+}
+
+.table:hover {
+    transform: rotateX(10deg) scale(1.05);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+}
+
+.table.occupied {
+    background-color: #FF6B6B;
+    border-color: #D35D5D;
+}
+
+.table.paid {
+    background-color: #4ECDC4;
+    border-color: #3AAFA9;
+}
+
+.chair {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background-color: #8B4513;
+    border-radius: 50%;
+    transform: rotateX(10deg);
+    border: 2px solid #5D2906;
+}
+
+.header {
+    background: linear-gradient(135deg, #FF8C42 0%, #FF6B6B 100%);
+    box-shadow: 0 4px 20px rgba(255, 107, 107, 0.3);
+}
+
+.stats-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    transition: all 0.3s ease;
+}
+
+.stats-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+}
+
+.order-button {
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.order-button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+}
+
+.history-item {
+    transition: all 0.2s ease;
+    background-color: #FFF9F0;
+    border-left: 4px solid #FFD700;
+}
+
+.history-item:hover {
+    transform: translateX(-5px);
+    background-color: #FFF5E6;
+}
+
+.order-bubble {
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    font-weight: bold;
+    color: white;
+    z-index: 10;
+}
+
+.order-bubble:hover {
+    transform: scale(1.1);
+}
+
+.takeaway {
+    background-color: #FF7F50;
+    border: 3px solid #E66A3D;
+}
+
+.whatsapp {
+    background-color: #25D366;
+    border: 3px solid #1DA851;
+}
+
+.notification {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    width: 20px;
+    height: 20px;
+    background-color: #FF4444;
+    border-radius: 50%;
+    color: white;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+.modal {
+    animation: modalFadeIn 0.3s ease-out;
+}
+
+@keyframes modalFadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+} 
