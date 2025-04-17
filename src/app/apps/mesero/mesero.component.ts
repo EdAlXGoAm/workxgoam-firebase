@@ -186,6 +186,19 @@ export class MeseroComponent implements OnInit {
     this.tipoOrdenActual = tipo;
     this.formVisible = true;
     this.limpiarFormulario();
+    // Valores por defecto para testing rápido
+    this.clienteNombre = 'Cliente Demo';
+    this.ordenNotas = 'Nota de prueba';
+    this.ordenItems = ['Item A', 'Item B'];
+    this.ordenTotal = 42.00;
+
+    // Enfocar el botón Guardar para que al presionar Enter se dispare la acción por defecto
+    setTimeout(() => {
+      const guardarBtn = this.el.nativeElement.querySelector('button[type="submit"]');
+      if (guardarBtn) {
+        guardarBtn.focus();
+      }
+    }, 0);
   }
 
   abrirModalMesa(numeroMesa: number): void {
@@ -231,7 +244,19 @@ export class MeseroComponent implements OnInit {
             this.tipoOrdenActual = 'mesa';
             this.formVisible = true;
             this.limpiarFormulario();
+            // Valores por defecto para testing rápido
+            this.clienteNombre = 'Cliente Demo';
+            this.ordenNotas = 'Orden mesa de prueba';
+            this.ordenItems = ['Item 1', 'Item 2'];
+            this.ordenTotal = 99.99;
             this.cerrarDetallesOrden();
+            // Enfocar el botón Guardar para la nueva orden de mesa
+            setTimeout(() => {
+              const guardarBtn = this.el.nativeElement.querySelector('button[type="submit"]');
+              if (guardarBtn) {
+                guardarBtn.focus();
+              }
+            }, 0);
           });
         }
         
@@ -269,7 +294,7 @@ export class MeseroComponent implements OnInit {
       
       if (mesa.estado === 'ocupada') {
         contenido.innerHTML += `
-          <div class="grid grid-cols-2 gap-2">
+          <div class="grid grid-cols-3 gap-2">
             <button id="cobrarOrdenBtn" 
                     class="bg-[#25D366] hover:bg-[#1DA851] text-white py-2 px-4 rounded-full flex items-center justify-center order-button">
               <i class="fas fa-money-bill-wave mr-2"></i> Cobrar
@@ -278,6 +303,10 @@ export class MeseroComponent implements OnInit {
                     class="bg-[#FF6B6B] hover:bg-[#D35D5D] text-white py-2 px-4 rounded-full flex items-center justify-center order-button">
               <i class="fas fa-door-open mr-2"></i> Desocupar
             </button>
+            <button id="cancelarModalBtn" 
+                    class="bg-gray-400 hover:bg-gray-500 text-white py-2 px-4 rounded-full flex items-center justify-center order-button">
+              <i class="fas fa-times mr-2"></i> Cancelar
+            </button>
           </div>
         `;
         
@@ -285,6 +314,7 @@ export class MeseroComponent implements OnInit {
         setTimeout(() => {
           const cobrarOrdenBtn = this.el.nativeElement.querySelector('#cobrarOrdenBtn');
           const desocuparMesaBtn = this.el.nativeElement.querySelector('#desocuparMesaBtn');
+          const cancelarModalBtn = this.el.nativeElement.querySelector('#cancelarModalBtn');
           
           if (cobrarOrdenBtn && orden.id) {
             cobrarOrdenBtn.addEventListener('click', () => {
@@ -295,6 +325,12 @@ export class MeseroComponent implements OnInit {
           if (desocuparMesaBtn && orden.id) {
             desocuparMesaBtn.addEventListener('click', () => {
               this.desocuparMesa(orden.id!);
+            });
+          }
+          
+          if (cancelarModalBtn) {
+            cancelarModalBtn.addEventListener('click', () => {
+              this.cerrarDetallesOrden();
             });
           }
         }, 0);
@@ -416,7 +452,7 @@ export class MeseroComponent implements OnInit {
       fechaFormateada = orden.fecha.toDate().toLocaleString();
     }
     
-    // Construir el contenido del modal
+    // Construir el contenido del modal con acciones según estado
     contenido.innerHTML = `
       <h3 class="text-xl font-bold mb-4 text-${orden.tipo === 'llevar' ? '[#FF7F50]' : '[#25D366]'}">
         <i class="fas ${orden.tipo === 'llevar' ? 'fa-walking' : 'fa-whatsapp'} mr-2"></i>
@@ -430,10 +466,15 @@ export class MeseroComponent implements OnInit {
         <p class="text-gray-700"><span class="font-bold">Fecha:</span> ${fechaFormateada}</p>
       </div>
       <div class="grid grid-cols-2 gap-2">
-        <button onclick="document.querySelector('#completarOrden${orden.id}').click()" 
+        ${orden.estado === 'pendiente'
+          ? `<button id="cobrarVisible${orden.id}" onclick="document.querySelector('#cobrarOrden${orden.id}').click()"
+                class="bg-[#25D366] hover:bg-[#1DA851] text-white py-2 px-4 rounded-full flex items-center justify-center order-button">
+             <i class="fas fa-money-bill-wave mr-2"></i> Cobrar
+           </button>`
+          : `<button id="completarVisible${orden.id}" onclick="document.querySelector('#completarOrden${orden.id}').click()"
                 class="bg-[#4ECDC4] hover:bg-[#3AAFA9] text-white py-2 px-4 rounded-full flex items-center justify-center order-button">
-          <i class="fas fa-check mr-2"></i> Completar
-        </button>
+             <i class="fas fa-check mr-2"></i> Completar
+           </button>`}
         <button onclick="document.querySelector('#detallesOrdenModal').classList.add('hidden')" 
                 class="bg-gray-400 hover:bg-gray-500 text-white py-2 px-4 rounded-full order-button">
           <i class="fas fa-times mr-2"></i> Cerrar
@@ -441,7 +482,14 @@ export class MeseroComponent implements OnInit {
       </div>
     `;
     
-    // Crear un botón oculto para manejar la acción de completar
+    // Crear botones ocultos para manejar Cobrar y Completar
+    if (orden.estado === 'pendiente') {
+      const cobrarBtnHidden = document.createElement('button');
+      cobrarBtnHidden.id = `cobrarOrden${orden.id}`;
+      cobrarBtnHidden.style.display = 'none';
+      cobrarBtnHidden.addEventListener('click', () => this.marcarComoPagada(orden.id!));
+      this.el.nativeElement.appendChild(cobrarBtnHidden);
+    }
     const completarBtn = document.createElement('button');
     completarBtn.id = `completarOrden${orden.id}`;
     completarBtn.style.display = 'none';
@@ -450,6 +498,13 @@ export class MeseroComponent implements OnInit {
     
     // Mostrar el modal
     modal.classList.remove('hidden');
+    // Enfocar el botón Completar en el modal de WhatsApp
+    setTimeout(() => {
+      const completarVisible = this.el.nativeElement.querySelector(`#completarVisible${orden.id}`);
+      if (completarVisible) {
+        completarVisible.focus();
+      }
+    }, 0);
   }
 
   cerrarDetallesOrden(): void {
@@ -516,6 +571,18 @@ export class MeseroComponent implements OnInit {
       await deleteDoc(doc(this.firestore, 'ZonaYummyOrdenes', ordenId));
     } catch (error) {
       console.error('Error al eliminar la orden:', error);
+    }
+  }
+
+  // Agregar método para eliminar todas las órdenes del historial para debug
+  async eliminarTodasOrdenes(): Promise<void> {
+    try {
+      const deletes = this.historialOrdenes
+        .filter(o => o.id)
+        .map(o => deleteDoc(doc(this.firestore, 'ZonaYummyOrdenes', o.id!)));
+      await Promise.all(deletes);
+    } catch (error) {
+      console.error('Error al eliminar todas las órdenes del historial:', error);
     }
   }
 

@@ -1,6 +1,6 @@
 <div class="container mx-auto px-4 py-6">
     <!-- Encabezado -->
-    <div class="header text-white rounded-2xl p-6 mb-8 flex justify-between items-center">
+    <div class="header text-white rounded-2xl p-6 mb-8 flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
         <div>
             <h1 class="text-4xl font-bold">🍽️ Mesero App</h1>
             <p class="text-xl opacity-90">Gestión de Órdenes</p>
@@ -20,71 +20,105 @@
         </div>
     </div>
     
-    <div class="flex">
-        <!-- Área principal -->
-        <div class="game-container relative w-3/4 h-[32rem] rounded-xl">
-            <!-- Mesas -->
-            <div class="absolute top-1/4 left-1/4 cursor-pointer" (click)="abrirModalMesa(1)">
-                <img [src]="'assets/Apps/Mesero/Images/' + (mesas[0].estado === 'libre' ? 'MesaVerde.png' : mesas[0].estado === 'pagada' ? 'MesaRoja.png' : 'MesaNaranja.png')" alt="Mesa 1" class="w-24 h-24 object-contain" />
-                <div class="absolute inset-0 flex items-center justify-center font-bold text-[#8B4513] pointer-events-none">Mesa 1</div>
-            </div>
-            
-            <div class="absolute top-1/4 right-1/4 cursor-pointer" (click)="abrirModalMesa(2)">
-                <img [src]="'assets/Apps/Mesero/Images/' + (mesas[1].estado === 'libre' ? 'MesaVerde.png' : mesas[1].estado === 'pagada' ? 'MesaRoja.png' : 'MesaNaranja.png')" alt="Mesa 2" class="w-24 h-24 object-contain" />
-                <div class="absolute inset-0 flex items-center justify-center font-bold text-[#8B4513] pointer-events-none">Mesa 2</div>
-            </div>
-            
-            <div class="absolute bottom-1/4 left-1/4 cursor-pointer" (click)="abrirModalMesa(3)">
-                <img [src]="'assets/Apps/Mesero/Images/' + (mesas[2].estado === 'libre' ? 'MesaVerde.png' : mesas[2].estado === 'pagada' ? 'MesaRoja.png' : 'MesaNaranja.png')" alt="Mesa 3" class="w-24 h-24 object-contain" />
-                <div class="absolute inset-0 flex items-center justify-center font-bold text-[#8B4513] pointer-events-none">Mesa 3</div>
-            </div>
-            
-            <div class="absolute bottom-1/4 right-1/4 cursor-pointer" (click)="abrirModalMesa(4)">
-                <img [src]="'assets/Apps/Mesero/Images/' + (mesas[3].estado === 'libre' ? 'MesaVerde.png' : mesas[3].estado === 'pagada' ? 'MesaRoja.png' : 'MesaNaranja.png')" alt="Mesa 4" class="w-24 h-24 object-contain" />
-                <div class="absolute inset-0 flex items-center justify-center font-bold text-[#8B4513] pointer-events-none">Mesa 4</div>
-            </div>
-
-            <!-- Órdenes flotantes -->
-            <div id="order-bubbles">
-                <div *ngFor="let orden of ordenesLlevar" class="order-bubble takeaway" 
-                     [style.top.px]="20 + 100 * (ordenesLlevar.indexOf(orden) % 3)" 
-                     [style.left.px]="50 + 120 * (ordenesLlevar.indexOf(orden) % 4)"
-                     (click)="abrirDetallesOrden(orden)">
+    <div class="flex flex-col md:flex-row gap-4 mb-8">
+        <!-- Panel de órdenes fijo -->
+        <div class="w-full md:w-2/4 bg-white rounded-xl shadow-sm p-6">
+            <h3 class="text-lg font-bold mb-4 text-gray-800">Para Llevar</h3>
+            <div class="flex space-x-2 overflow-x-auto pb-2">
+                <div *ngFor="let orden of ordenesLlevar" (click)="abrirDetallesOrden(orden)" class="flex-shrink-0 w-12 h-12 rounded-full bg-[#FF7F50] border-2 border-[#E66A3D] text-white flex items-center justify-center cursor-pointer relative">
+                    <span class="notification">${{ orden.total | number:'1.0-0' }}</span>
                     #{{ orden.numeroOrden }}
+                </div>
+            </div>
+        </div>
+        <div class="w-full md:w-2/4 bg-white rounded-xl shadow-sm p-6">
+            <h3 class="text-lg font-bold mb-4 text-gray-800">WhatsApp</h3>
+            <div class="flex space-x-2 overflow-x-auto pb-2">
+                <div *ngFor="let orden of ordenesWhatsapp" (click)="abrirDetallesOrden(orden)" class="flex-shrink-0 w-12 h-12 rounded-full bg-[#25D366] border-2 border-[#1DA851] text-white flex items-center justify-center cursor-pointer relative">
+                    <span class="notification">${{ orden.total | number:'1.0-0' }}</span>
+                    #{{ orden.numeroOrden }}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="flex flex-col md:flex-row">
+        <!-- Área principal -->
+        <div class="game-container relative w-full md:w-3/4 h-64 md:h-[32rem] rounded-xl">
+            <!-- Mesas: layout absoluto en md+ -->
+            <div class="hidden md:block">
+                <div class="absolute top-1/4 left-1/4 cursor-pointer" (click)="abrirModalMesa(1)">
+                    <img [src]="'assets/Apps/Mesero/Images/' + (mesas[0].estado === 'libre' ? 'MesaVerde.png' : mesas[0].estado === 'ocupada' ? 'MesaRoja.png' : 'MesaNaranja.png')" alt="Mesa 1" class="w-24 h-24 object-contain" />
+                    <div class="absolute inset-0 flex items-center justify-center font-bold text-[#8B4513] pointer-events-none">Mesa 1</div>
+                    <span *ngIf="mesas[0].estado === 'ocupada' && mesas[0].orden" class="notification">${{ mesas[0].orden.total | number:'1.0-0' }}</span>
                 </div>
                 
-                <div *ngFor="let orden of ordenesWhatsapp" class="order-bubble whatsapp"
-                     [style.bottom.px]="20 + 100 * (ordenesWhatsapp.indexOf(orden) % 3)"
-                     [style.left.px]="240 + 120 * (ordenesWhatsapp.indexOf(orden) % 4)"
-                     (click)="abrirDetallesOrden(orden)">
-                    #{{ orden.numeroOrden }}
+                <div class="absolute top-1/4 right-1/4 cursor-pointer" (click)="abrirModalMesa(2)">
+                    <img [src]="'assets/Apps/Mesero/Images/' + (mesas[1].estado === 'libre' ? 'MesaVerde.png' : mesas[1].estado === 'ocupada' ? 'MesaRoja.png' : 'MesaNaranja.png')" alt="Mesa 2" class="w-24 h-24 object-contain" />
+                    <div class="absolute inset-0 flex items-center justify-center font-bold text-[#8B4513] pointer-events-none">Mesa 2</div>
+                    <span *ngIf="mesas[1].estado === 'ocupada' && mesas[1].orden" class="notification">${{ mesas[1].orden.total | number:'1.0-0' }}</span>
+                </div>
+                
+                <div class="absolute bottom-1/4 left-1/4 cursor-pointer" (click)="abrirModalMesa(3)">
+                    <img [src]="'assets/Apps/Mesero/Images/' + (mesas[2].estado === 'libre' ? 'MesaVerde.png' : mesas[2].estado === 'ocupada' ? 'MesaRoja.png' : 'MesaNaranja.png')" alt="Mesa 3" class="w-24 h-24 object-contain" />
+                    <div class="absolute inset-0 flex items-center justify-center font-bold text-[#8B4513] pointer-events-none">Mesa 3</div>
+                    <span *ngIf="mesas[2].estado === 'ocupada' && mesas[2].orden" class="notification">${{ mesas[2].orden.total | number:'1.0-0' }}</span>
+                </div>
+                
+                <div class="absolute bottom-1/4 right-1/4 cursor-pointer" (click)="abrirModalMesa(4)">
+                    <img [src]="'assets/Apps/Mesero/Images/' + (mesas[3].estado === 'libre' ? 'MesaVerde.png' : mesas[3].estado === 'ocupada' ? 'MesaRoja.png' : 'MesaNaranja.png')" alt="Mesa 4" class="w-24 h-24 object-contain" />
+                    <div class="absolute inset-0 flex items-center justify-center font-bold text-[#8B4513] pointer-events-none">Mesa 4</div>
+                    <span *ngIf="mesas[3].estado === 'ocupada' && mesas[3].orden" class="notification">${{ mesas[3].orden.total | number:'1.0-0' }}</span>
                 </div>
             </div>
-            
-            <!-- Elementos de restaurante -->
-            <div class="absolute bottom-4 left-4 w-32 h-12 bg-[#FF6B6B] rounded-md flex items-center justify-center border-2 border-[#D35D5D]">
-                <span class="font-bold text-white">🍳 Cocina</span>
-            </div>
-            <div class="absolute bottom-4 right-4 w-16 h-16 bg-[#4ECDC4] rounded-full flex items-center justify-center border-2 border-[#3AAFA9]">
-                <span class="font-bold text-white">💰 Caja</span>
+            <!-- Mesas: grid en móviles -->
+            <div class="grid grid-cols-2 gap-4 p-4 md:hidden">
+                <div class="flex flex-col items-center cursor-pointer" (click)="abrirModalMesa(1)">
+                    <img [src]="'assets/Apps/Mesero/Images/' + (mesas[0].estado === 'libre' ? 'MesaVerde.png' : mesas[0].estado === 'ocupada' ? 'MesaRoja.png' : 'MesaNaranja.png')" alt="Mesa 1" class="w-16 h-16 object-contain" />
+                    <span class="font-bold text-[#8B4513] mt-2">Mesa 1</span>
+                    <span *ngIf="mesas[0].estado === 'ocupada' && mesas[0].orden" class="notification">${{ mesas[0].orden.total | number:'1.0-0' }}</span>
+                </div>
+                <div class="flex flex-col items-center cursor-pointer" (click)="abrirModalMesa(2)">
+                    <img [src]="'assets/Apps/Mesero/Images/' + (mesas[1].estado === 'libre' ? 'MesaVerde.png' : mesas[1].estado === 'ocupada' ? 'MesaRoja.png' : 'MesaNaranja.png')" alt="Mesa 2" class="w-16 h-16 object-contain" />
+                    <span class="font-bold text-[#8B4513] mt-2">Mesa 2</span>
+                    <span *ngIf="mesas[1].estado === 'ocupada' && mesas[1].orden" class="notification">${{ mesas[1].orden.total | number:'1.0-0' }}</span>
+                </div>
+                <div class="flex flex-col items-center cursor-pointer" (click)="abrirModalMesa(3)">
+                    <img [src]="'assets/Apps/Mesero/Images/' + (mesas[2].estado === 'libre' ? 'MesaVerde.png' : mesas[2].estado === 'ocupada' ? 'MesaRoja.png' : 'MesaNaranja.png')" alt="Mesa 3" class="w-16 h-16 object-contain" />
+                    <span class="font-bold text-[#8B4513] mt-2">Mesa 3</span>
+                    <span *ngIf="mesas[2].estado === 'ocupada' && mesas[2].orden" class="notification">${{ mesas[2].orden.total | number:'1.0-0' }}</span>
+                </div>
+                <div class="flex flex-col items-center cursor-pointer" (click)="abrirModalMesa(4)">
+                    <img [src]="'assets/Apps/Mesero/Images/' + (mesas[3].estado === 'libre' ? 'MesaVerde.png' : mesas[3].estado === 'ocupada' ? 'MesaRoja.png' : 'MesaNaranja.png')" alt="Mesa 4" class="w-16 h-16 object-contain" />
+                    <span class="font-bold text-[#8B4513] mt-2">Mesa 4</span>
+                    <span *ngIf="mesas[3].estado === 'ocupada' && mesas[3].orden" class="notification">${{ mesas[3].orden.total | number:'1.0-0' }}</span>
+                </div>
             </div>
         </div>
         
         <!-- Historial lateral -->
-        <div class="w-1/4 ml-4 bg-white rounded-xl p-4 shadow-lg overflow-y-auto" style="max-height: 32rem;">
+        <div class="w-full md:w-1/4 bg-white rounded-xl p-4 shadow-lg overflow-y-auto max-h-64 md:max-h-[32rem]">
             <h2 class="text-xl font-bold mb-4 text-[#FF8C42] border-b border-[#FFD700] pb-2 flex items-center">
                 <i class="fas fa-history mr-2"></i> HISTORIAL
             </h2>
+            <button *ngIf="historialOrdenes.length > 0" (click)="eliminarTodasOrdenes(); $event.stopPropagation()" class="text-red-500 hover:text-red-700 mb-4 flex items-center">
+                <i class="fas fa-trash-alt mr-1"></i> Eliminar todas
+            </button>
             <div *ngIf="historialOrdenes.length === 0" class="text-center text-gray-400 py-4">
                 <i class="fas fa-clipboard-list text-3xl mb-2"></i>
                 <p>Aquí aparecerán los pedidos completados</p>
             </div>
-            <div *ngFor="let orden of historialOrdenes" class="history-item bg-white p-3 rounded-lg cursor-pointer mb-2 shadow-sm">
+            <div *ngFor="let orden of historialOrdenes" class="history-item relative bg-white p-3 rounded-lg cursor-pointer mb-2 shadow-sm">
                 <div class="flex justify-between items-center">
                     <span class="font-bold text-[#FF8C42]">
                         {{ orden.tipo === 'mesa' ? 'Mesa ' + orden.numeroMesa : orden.tipo === 'llevar' ? 'Para llevar' : 'WhatsApp' }} #{{ orden.numeroOrden }}
                     </span>
-                    <span class="text-xs text-gray-500">{{ formatearFecha(orden.fecha) }}</span>
+                    <div class="flex items-center">
+                        <span class="text-xs text-gray-500">{{ formatearFecha(orden.fecha) }}</span>
+                        <button (click)="eliminarOrden(orden.id!); $event.stopPropagation()" class="ml-2 text-red-500 hover:text-red-700">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="text-sm mt-1">
                     <p class="text-gray-700"><span class="font-bold">Cliente:</span> {{ orden.cliente }}</p>
@@ -97,7 +131,7 @@
     </div>
     
     <!-- Estadísticas -->
-    <div class="mt-8 grid grid-cols-4 gap-4">
+    <div class="mt-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <div class="stats-card p-4 text-center">
             <div class="text-2xl font-bold text-[#FF8C42]">${{ totalGanancias.toFixed(2) }}</div>
             <div class="text-gray-600">Ganancias</div>
@@ -132,7 +166,7 @@
 
 <!-- Modal para crear/editar orden -->
 <div *ngIf="formVisible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-xl p-6 w-96 modal border-4" 
+    <div class="bg-white rounded-xl p-6 w-11/12 sm:w-96 modal border-4" 
          [ngClass]="{
             'border-[#FF7F50]': tipoOrdenActual === 'llevar',
             'border-[#25D366]': tipoOrdenActual === 'whatsapp',
@@ -207,7 +241,7 @@
 
 <!-- Modal para detalles de orden -->
 <div id="detallesOrdenModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
-    <div class="bg-white rounded-xl p-6 w-96 modal border-4" id="modalBorde">
+    <div class="bg-white rounded-xl p-6 w-11/12 sm:w-96 modal border-4" id="modalBorde">
         <div id="detallesOrdenContent">
             <!-- Contenido dinámico -->
         </div>
