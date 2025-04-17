@@ -8,11 +8,8 @@ body {
 .game-container {
     perspective: 1000px;
     transform-style: preserve-3d;
-    background-color: #F8E8CC;
-    background-image: 
-        linear-gradient(#E3C9A8 1px, transparent 1px),
-        linear-gradient(90deg, #E3C9A8 1px, transparent 1px);
-    background-size: 40px 40px;
+    background-color: #fafafa;
+    background-image: none;
     border: 8px solid #D4A76A;
     box-shadow: 0 10px 30px rgba(0,0,0,0.1);
 }
