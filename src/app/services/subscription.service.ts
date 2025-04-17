@@ -9,7 +9,8 @@ import {
   updateDoc, 
   query, 
   where, 
-  getDocs 
+  getDocs, 
+  getDoc 
 } from '@angular/fire/firestore';
 import { Observable, from, map, of, switchMap } from 'rxjs';
 import { AuthService } from './auth.service';
@@ -17,6 +18,7 @@ import { AuthService } from './auth.service';
 export interface Subscription {
   id?: string;
   name: string;
+  emoji?: string;
   cost: number;
   costMXN: number;
   costUSD: number;
@@ -102,31 +104,33 @@ export class SubscriptionService {
 
     const updateData: Partial<Subscription> = { ...subscription };
     
-    // Si se actualiza el costo o la moneda, recalcular los valores
-    if (subscription.cost !== undefined || subscription.currency !== undefined) {
-      // Obtener la suscripción actual para tener todos los datos
-      const subscriptionRef = doc(this.firestore, 'subscriptions', id);
-      const subscriptionSnap = await getDocs(query(
-        collection(this.firestore, 'subscriptions'),
-        where('id', '==', id),
-        where('userId', '==', user.uid)
-      ));
-      
-      if (subscriptionSnap.empty) {
-        console.error('No se encontró la suscripción o no pertenece al usuario');
-        return false;
+    try {
+      // Si se actualiza el costo o la moneda, recalcular los valores
+      if (subscription.cost !== undefined || subscription.currency !== undefined) {
+        // Obtener la suscripción actual para tener todos los datos
+        const subscriptionDoc = await getDoc(doc(this.firestore, 'subscriptions', id));
+        
+        if (!subscriptionDoc.exists()) {
+          console.error('No se encontró la suscripción');
+          return false;
+        }
+        
+        const currentSub = subscriptionDoc.data() as Subscription;
+        
+        // Verificar que la suscripción pertenece al usuario
+        if (currentSub.userId !== user.uid) {
+          console.error('La suscripción no pertenece al usuario');
+          return false;
+        }
+        
+        const cost = subscription.cost !== undefined ? subscription.cost : currentSub.cost;
+        const currency = subscription.currency !== undefined ? subscription.currency : currentSub.currency;
+        
+        // Calcular los valores en ambas monedas
+        updateData.costMXN = currency === 'USD' ? cost * this.EXCHANGE_RATE : cost;
+        updateData.costUSD = currency === 'MXN' ? cost / this.EXCHANGE_RATE : cost;
       }
       
-      const currentSub = subscriptionSnap.docs[0].data() as Subscription;
-      const cost = subscription.cost !== undefined ? subscription.cost : currentSub.cost;
-      const currency = subscription.currency !== undefined ? subscription.currency : currentSub.currency;
-      
-      // Calcular los valores en ambas monedas
-      updateData.costMXN = currency === 'USD' ? cost * this.EXCHANGE_RATE : cost;
-      updateData.costUSD = currency === 'MXN' ? cost / this.EXCHANGE_RATE : cost;
-    }
-    
-    try {
       await updateDoc(doc(this.firestore, 'subscriptions', id), updateData);
       return true;
     } catch (error) {

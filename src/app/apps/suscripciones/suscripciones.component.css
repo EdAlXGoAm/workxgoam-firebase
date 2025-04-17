@@ -36,9 +36,24 @@
   content: "➕";
 }
 
+.fa-expand:before {
+  content: "🔍";
+}
+
+.fa-compress:before {
+  content: "🔍";
+}
+
 .calendar-day {
     min-height: 120px;
     transition: all 0.2s ease;
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+.calendar-day.expanded {
+    max-height: none;
+    height: auto;
 }
 
 .calendar-day:hover {
@@ -96,4 +111,62 @@
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
+}
+
+/* Estilos para el selector de emojis */
+.emoji-button {
+    transition: all 0.2s ease;
+    min-width: 50px;
+}
+
+.emoji-button:hover {
+    background-color: #f3f4f6;
+}
+
+.emoji-picker {
+    max-height: 220px;
+    overflow-y: auto;
+    animation: fadeIn 0.2s ease-in;
+}
+
+.emoji-option {
+    font-size: 24px;
+    transition: all 0.2s ease;
+}
+
+.emoji-option:hover {
+    transform: scale(1.1);
+    background-color: #f3f4f6;
+}
+
+.emoji {
+    font-size: 1.2em;
+    line-height: 1;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.category-header {
+    position: sticky;
+    top: 0;
+    background-color: rgba(249, 250, 251, 0.8);
+    backdrop-filter: blur(5px);
+    z-index: 10;
+    border-radius: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: #6b7280;
+}
+
+.delete-button {
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.subscription-item:hover .delete-button {
+    opacity: 1;
 } 

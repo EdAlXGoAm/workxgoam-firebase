@@ -18,21 +18,40 @@ export class SuscripcionesComponent implements OnInit, OnDestroy {
   monthNames: string[] = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
                           "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
   calendarDays: any[] = [];
+  expandedCalendarView: boolean = false; // Variable para controlar la altura expandida del calendario
   
   // Variables para la gestión de suscripciones
   subscriptions: Subscription[] = [];
   isEditing: boolean = false;
   currentEditId: string | null = null;
   showConfirmModal: boolean = false;
+  showDeleteModal: boolean = false;
+  subscriptionToDelete: string | null = null;
   isLoading: boolean = true;
+  
+  // Variables para el ordenamiento de suscripciones
+  sortCriteria: string = 'alphabetical'; // 'start_date', 'end_date', 'alphabetical'
+  groupByCategory: boolean = true;
+  sortedSubscriptions: Subscription[] = [];
 
   // Para limpiar suscripciones cuando se destruye el componente
   private destroy$ = new Subject<void>();
+  
+  // Lista de emojis disponibles
+  availableEmojis: string[] = [
+    '📱', '💻', '🎮', '🎬', '🎵', '📺', '📚', '🏋️', '🎨', '🎲', 
+    '☁️', '📝', '🎓', '🔍', '🛍️', '🏠', '🍿', '🎧', '📰', '📷',
+    '🎭', '🚗', '✈️', '🏦', '💼', '🛒', '🎟️', '🍔', '☕', '🍕'
+  ];
+  
+  // Variable para controlar la visibilidad del selector de emojis
+  showEmojiPicker: boolean = false;
   
   // Formulario para suscripción
   subscriptionForm = {
     id: null as string | null,
     name: '',
+    emoji: '📱', // Emoji por defecto
     cost: 0,
     currency: 'MXN',
     startDate: '',
@@ -58,6 +77,7 @@ export class SuscripcionesComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(subs => {
         this.subscriptions = subs;
+        this.sortSubscriptions();
         this.isLoading = false;
         this.updateCalendar();
         this.updateSummary();
@@ -68,6 +88,17 @@ export class SuscripcionesComponent implements OnInit, OnDestroy {
     // Limpieza al destruir el componente
     this.destroy$.next();
     this.destroy$.complete();
+  }
+  
+  // Método para seleccionar un emoji
+  selectEmoji(emoji: string): void {
+    this.subscriptionForm.emoji = emoji;
+    this.showEmojiPicker = false;
+  }
+  
+  // Método para mostrar/ocultar el selector de emojis
+  toggleEmojiPicker(): void {
+    this.showEmojiPicker = !this.showEmojiPicker;
   }
   
   // Métodos para el manejo del calendario
@@ -147,8 +178,12 @@ export class SuscripcionesComponent implements OnInit, OnDestroy {
     return this.subscriptions.filter(sub => {
       // Si es recurrente, verificar si es el mismo día del mes
       if (sub.isRecurring) {
-        const startDate = new Date(this.normalizeDate(sub.startDate));
-        return startDate.getDate() === dayOfMonth;
+        // Crear fecha usando UTC para evitar problemas de zona horaria
+        const parts = this.normalizeDate(sub.startDate).split('-').map(part => parseInt(part, 10));
+        // Usamos UTC para evitar desplazamiento por zona horaria
+        const startDateUTC = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+        // Comparamos el día en UTC para mantener consistencia
+        return startDateUTC.getUTCDate() === dayOfMonth;
       }
       
       // Para suscripciones no recurrentes
@@ -193,6 +228,7 @@ export class SuscripcionesComponent implements OnInit, OnDestroy {
       // Editar suscripción existente
       const updateData = {
         name: this.subscriptionForm.name,
+        emoji: this.subscriptionForm.emoji,
         cost: this.subscriptionForm.cost,
         currency: this.subscriptionForm.currency,
         startDate: this.subscriptionForm.startDate,
@@ -207,6 +243,7 @@ export class SuscripcionesComponent implements OnInit, OnDestroy {
       if (success) {
         this.showNotification('Suscripción actualizada correctamente', 'success');
         this.resetForm();
+        this.sortSubscriptions();
       } else {
         this.showNotification('Error al actualizar la suscripción', 'error');
       }
@@ -214,6 +251,7 @@ export class SuscripcionesComponent implements OnInit, OnDestroy {
       // Añadir nueva suscripción
       const newSubscription = {
         name: this.subscriptionForm.name,
+        emoji: this.subscriptionForm.emoji,
         cost: this.subscriptionForm.cost,
         costMXN: 0, // Se calcula en el servicio
         costUSD: 0, // Se calcula en el servicio
@@ -231,6 +269,7 @@ export class SuscripcionesComponent implements OnInit, OnDestroy {
       if (id) {
         this.showNotification('Suscripción agregada correctamente', 'success');
         this.resetForm();
+        this.sortSubscriptions();
       } else {
         this.showNotification('Error al añadir la suscripción', 'error');
       }
@@ -247,6 +286,8 @@ export class SuscripcionesComponent implements OnInit, OnDestroy {
     this.subscriptionForm = {
       id: subscription.id || null,
       name: subscription.name,
+      
+      emoji: subscription.emoji || '📱', // Usar emoji actual o el predeterminado si no existe
       cost: subscription.cost,
       currency: subscription.currency,
       startDate: subscription.startDate,
@@ -257,6 +298,11 @@ export class SuscripcionesComponent implements OnInit, OnDestroy {
   }
   
   async deleteSubscription(id: string): Promise<void> {
+    this.subscriptionToDelete = id;
+    this.showDeleteModal = true;
+  }
+  
+  async confirmDeleteSubscription(id: string): Promise<void> {
     const success = await this.subscriptionService.deleteSubscription(id);
     
     if (success) {
@@ -266,18 +312,27 @@ export class SuscripcionesComponent implements OnInit, OnDestroy {
       if (this.isEditing && this.currentEditId === id) {
         this.resetForm();
       }
+      
+      this.sortSubscriptions();
     } else {
       this.showNotification('Error al eliminar la suscripción', 'error');
     }
   }
   
+  cancelDeleteSubscription(): void {
+    this.showDeleteModal = false;
+    this.subscriptionToDelete = null;
+  }
+  
   resetForm(): void {
     this.isEditing = false;
     this.currentEditId = null;
+    this.showEmojiPicker = false;
     
     this.subscriptionForm = {
       id: null,
       name: '',
+      emoji: '📱',
       cost: 0,
       currency: 'MXN',
       startDate: '',
@@ -297,6 +352,7 @@ export class SuscripcionesComponent implements OnInit, OnDestroy {
     if (success) {
       this.showConfirmModal = false;
       this.showNotification('Todas las suscripciones han sido eliminadas', 'warning');
+      this.sortSubscriptions();
     } else {
       this.showNotification('Error al eliminar las suscripciones', 'error');
     }
@@ -323,8 +379,11 @@ export class SuscripcionesComponent implements OnInit, OnDestroy {
   }
   
   formatDisplayDate(dateString: string): string {
-    const date = new Date(dateString);
-    return `${date.getDate()} ${this.monthNames[date.getMonth()]} ${date.getFullYear()}`;
+    // Usamos el mismo enfoque de parsing con UTC para evitar problemas de zona horaria
+    const parts = this.normalizeDate(dateString).split('-').map(part => parseInt(part, 10));
+    // Usamos UTC para garantizar que no haya desplazamiento por zona horaria
+    const dateUTC = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+    return `${dateUTC.getUTCDate()} ${this.monthNames[dateUTC.getUTCMonth()]} ${dateUTC.getUTCFullYear()}`;
   }
   
   getCategory(serviceName: string): string {
@@ -352,9 +411,111 @@ export class SuscripcionesComponent implements OnInit, OnDestroy {
     this.activeTab = tab;
   }
   
+  // Método para alternar la vista expandida del calendario
+  toggleCalendarHeight(): void {
+    this.expandedCalendarView = !this.expandedCalendarView;
+  }
+  
   // Notificaciones temporales (simuladas por ahora)
   showNotification(message: string, type: string): void {
     console.log(`[${type}] ${message}`);
     // Aquí podrías implementar una notificación real
+  }
+
+  // Métodos para ordenamiento de suscripciones
+  sortSubscriptions(): void {
+    // Primero hacemos una copia para no modificar el array original
+    let sorted = [...this.subscriptions];
+    
+    // Aplicar criterio de ordenamiento
+    if (this.sortCriteria === 'start_date') {
+      sorted = this.sortByStartDate(sorted);
+    } else if (this.sortCriteria === 'end_date') {
+      sorted = this.sortByEndDate(sorted);
+    } else {
+      // Por defecto, ordenamiento alfabético
+      sorted = this.sortAlphabetically(sorted);
+    }
+    
+    // Si está activado el agrupamiento por categorías
+    if (this.groupByCategory) {
+      sorted = this.groupSubscriptionsByCategory(sorted);
+    }
+    
+    this.sortedSubscriptions = sorted;
+  }
+  
+  // Ordenar alfabéticamente por nombre
+  sortAlphabetically(subscriptions: Subscription[]): Subscription[] {
+    return subscriptions.sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+  }
+  
+  // Ordenar por fecha de inicio (más reciente primero)
+  sortByStartDate(subscriptions: Subscription[]): Subscription[] {
+    return subscriptions.sort((a, b) => {
+      const dateA = new Date(this.normalizeDate(a.startDate));
+      const dateB = new Date(this.normalizeDate(b.startDate));
+      return dateB.getTime() - dateA.getTime();
+    });
+  }
+  
+  // Ordenar por fecha de término (más reciente primero)
+  sortByEndDate(subscriptions: Subscription[]): Subscription[] {
+    return subscriptions.sort((a, b) => {
+      // Si no hay fecha de término, considerarla como fecha muy lejana
+      const dateA = a.endDate ? new Date(this.normalizeDate(a.endDate)) : new Date(8640000000000000);
+      const dateB = b.endDate ? new Date(this.normalizeDate(b.endDate)) : new Date(8640000000000000);
+      return dateB.getTime() - dateA.getTime();
+    });
+  }
+  
+  // Agrupar por categoría y luego aplicar el ordenamiento dentro de cada grupo
+  groupSubscriptionsByCategory(subscriptions: Subscription[]): Subscription[] {
+    // Orden de categorías
+    const categoryOrder = ['entertainment', 'productivity', 'education', 'tools', 'other'];
+    
+    // Crear un mapa de suscripciones por categoría
+    const subscriptionsByCategory = new Map<string, Subscription[]>();
+    
+    // Inicializar el mapa con arrays vacíos para cada categoría
+    categoryOrder.forEach(category => {
+      subscriptionsByCategory.set(category, []);
+    });
+    
+    // Agrupar suscripciones por categoría
+    subscriptions.forEach(sub => {
+      const category = sub.category || 'other';
+      const categorySubscriptions = subscriptionsByCategory.get(category) || [];
+      categorySubscriptions.push(sub);
+      subscriptionsByCategory.set(category, categorySubscriptions);
+    });
+    
+    // Unir todos los grupos en un solo array en el orden de categorías
+    const result: Subscription[] = [];
+    categoryOrder.forEach(category => {
+      const categorySubscriptions = subscriptionsByCategory.get(category) || [];
+      if (categorySubscriptions.length > 0) {
+        result.push(...categorySubscriptions);
+      }
+    });
+    
+    return result;
+  }
+  
+  // Cambia el criterio de ordenamiento
+  setSortCriteria(criteria: string): void {
+    this.sortCriteria = criteria;
+    this.sortSubscriptions();
+  }
+  
+  // Para manejar el evento change del select
+  handleSortCriteriaChange(event: any): void {
+    this.setSortCriteria(event.target.value);
+  }
+  
+  // Cambia si se agrupan por categoría
+  toggleGroupByCategory(): void {
+    this.groupByCategory = !this.groupByCategory;
+    this.sortSubscriptions();
   }
 } 
