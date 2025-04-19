@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CostCalculationService, CostItem, CostCalculation } from '../../services/cost-calculation.service';
 import Chart from 'chart.js/auto';
+import { IngredientService, Ingredient } from '../../services/ingredient.service';
 import { Storage, ref, uploadString, getDownloadURL } from '@angular/fire/storage';
 
 @Component({
@@ -13,9 +14,11 @@ import { Storage, ref, uploadString, getDownloadURL } from '@angular/fire/storag
   styles: []
 })
 export class CalculadoraComponent implements OnInit, AfterViewInit {
+  // Ingredientes
+  ingredients: Ingredient[] = [];
+  selectedIngredients: { ingredientId: string; quantity: number }[] = [];
   // ID del cálculo actualmente cargado (null si es nuevo)
   currentLoadedId: string | null = null;
-
   // Lista de cálculos guardados
   savedCalculations: CostCalculation[] = [];
   // Costos
@@ -57,18 +60,31 @@ export class CalculadoraComponent implements OnInit, AfterViewInit {
   currentImageIndex = 0;
   modalVisible = false;
 
+  // Editable ingredient
+  editingIngredientId: string | null = null;
+  newIngredient: Omit<Ingredient, 'id'> = { name: '', unit: '', packageSize: 1, unitValue: 0 };
+
+  // Estado de modal de ingredientes
+  openIngModal = false;
+
+  /** Ingredientes ordenados alfabéticamente por nombre */
+  get sortedIngredients(): Ingredient[] {
+    return [...this.ingredients].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
   constructor(
     private calcService: CostCalculationService,
-    private storage: Storage
+    private storage: Storage,
+    private ingredientService: IngredientService
   ) {}
 
   ngOnInit(): void {
-    // Agregar item inicial
+    // Inicialización básica
     this.addCostWithoutProfit();
     this.addCostWithProfit();
-    // Suscripción a cálculos guardados
-    this.calcService.getCalculations()
-      .subscribe(calcs => this.savedCalculations = calcs);
+    this.calcService.getCalculations().subscribe(calcs => this.savedCalculations = calcs);
+    // Cargar lista de ingredientes
+    this.ingredientService.getIngredients().subscribe(list => this.ingredients = list);
   }
 
   ngAfterViewInit(): void {
@@ -126,6 +142,10 @@ export class CalculadoraComponent implements OnInit, AfterViewInit {
   calculatePrices(): void {
     // Basado en la lógica original, simplificado
     let totalWithoutProfit = this.sumCosts(this.costsWithoutProfit);
+    // Sumar costo de ingredientes seleccionados
+    const ingredientCost = this.sumIngredientsCost();
+    totalWithoutProfit += ingredientCost;
+
     let totalWithProfit = this.sumCosts(this.costsWithProfit);
 
     let laborH = 0;
@@ -309,10 +329,10 @@ export class CalculadoraComponent implements OnInit, AfterViewInit {
     this.publicFactorChart.update();
   }
 
-  // Guardar cálculo
+  // Guardar cálculo (subida a Storage, luego URLs a Firestore)
   async saveCalculation(): Promise<void> {
-    // Preparo el objeto sin imágenes (para no exceder el límite)
-    const calcBase: Omit<CostCalculation, 'id' | 'userId' | 'createdAt'> = {
+    // Preparo el objeto sin imágenes
+    const calcBase = {
       title: this.calculationTitle,
       links: this.calculationLinksText.split('\n').filter(l => l.trim() !== ''),
       costsWithoutProfit: this.costsWithoutProfit,
@@ -323,17 +343,16 @@ export class CalculadoraComponent implements OnInit, AfterViewInit {
       forcePublicFactor: this.forcePublicFactor,
       merchantRounding: this.merchantRounding,
       publicRounding: this.publicRounding,
-      images: []
+      images: [],
+      selectedIngredients: this.selectedIngredients
     };
-
-    // Paso 1: crear documento Firestore sin imágenes
+    // Crear documento sin imágenes
     const id = await this.calcService.addCalculation(calcBase);
     if (!id) {
       alert('No se pudo guardar el cálculo');
       return;
     }
-
-    // Paso 2: subir cada imagen a Storage y recopilar URLs
+    // Subir cada imagen a Storage y recopilar URLs
     const imageUrls: string[] = [];
     for (let i = 0; i < this.images.length; i++) {
       const dataUrl = this.images[i];
@@ -347,14 +366,14 @@ export class CalculadoraComponent implements OnInit, AfterViewInit {
         console.error('Error subiendo imagen', e);
       }
     }
-
-    // Paso 3: actualizar Firestore con URLs de las imágenes
+    // Actualizar Firestore con URLs de las imágenes
     const success = await this.calcService.updateCalculation(id, { images: imageUrls });
     if (success) {
+      console.log('Imágenes guardadas en Storage y URLs actualizadas en Firestore');
       alert('Cálculo guardado correctamente');
       this.currentLoadedId = null;
     } else {
-      alert('Error al actualizar imágenes en Firestore');
+      alert('Error actualizando URLs de imágenes en Firestore');
     }
   }
 
@@ -410,6 +429,7 @@ export class CalculadoraComponent implements OnInit, AfterViewInit {
     this.merchantRounding = calc.merchantRounding;
     this.publicRounding = calc.publicRounding;
     this.images = [...calc.images, '', '', ''].slice(0, 3) as (string|null)[];
+    this.selectedIngredients = calc.selectedIngredients || [];
     this.calculatePrices();
   }
 
@@ -424,12 +444,10 @@ export class CalculadoraComponent implements OnInit, AfterViewInit {
       });
   }
 
-  // Editar (sobreescribir) el cálculo existente
+  // Editar (sobreescribir) el cálculo actualmente cargado
   async editCalculation(): Promise<void> {
     if (!this.currentLoadedId) return;
-
-    // Paso 1: actualizar campos base sin imágenes
-    const calcUpdate: Omit<CostCalculation, 'id' | 'userId' | 'createdAt'> = {
+    const calculation = {
       title: this.calculationTitle,
       links: this.calculationLinksText.split('\n').filter(l => l.trim() !== ''),
       costsWithoutProfit: this.costsWithoutProfit,
@@ -440,35 +458,112 @@ export class CalculadoraComponent implements OnInit, AfterViewInit {
       forcePublicFactor: this.forcePublicFactor,
       merchantRounding: this.merchantRounding,
       publicRounding: this.publicRounding,
-      images: []
+      images: this.images.filter(img => img !== null) as string[],
+      selectedIngredients: this.selectedIngredients
     };
-    const baseSuccess = await this.calcService.updateCalculation(this.currentLoadedId, calcUpdate);
-    if (!baseSuccess) {
-      alert('No se pudo actualizar el cálculo');
-      return;
-    }
-
-    // Paso 2: subir nuevas imágenes de ser necesario
-    const imageUrls: string[] = [];
-    for (let i = 0; i < this.images.length; i++) {
-      const dataUrl = this.images[i];
-      if (!dataUrl) continue;
-      try {
-        const storageRef = ref(this.storage, `calculations/${this.currentLoadedId}/${i}`);
-        await uploadString(storageRef, dataUrl, 'data_url');
-        const url = await getDownloadURL(storageRef);
-        imageUrls.push(url);
-      } catch (e) {
-        console.error('Error subiendo imagen', e);
-      }
-    }
-
-    // Paso 3: actualizar Firestore con URLs finales
-    const editSuccess = await this.calcService.updateCalculation(this.currentLoadedId, { images: imageUrls });
-    if (editSuccess) {
+    const success = await this.calcService.updateCalculation(this.currentLoadedId, calculation);
+    if (success) {
       alert('Cálculo actualizado correctamente');
     } else {
-      alert('Error al actualizar imágenes en Firestore');
+      alert('No se pudo actualizar el cálculo');
     }
+    // Mantener currentLoadedId para futuras ediciones o limpiarlo si prefieres
+  }
+
+  // Métodos de gestión de ingredientes
+  addIngredient(): void {
+    this.selectedIngredients.push({ ingredientId: '', quantity: 1 });
+  }
+
+  removeIngredient(index: number): void {
+    this.selectedIngredients.splice(index, 1);
+  }
+
+  // Cálculo de costo por ingrediente
+  getIngredientCost(sel: { ingredientId: string; quantity: number }): number {
+    const ing = this.ingredients.find(i => i.id === sel.ingredientId);
+    if (!ing) return 0;
+    // costo unitario por unidad = unitValue / packageSize
+    const costPerUnit = ing.unitValue / ing.packageSize;
+    return costPerUnit * sel.quantity;
+  }
+
+  // Suma total de ingredientes
+  sumIngredientsCost(): number {
+    return this.selectedIngredients.reduce((sum, sel) => sum + this.getIngredientCost(sel), 0);
+  }
+
+  // Obtiene la unidad de un ingrediente por su ID
+  getIngredientUnit(ingredientId: string | undefined): string {
+    const ing = this.ingredients.find(i => i.id === ingredientId);
+    return ing?.unit || '';
+  }
+
+  /** Devuelve el ingrediente completo según su id */
+  getIngredientById(id: string | undefined): Ingredient | undefined {
+    return this.ingredients.find(i => i.id === id);
+  }
+
+  // Seleccionar un ingrediente para editar en la gestión
+  selectIngredient(ing: Ingredient): void {
+    this.editingIngredientId = ing.id ?? null;
+    this.newIngredient = { name: ing.name, unit: ing.unit, packageSize: ing.packageSize, unitValue: ing.unitValue };
+  }
+
+  // Abrir modal de gestión
+  openIngredientsModal(): void {
+    this.editingIngredientId = null;
+    this.newIngredient = { name: '', unit: '', packageSize: 1, unitValue: 0 };
+    this.openIngModal = true;
+  }
+
+  closeIngredientsModal(): void {
+    this.openIngModal = false;
+  }
+
+  // Guardar o actualizar ingrediente
+  async saveIngredient(): Promise<void> {
+    if (this.editingIngredientId) {
+      const success = await this.ingredientService.updateIngredient(this.editingIngredientId, this.newIngredient);
+      if (!success) alert('Error al actualizar ingrediente');
+    } else {
+      const id = await this.ingredientService.addIngredient(this.newIngredient);
+      if (!id) alert('Error al añadir ingrediente');
+    }
+    // recargar lista
+    this.ingredientService.getIngredients().subscribe(list => this.ingredients = list);
+    this.closeIngredientsModal();
+  }
+
+  // Eliminar ingrediente
+  async deleteIngredientFromModal(id: string): Promise<void> {
+    const confirmed = confirm('¿Eliminar ingrediente?');
+    if (!confirmed) return;
+    const success = await this.ingredientService.deleteIngredient(id);
+    if (!success) alert('Error al eliminar ingrediente');
+    this.ingredientService.getIngredients().subscribe(list => this.ingredients = list);
+  }
+
+  // Cargar ingrediente en formulario
+  editIngredient(ing: Ingredient): void {
+    this.editingIngredientId = ing.id || null;
+    this.newIngredient = { name: ing.name, unit: ing.unit, packageSize: ing.packageSize, unitValue: ing.unitValue };
+    this.openIngModal = true;
+  }
+
+  // Pegar desde Excel (tab-separated)
+  pasteIngredients(event: ClipboardEvent): void {
+    const text = event.clipboardData?.getData('text') || '';
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l);
+    lines.forEach(async line => {
+      // Solo dividir por tabulaciones para respetar espacios en el nombre
+      const parts = line.split('\t').map(p => p.trim());
+      if (parts.length < 4) return;
+      const [name, unit, pkg, val] = parts;
+      const packageSize = parseFloat(pkg.replace(',', '.'));
+      const unitValue = parseFloat(val.replace(/[^0-9.,-]+/g, '').replace(',', '.'));
+      await this.ingredientService.addIngredient({ name, unit, packageSize, unitValue });
+    });
+    setTimeout(() => this.ingredientService.getIngredients().subscribe(list => this.ingredients = list), 500);
   }
 } 

@@ -37,6 +37,7 @@ export interface CostCalculation {
   merchantRounding: string;
   publicRounding: string;
   images: string[]; // dataURL base64 de máximo 3 imágenes
+  selectedIngredients: { ingredientId: string; quantity: number }[];
   userId: string; // uid del usuario
   createdAt: number; // timestamp en milisegundos
 }
