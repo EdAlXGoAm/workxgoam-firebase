@@ -253,35 +253,6 @@
       <h3 class="text-xl font-bold">Gestión de Ingredientes</h3>
       <button (click)="closeIngredientsModal()" class="text-gray-500 hover:text-gray-700">✕</button>
     </div>
-    <!-- Área para pegar tabla de Excel -->
-    <div class="mb-4">
-      <label class="block text-sm font-medium text-gray-700 mb-1">Pega la tabla de Excel aquí:</label>
-      <textarea rows="4" (paste)="pasteIngredients($event)" placeholder="Nombre\tUnidad\tTamaño\tValor" class="w-full px-2 py-2 border-2 border-dashed border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
-    </div>
-    <!-- Tabla de Ingredientes -->
-    <table class="w-full mb-4 border-collapse">
-      <thead>
-        <tr>
-          <th class="border-b px-2 py-1 text-left">Nombre</th>
-          <th class="border-b px-2 py-1 text-left">Unidad</th>
-          <th class="border-b px-2 py-1 text-right">Tamaño Empaque</th>
-          <th class="border-b px-2 py-1 text-right">Valor Unitario</th>
-          <th class="border-b px-2 py-1">Acciones</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let ing of ingredients">
-          <td class="px-2 py-1">{{ ing.name }}</td>
-          <td class="px-2 py-1">{{ ing.unit }}</td>
-          <td class="px-2 py-1 text-right">{{ ing.packageSize }}</td>
-          <td class="px-2 py-1 text-right">{{ ing.unitValue | currency:'USD':'symbol':'1.2-2' }}</td>
-          <td class="px-2 py-1 space-x-2">
-            <button (click)="editIngredient(ing)" class="text-blue-600 hover:underline">Editar</button>
-            <button (click)="deleteIngredientFromModal(ing.id!)" class="text-red-600 hover:underline">Eliminar</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
     <!-- Formulario de Ingrediente -->
     <div class="grid grid-cols-2 gap-4 mb-4">
       <div>
@@ -307,9 +278,71 @@
       </div>
     </div>
     <div class="flex justify-end space-x-2">
-      <button (click)="saveIngredient()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Guardar</button>
+      <button (click)="saveIngredient()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+        {{ editingIngredientId ? 'Actualizar' : 'Agregar' }}
+      </button>
       <button (click)="closeIngredientsModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400">Cancelar</button>
     </div>
+    <!-- Tabla de Ingredientes -->
+    <table class="w-full mb-4 border-collapse">
+      <thead>
+        <tr>
+          <th class="border-b px-2 py-1 text-left">Nombre</th>
+          <th class="border-b px-2 py-1 text-left">Unidad</th>
+          <th class="border-b px-2 py-1 text-right">Tamaño Empaque</th>
+          <th class="border-b px-2 py-1 text-right">Valor Unitario</th>
+          <th class="border-b px-2 py-1">Acciones</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        <tr *ngFor="let ing of sortedIngredients">
+          <td class="px-2 py-1">
+            <ng-container *ngIf="editingIngredientId === ing.id; else viewName">
+              <input [(ngModel)]="newIngredient.name" class="w-full px-1 py-1 border rounded" />
+            </ng-container>
+            <ng-template #viewName>{{ ing.name }}</ng-template>
+          </td>
+          <td class="px-2 py-1">
+            <ng-container *ngIf="editingIngredientId === ing.id; else viewUnit">
+              <select [(ngModel)]="newIngredient.unit" class="w-full px-1 py-1 border rounded">
+                <option value="">Seleccione</option>
+                <option value="L">L</option>
+                <option value="KG">KG</option>
+                <option value="PZ">PZ</option>
+              </select>
+            </ng-container>
+            <ng-template #viewUnit>{{ ing.unit }}</ng-template>
+          </td>
+          <td class="px-2 py-1 text-right">
+            <ng-container *ngIf="editingIngredientId === ing.id; else viewPkg">
+              <input type="number" [(ngModel)]="newIngredient.packageSize" class="w-full px-1 py-1 border rounded text-right" />
+            </ng-container>
+            <ng-template #viewPkg>{{ ing.packageSize }}</ng-template>
+          </td>
+          <td class="px-2 py-1 text-right">
+            <ng-container *ngIf="editingIngredientId === ing.id; else viewVal">
+              <input type="number" [(ngModel)]="newIngredient.unitValue" class="w-full px-1 py-1 border rounded text-right" />
+            </ng-container>
+            <ng-template #viewVal>{{ ing.unitValue | currency:'USD':'symbol':'1.2-2' }}</ng-template>
+          </td>
+          <td class="px-2 py-1 space-x-2">
+            <ng-container *ngIf="editingIngredientId === ing.id; else actionView">
+              <button (click)="saveIngredient()" class="text-green-600 hover:underline">Aceptar</button>
+              <button (click)="cancelInlineEdit()" class="text-gray-600 hover:underline">Cancelar</button>
+            </ng-container>
+            <ng-template #actionView>
+              <button (click)="editIngredient(ing)" class="text-blue-600 hover:underline">Editar</button>
+              <button (click)="deleteIngredientFromModal(ing.id!)" class="text-red-600 hover:underline">Eliminar</button>
+            </ng-template>
+          </td>
+        </tr>
+      </tbody>
+    </table>
     <p class="mt-4 text-sm text-gray-500">Pega una tabla desde Excel (tab separado) con: Nombre, Unidad, Tamaño, Valor</p>
+    <!-- Área para pegar tabla de Excel -->
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-1">Pega la tabla de Excel aquí:</label>
+      <textarea rows="4" (paste)="pasteIngredients($event)" placeholder="Nombre\tUnidad\tTamaño\tValor" class="w-full px-2 py-2 border-2 border-dashed border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+    </div>
   </div>
 </div> 

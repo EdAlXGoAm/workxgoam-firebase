@@ -524,15 +524,32 @@ export class CalculadoraComponent implements OnInit, AfterViewInit {
   // Guardar o actualizar ingrediente
   async saveIngredient(): Promise<void> {
     if (this.editingIngredientId) {
+      // Actualizar inline sin cerrar modal
       const success = await this.ingredientService.updateIngredient(this.editingIngredientId, this.newIngredient);
-      if (!success) alert('Error al actualizar ingrediente');
+      if (!success) {
+        alert('Error al actualizar ingrediente');
+      } else {
+        // recargar lista y salir modo edición
+        this.ingredientService.getIngredients().subscribe(list => this.ingredients = list);
+        this.editingIngredientId = null;
+        this.newIngredient = { name: '', unit: '', packageSize: 1, unitValue: 0 };
+      }
     } else {
+      // Agregar nuevo ingrediente (mantener modal abierto)
       const id = await this.ingredientService.addIngredient(this.newIngredient);
-      if (!id) alert('Error al añadir ingrediente');
+      if (!id) {
+        alert('Error al añadir ingrediente');
+      } else {
+        this.ingredientService.getIngredients().subscribe(list => this.ingredients = list);
+        this.newIngredient = { name: '', unit: '', packageSize: 1, unitValue: 0 };
+      }
     }
-    // recargar lista
-    this.ingredientService.getIngredients().subscribe(list => this.ingredients = list);
-    this.closeIngredientsModal();
+  }
+
+  /** Cancela la edición inline de un ingrediente */
+  cancelInlineEdit(): void {
+    this.editingIngredientId = null;
+    this.newIngredient = { name: '', unit: '', packageSize: 1, unitValue: 0 };
   }
 
   // Eliminar ingrediente
