@@ -8,7 +8,8 @@ import {
   where,
   doc,
   updateDoc,
-  deleteDoc
+  deleteDoc,
+  orderBy
 } from '@angular/fire/firestore';
 import { Observable, of, switchMap } from 'rxjs';
 import { AuthService } from './auth.service';
@@ -69,16 +70,12 @@ export class CostCalculationService {
     }
   }
 
-  // Obtener cálculos del usuario actual
+  // Obtener todos los cálculos (visibles para todos)
   getCalculations(): Observable<CostCalculation[]> {
-    return this.authService.user$.pipe(
-      switchMap(user => {
-        if (!user) return of([]);
-        const coll = collection(this.firestore, 'costCalculations');
-        const q = query(coll, where('userId', '==', user.uid));
-        return collectionData(q, { idField: 'id' }) as Observable<CostCalculation[]>;
-      })
-    );
+    // Recuperar todos los cálculos sin filtrar, ordenados por createdAt descendente
+    const collRef = collection(this.firestore, 'costCalculations');
+    const q = query(collRef, orderBy('createdAt', 'desc'));
+    return collectionData(q, { idField: 'id' }) as Observable<CostCalculation[]>;
   }
 
   // Actualizar cálculo

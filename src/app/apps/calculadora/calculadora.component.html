@@ -176,7 +176,16 @@
               </div>
             </div>
           </div>
-          <button (click)="saveCalculation()" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-md font-medium hover:bg-gray-200 transition">Guardar</button>
+          <!-- Guardar nuevo o actualizar existente -->
+          <ng-container *ngIf="!currentLoadedId">
+            <button (click)="saveCalculation()" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-md font-medium hover:bg-gray-200 transition">Guardar</button>
+          </ng-container>
+          <ng-container *ngIf="currentLoadedId">
+            <div class="flex space-x-2">
+              <button (click)="saveCalculation()" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-md font-medium hover:bg-gray-200 transition">Guardar como nuevo</button>
+              <button (click)="editCalculation()" class="bg-green-500 text-white px-4 py-2 rounded-md font-medium hover:bg-green-600 transition">Actualizar</button>
+            </div>
+          </ng-container>
         </div>
       </div>
     </div>

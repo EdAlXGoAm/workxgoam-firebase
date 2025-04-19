@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CostCalculationService, CostItem, CostCalculation } from '../../services/cost-calculation.service';
 import Chart from 'chart.js/auto';
+import { Storage, ref, uploadString, getDownloadURL } from '@angular/fire/storage';
 
 @Component({
   selector: 'app-calculadora',
@@ -12,6 +13,9 @@ import Chart from 'chart.js/auto';
   styles: []
 })
 export class CalculadoraComponent implements OnInit, AfterViewInit {
+  // ID del cálculo actualmente cargado (null si es nuevo)
+  currentLoadedId: string | null = null;
+
   // Lista de cálculos guardados
   savedCalculations: CostCalculation[] = [];
   // Costos
@@ -53,7 +57,10 @@ export class CalculadoraComponent implements OnInit, AfterViewInit {
   currentImageIndex = 0;
   modalVisible = false;
 
-  constructor(private calcService: CostCalculationService) {}
+  constructor(
+    private calcService: CostCalculationService,
+    private storage: Storage
+  ) {}
 
   ngOnInit(): void {
     // Agregar item inicial
@@ -304,7 +311,8 @@ export class CalculadoraComponent implements OnInit, AfterViewInit {
 
   // Guardar cálculo
   async saveCalculation(): Promise<void> {
-    const calculation = {
+    // Preparo el objeto sin imágenes (para no exceder el límite)
+    const calcBase: Omit<CostCalculation, 'id' | 'userId' | 'createdAt'> = {
       title: this.calculationTitle,
       links: this.calculationLinksText.split('\n').filter(l => l.trim() !== ''),
       costsWithoutProfit: this.costsWithoutProfit,
@@ -315,14 +323,38 @@ export class CalculadoraComponent implements OnInit, AfterViewInit {
       forcePublicFactor: this.forcePublicFactor,
       merchantRounding: this.merchantRounding,
       publicRounding: this.publicRounding,
-      images: this.images.filter(img => img !== null) as string[]
+      images: []
     };
 
-    const id = await this.calcService.addCalculation(calculation);
-    if (id) {
-      alert('Cálculo guardado correctamente');
-    } else {
+    // Paso 1: crear documento Firestore sin imágenes
+    const id = await this.calcService.addCalculation(calcBase);
+    if (!id) {
       alert('No se pudo guardar el cálculo');
+      return;
+    }
+
+    // Paso 2: subir cada imagen a Storage y recopilar URLs
+    const imageUrls: string[] = [];
+    for (let i = 0; i < this.images.length; i++) {
+      const dataUrl = this.images[i];
+      if (!dataUrl) continue;
+      try {
+        const storageRef = ref(this.storage, `calculations/${id}/${i}`);
+        await uploadString(storageRef, dataUrl, 'data_url');
+        const url = await getDownloadURL(storageRef);
+        imageUrls.push(url);
+      } catch (e) {
+        console.error('Error subiendo imagen', e);
+      }
+    }
+
+    // Paso 3: actualizar Firestore con URLs de las imágenes
+    const success = await this.calcService.updateCalculation(id, { images: imageUrls });
+    if (success) {
+      alert('Cálculo guardado correctamente');
+      this.currentLoadedId = null;
+    } else {
+      alert('Error al actualizar imágenes en Firestore');
     }
   }
 
@@ -365,6 +397,7 @@ export class CalculadoraComponent implements OnInit, AfterViewInit {
 
   // Cargar un cálculo guardado en el formulario
   loadCalculation(calc: CostCalculation): void {
+    this.currentLoadedId = calc.id ?? null;
     this.calculationTitle = calc.title;
     this.calculationLinksText = calc.links.join('\n');
     this.costsWithoutProfit = calc.costsWithoutProfit.map(c => ({ description: c.description, value: c.value }));
@@ -389,5 +422,53 @@ export class CalculadoraComponent implements OnInit, AfterViewInit {
           alert('No se pudo eliminar el cálculo');
         }
       });
+  }
+
+  // Editar (sobreescribir) el cálculo existente
+  async editCalculation(): Promise<void> {
+    if (!this.currentLoadedId) return;
+
+    // Paso 1: actualizar campos base sin imágenes
+    const calcUpdate: Omit<CostCalculation, 'id' | 'userId' | 'createdAt'> = {
+      title: this.calculationTitle,
+      links: this.calculationLinksText.split('\n').filter(l => l.trim() !== ''),
+      costsWithoutProfit: this.costsWithoutProfit,
+      costsWithProfit: this.costsWithProfit,
+      labor: { hours: this.laborHours, minutes: this.laborMinutes },
+      forceBaseCost: this.forceBaseCost,
+      forceMerchantFactor: this.forceMerchantFactor,
+      forcePublicFactor: this.forcePublicFactor,
+      merchantRounding: this.merchantRounding,
+      publicRounding: this.publicRounding,
+      images: []
+    };
+    const baseSuccess = await this.calcService.updateCalculation(this.currentLoadedId, calcUpdate);
+    if (!baseSuccess) {
+      alert('No se pudo actualizar el cálculo');
+      return;
+    }
+
+    // Paso 2: subir nuevas imágenes de ser necesario
+    const imageUrls: string[] = [];
+    for (let i = 0; i < this.images.length; i++) {
+      const dataUrl = this.images[i];
+      if (!dataUrl) continue;
+      try {
+        const storageRef = ref(this.storage, `calculations/${this.currentLoadedId}/${i}`);
+        await uploadString(storageRef, dataUrl, 'data_url');
+        const url = await getDownloadURL(storageRef);
+        imageUrls.push(url);
+      } catch (e) {
+        console.error('Error subiendo imagen', e);
+      }
+    }
+
+    // Paso 3: actualizar Firestore con URLs finales
+    const editSuccess = await this.calcService.updateCalculation(this.currentLoadedId, { images: imageUrls });
+    if (editSuccess) {
+      alert('Cálculo actualizado correctamente');
+    } else {
+      alert('Error al actualizar imágenes en Firestore');
+    }
   }
 } 
