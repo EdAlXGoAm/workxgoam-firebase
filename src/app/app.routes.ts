@@ -27,6 +27,11 @@ export const routes: Routes = [
     canActivate: [authGuard]
   },
   { 
+    path: 'apps/calculadora', 
+    loadComponent: () => import('./apps/calculadora/calculadora.component').then(m => m.CalculadoraComponent),
+    canActivate: [authGuard]
+  },
+  { 
     path: '', 
     canActivate: [rootRedirectGuard],
     component: HomeComponent

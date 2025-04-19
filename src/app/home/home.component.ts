@@ -52,6 +52,19 @@ import { AuthService } from '../services/auth.service';
             </button>
           </div>
         </div>
+        
+        <!-- Card Calculadora -->
+        <div class="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+          <div class="bg-indigo-500 p-5 text-white">
+            <h3 class="text-xl font-bold">Calculadora de Costos</h3>
+          </div>
+          <div class="p-5">
+            <p class="text-gray-600 mb-4">Calcula precios para comerciantes y público con ganancias automáticas.</p>
+            <a routerLink="/apps/calculadora" class="block w-full text-center bg-indigo-500 hover:bg-indigo-600 text-white py-2 rounded-lg transition-colors">
+              Abrir
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   `,
