@@ -583,4 +583,25 @@ export class CalculadoraComponent implements OnInit, AfterViewInit {
     });
     setTimeout(() => this.ingredientService.getIngredients().subscribe(list => this.ingredients = list), 500);
   }
+
+  /** Exporta los ingredientes a un archivo Excel */
+  exportIngredients(): void {
+    import('xlsx').then(XLSX => {
+      const ws = XLSX.utils.json_to_sheet(this.sortedIngredients.map(ing => ({
+        Nombre: ing.name,
+        Unidad: ing.unit,
+        TamanoEmpaque: ing.packageSize,
+        ValorUnitario: ing.unitValue
+      })));
+      const wb = { Sheets: { 'Ingredientes': ws }, SheetNames: ['Ingredientes'] };
+      const excelBuffer: any = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'ingredientes.xlsx';
+      a.click();
+      window.URL.revokeObjectURL(url);
+    }).catch(err => console.error('Error al exportar Excel:', err));
+  }
 } 
