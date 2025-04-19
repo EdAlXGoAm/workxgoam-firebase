@@ -2,18 +2,28 @@ import { Component, OnInit, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { Firestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, Timestamp } from '@angular/fire/firestore';
+import { v4 as uuidv4 } from 'uuid';
+
+interface OrdenItem {
+  id: string;        // identificador único
+  nombre: string;
+  precio: number;
+  cobrado: boolean; // true si ya fue incluido en un cobro parcial/final
+}
 
 interface Orden {
   id?: string;
   cliente: string;
   total: number;
   notas?: string;
-  items: string[];
+  items: OrdenItem[];
   fecha: Date | Timestamp;
   tipo: 'llevar' | 'whatsapp' | 'mesa';
   estado: 'pendiente' | 'completada' | 'pagada' | 'ocupada';
   numeroOrden: number;
   numeroMesa?: number;
+  pagado?: number;
+  pendiente?: number;
 }
 
 interface Mesa {
@@ -53,8 +63,15 @@ export class MeseroComponent implements OnInit {
   // Datos para el formulario
   clienteNombre = '';
   ordenTotal = 0;
-  ordenItems: string[] = [''];
+  ordenItems: OrdenItem[] = [ { id: uuidv4(), nombre: '', precio: 0, cobrado: false } ];
   ordenNotas = '';
+
+  // Estado del modal de cobro parcial
+  cobroParcialVisible = false;
+  ordenEnCobroParcial?: Orden;
+  itemsSeleccionados: Set<string> = new Set();
+  modoMontoEspecifico = false;
+  montoEspecifico = 0;
 
   constructor(private firestore: Firestore, private el: ElementRef) {}
 
@@ -95,12 +112,19 @@ export class MeseroComponent implements OnInit {
           cliente: data['cliente'] || '',
           total: data['total'] || 0,
           notas: data['notas'],
-          items: data['items'] || [],
+          items: (data['items'] || []).map((it: any) => ({
+            id: it.id ?? uuidv4(),
+            nombre: it.nombre ?? it,      // compat. con antiguo string
+            precio: Number(it.precio ?? 0),
+            cobrado: !!it.cobrado
+          })),
           fecha: fechaJS,
           tipo: data['tipo'] as 'llevar' | 'whatsapp' | 'mesa',
           estado: data['estado'] as 'pendiente' | 'completada' | 'pagada' | 'ocupada',
           numeroOrden: data['numeroOrden'] || 0,
-          numeroMesa: data['numeroMesa']
+          numeroMesa: data['numeroMesa'],
+          pagado: data['pagado'] ?? 0,
+          pendiente: data['pendiente'] ?? (data['total'] || 0) - (data['pagado'] ?? 0)
         };
         
         ordenes.push(orden);
@@ -182,6 +206,19 @@ export class MeseroComponent implements OnInit {
     return this.ordenesLlevar.length + this.ordenesWhatsapp.length;
   }
 
+  // Devuelve el monto pendiente (o total si aún no se ha definido)
+  getPendiente(orden: Orden | undefined): number {
+    if (!orden) return 0;
+    // Si existen items con bandera cobrado, recalculamos pendiente en cliente para mostrar correctamente
+    if (orden.items && orden.items.length) {
+      const totalCobrado = orden.items
+        .filter(i => i.cobrado)
+        .reduce((s, i) => s + i.precio, 0);
+      return orden.total - totalCobrado;
+    }
+    return orden.pendiente !== undefined ? orden.pendiente : orden.total;
+  }
+
   mostrarFormulario(tipo: 'llevar' | 'whatsapp'): void {
     this.tipoOrdenActual = tipo;
     this.formVisible = true;
@@ -189,7 +226,7 @@ export class MeseroComponent implements OnInit {
     // Valores por defecto para testing rápido
     this.clienteNombre = 'Cliente Demo';
     this.ordenNotas = 'Nota de prueba';
-    this.ordenItems = ['Item A', 'Item B'];
+    this.ordenItems = [ { id: uuidv4(), nombre: '', precio: 0, cobrado: false } ];
     this.ordenTotal = 42.00;
 
     // Enfocar el botón Guardar para que al presionar Enter se dispare la acción por defecto
@@ -247,7 +284,7 @@ export class MeseroComponent implements OnInit {
             // Valores por defecto para testing rápido
             this.clienteNombre = 'Cliente Demo';
             this.ordenNotas = 'Orden mesa de prueba';
-            this.ordenItems = ['Item 1', 'Item 2'];
+            this.ordenItems = [ { id: uuidv4(), nombre: '', precio: 0, cobrado: false } ];
             this.ordenTotal = 99.99;
             this.cerrarDetallesOrden();
             // Enfocar el botón Guardar para la nueva orden de mesa
@@ -287,17 +324,22 @@ export class MeseroComponent implements OnInit {
           <p class="text-gray-700"><span class="font-bold">Cliente:</span> ${orden.cliente}</p>
           <p class="text-gray-700"><span class="font-bold">Total:</span> $${orden.total}</p>
           ${orden.notas ? `<p class="text-gray-700"><span class="font-bold">Notas:</span> ${orden.notas}</p>` : ''}
-          <p class="text-gray-700"><span class="font-bold">Pedido:</span> ${orden.items.join(', ')}</p>
+          <p class="text-gray-700"><span class="font-bold">Pedido:</span> ${orden.items.map(i => i.nombre).join(', ')}</p>
+          <p class="text-gray-700"><span class="font-bold">Pendiente:</span> $${orden.pendiente?.toFixed(2)}</p>
           <p class="text-gray-700"><span class="font-bold">Fecha:</span> ${fechaFormateada}</p>
         </div>
       `;
       
       if (mesa.estado === 'ocupada') {
         contenido.innerHTML += `
-          <div class="grid grid-cols-3 gap-2">
+          <div class="grid grid-cols-4 gap-2">
             <button id="cobrarOrdenBtn" 
                     class="bg-[#25D366] hover:bg-[#1DA851] text-white py-2 px-4 rounded-full flex items-center justify-center order-button">
               <i class="fas fa-money-bill-wave mr-2"></i> Cobrar
+            </button>
+            <button id="cobroParcialMesaBtn" 
+                    class="bg-[#FFD700] hover:bg-[#E6C200] text-white py-2 px-4 rounded-full flex items-center justify-center order-button">
+              <i class="fas fa-hand-holding-usd mr-2"></i> Parcial
             </button>
             <button id="desocuparMesaBtn" 
                     class="bg-[#FF6B6B] hover:bg-[#D35D5D] text-white py-2 px-4 rounded-full flex items-center justify-center order-button">
@@ -313,12 +355,19 @@ export class MeseroComponent implements OnInit {
         // Agregar event listeners
         setTimeout(() => {
           const cobrarOrdenBtn = this.el.nativeElement.querySelector('#cobrarOrdenBtn');
+          const cobroParcialMesaBtn = this.el.nativeElement.querySelector('#cobroParcialMesaBtn');
           const desocuparMesaBtn = this.el.nativeElement.querySelector('#desocuparMesaBtn');
           const cancelarModalBtn = this.el.nativeElement.querySelector('#cancelarModalBtn');
           
           if (cobrarOrdenBtn && orden.id) {
             cobrarOrdenBtn.addEventListener('click', () => {
               this.marcarComoPagada(orden.id!);
+            });
+          }
+          
+          if (cobroParcialMesaBtn && orden.id) {
+            cobroParcialMesaBtn.addEventListener('click', () => {
+              this.abrirCobroParcial(orden);
             });
           }
           
@@ -367,19 +416,26 @@ export class MeseroComponent implements OnInit {
   }
 
   agregarItem(): void {
-    this.ordenItems.push('');
+    this.ordenItems.push({ id: uuidv4(), nombre: '', precio: 0, cobrado: false });
   }
 
   eliminarItem(index: number): void {
     if (this.ordenItems.length > 1) {
       this.ordenItems.splice(index, 1);
+      this.recalcularTotal();
     }
+  }
+
+  // Recalcula el total en base a los precios capturados
+  recalcularTotal(): void {
+    this.ordenTotal = this.ordenItems
+      .reduce((sum, item) => sum + (Number(item.precio) || 0), 0);
   }
 
   limpiarFormulario(): void {
     this.clienteNombre = '';
     this.ordenTotal = 0;
-    this.ordenItems = [''];
+    this.ordenItems = [ { id: uuidv4(), nombre: '', precio: 0, cobrado: false } ];
     this.ordenNotas = '';
   }
 
@@ -393,22 +449,29 @@ export class MeseroComponent implements OnInit {
       return; // Validación básica
     }
 
-    // Filtrar items vacíos
-    const items = this.ordenItems.filter(item => item.trim() !== '');
-    
+    // Filtrar items con nombre y precio válidos
+    const items = this.ordenItems
+      .filter(i => i.nombre.trim() !== '' && i.precio > 0)
+      .map(i => ({ ...i, cobrado: false }));
+
     if (items.length === 0) {
-      return; // Al menos un item es requerido
+      return; // Al menos un item válido requerido
     }
+
+    // Recalcular total por si acaso
+    this.ordenTotal = items.reduce((s, it) => s + it.precio, 0);
 
     const nuevaOrden: Orden = {
       cliente: this.clienteNombre,
       total: this.ordenTotal,
-      items: items,
+      items,
       notas: this.ordenNotas,
       fecha: new Date(),
       tipo: this.tipoOrdenActual,
       estado: this.tipoOrdenActual === 'mesa' ? 'ocupada' : 'pendiente',
-      numeroOrden: this.siguienteNumeroOrden
+      numeroOrden: this.siguienteNumeroOrden,
+      pagado: 0,
+      pendiente: this.ordenTotal
     };
     
     // Si es una orden de mesa, agregar el número de mesa
@@ -462,14 +525,19 @@ export class MeseroComponent implements OnInit {
         <p class="text-gray-700"><span class="font-bold">Cliente:</span> ${orden.cliente}</p>
         <p class="text-gray-700"><span class="font-bold">Total:</span> $${orden.total}</p>
         ${orden.notas ? `<p class="text-gray-700"><span class="font-bold">Notas:</span> ${orden.notas}</p>` : ''}
-        <p class="text-gray-700"><span class="font-bold">Pedido:</span> ${orden.items.join(', ')}</p>
+        <p class="text-gray-700"><span class="font-bold">Pedido:</span> ${orden.items.map(i => i.nombre).join(', ')}</p>
+        <p class="text-gray-700"><span class="font-bold">Pendiente:</span> $${orden.pendiente?.toFixed(2)}</p>
         <p class="text-gray-700"><span class="font-bold">Fecha:</span> ${fechaFormateada}</p>
       </div>
-      <div class="grid grid-cols-2 gap-2">
+      <div class="grid grid-cols-3 gap-2">
         ${orden.estado === 'pendiente'
           ? `<button id="cobrarVisible${orden.id}" onclick="document.querySelector('#cobrarOrden${orden.id}').click()"
                 class="bg-[#25D366] hover:bg-[#1DA851] text-white py-2 px-4 rounded-full flex items-center justify-center order-button">
              <i class="fas fa-money-bill-wave mr-2"></i> Cobrar
+           </button>
+          <button id="cobroParcialVisible${orden.id}" onclick="document.querySelector('#cobroParcial${orden.id}').click()"
+                class="bg-[#FFD700] hover:bg-[#E6C200] text-white py-2 px-4 rounded-full flex items-center justify-center order-button">
+             <i class="fas fa-hand-holding-usd mr-2"></i> Cobro parcial
            </button>`
           : `<button id="completarVisible${orden.id}" onclick="document.querySelector('#completarOrden${orden.id}').click()"
                 class="bg-[#4ECDC4] hover:bg-[#3AAFA9] text-white py-2 px-4 rounded-full flex items-center justify-center order-button">
@@ -489,6 +557,13 @@ export class MeseroComponent implements OnInit {
       cobrarBtnHidden.style.display = 'none';
       cobrarBtnHidden.addEventListener('click', () => this.marcarComoPagada(orden.id!));
       this.el.nativeElement.appendChild(cobrarBtnHidden);
+
+      // Botón oculto para cobrar parcialmente
+      const cobrarParcialBtnHidden = document.createElement('button');
+      cobrarParcialBtnHidden.id = `cobroParcial${orden.id}`;
+      cobrarParcialBtnHidden.style.display = 'none';
+      cobrarParcialBtnHidden.addEventListener('click', () => this.abrirCobroParcial(orden));
+      this.el.nativeElement.appendChild(cobrarParcialBtnHidden);
     }
     const completarBtn = document.createElement('button');
     completarBtn.id = `completarOrden${orden.id}`;
@@ -533,20 +608,63 @@ export class MeseroComponent implements OnInit {
 
   async marcarComoPagada(ordenId: string): Promise<void> {
     try {
+      const ordenActual = this.obtenerOrdenPorId(ordenId);
+      if (!ordenActual) return;
+      const montoPendiente = ordenActual.pendiente ?? (ordenActual.total - (ordenActual.pagado || 0));
+      if (montoPendiente <= 0) return; // Nada que cobrar
+
       const ordenRef = doc(this.firestore, 'ZonaYummyOrdenes', ordenId);
-      
-      // Actualizar a pagada
+
       await updateDoc(ordenRef, {
-        estado: 'pagada'
+        estado: 'pagada',
+        pagado: (ordenActual.pagado || 0) + montoPendiente,
+        pendiente: 0
       });
-      
-      // Actualizar estadísticas
-      this.totalGanancias += this.obtenerOrdenPorId(ordenId)?.total || 0;
+      // Actualizar estadísticas sumando solo lo cobrado
+      this.totalGanancias += montoPendiente;
       
       // Cerrar modal
       this.cerrarDetallesOrden();
     } catch (error) {
       console.error('Error al marcar como pagada la orden:', error);
+    }
+  }
+
+  async cobrarParcial(ordenId: string): Promise<void> {
+    const ordenActual = this.obtenerOrdenPorId(ordenId);
+    if (!ordenActual) return;
+
+    const pendiente = ordenActual.pendiente ?? (ordenActual.total - (ordenActual.pagado || 0));
+    const input = prompt(`Monto a cobrar (pendiente $${pendiente.toFixed(2)})`, pendiente.toFixed(2));
+    if (!input) return;
+    const monto = parseFloat(input);
+    if (isNaN(monto) || monto <= 0 || monto > pendiente) {
+      alert('Monto inválido.');
+      return;
+    }
+
+    try {
+      const ordenRef = doc(this.firestore, 'ZonaYummyOrdenes', ordenId);
+      const nuevoPagado = (ordenActual.pagado || 0) + monto;
+      const nuevoPendiente = pendiente - monto;
+
+      const updates: any = {
+        pagado: nuevoPagado,
+        pendiente: nuevoPendiente
+      };
+      if (nuevoPendiente <= 0) {
+        updates.estado = 'pagada';
+      }
+
+      await updateDoc(ordenRef, updates);
+
+      // Actualizar estadísticas localmente
+      this.totalGanancias += monto;
+
+      // Cerrar modal
+      this.cerrarDetallesOrden();
+    } catch (error) {
+      console.error('Error en cobro parcial:', error);
     }
   }
 
@@ -611,5 +729,101 @@ export class MeseroComponent implements OnInit {
     } else {
       return 'table';
     }
+  }
+
+  /* =====================================================
+     COBRO PARCIAL (UI + lógica de selección de items)
+     ===================================================== */
+
+  abrirCobroParcial(orden: Orden): void {
+    this.ordenEnCobroParcial = orden;
+    this.itemsSeleccionados.clear();
+    this.modoMontoEspecifico = false;
+    this.montoEspecifico = 0;
+    this.cobroParcialVisible = true;
+  }
+
+  alternarItem(itemId: string, checked: boolean): void {
+    if (checked) {
+      this.itemsSeleccionados.add(itemId);
+    } else {
+      this.itemsSeleccionados.delete(itemId);
+    }
+  }
+
+  confirmarCobroParcial(): void {
+    if (!this.ordenEnCobroParcial) return;
+
+    let montoCobro = 0;
+    let itemsPagados: string[] = [];
+
+    if (this.modoMontoEspecifico) {
+      if (this.montoEspecifico <= 0 || this.montoEspecifico > this.getPendiente(this.ordenEnCobroParcial)) {
+        alert('Monto inválido');
+        return;
+      }
+      montoCobro = this.montoEspecifico;
+    } else {
+      if (this.itemsSeleccionados.size === 0) return;
+      this.ordenEnCobroParcial.items.forEach(it => {
+        if (!it.cobrado && this.itemsSeleccionados.has(it.id)) {
+          montoCobro += it.precio;
+          itemsPagados.push(it.id);
+        }
+      });
+    }
+
+    if (montoCobro === 0) return;
+
+    // Persistir en Firestore
+    const ordenId = this.ordenEnCobroParcial.id!;
+    const ordenRef = doc(this.firestore, 'ZonaYummyOrdenes', ordenId);
+    const pagosCol = collection(this.firestore, 'ZonaYummyOrdenes', ordenId, 'pagos');
+
+    const batchOps: Promise<any>[] = [];
+    batchOps.push(addDoc(pagosCol, {
+      fecha: new Date(),
+      monto: montoCobro,
+      tipoPago: this.modoMontoEspecifico ? 'monto' : 'items',
+      itemsPagados
+    }));
+
+    // Actualizar items cobrados y montos acumulados
+    const nuevosItems = this.ordenEnCobroParcial.items.map(it => {
+      if (itemsPagados.includes(it.id)) {
+        return { ...it, cobrado: true };
+      }
+      return it;
+    });
+
+    const nuevoPagado = (this.ordenEnCobroParcial.pagado || 0) + montoCobro;
+    const nuevoPendiente = Math.max(this.ordenEnCobroParcial.total - nuevoPagado, 0);
+
+    batchOps.push(updateDoc(ordenRef, {
+      items: nuevosItems,
+      pagado: nuevoPagado,
+      pendiente: nuevoPendiente,
+      estado: nuevoPendiente === 0 ? 'pagada' : 'pendiente'
+    }));
+
+    Promise.all(batchOps).then(() => {
+    // Actualizar estado local de la orden para reflejar ítems cobrados inmediatamente
+      if (this.ordenEnCobroParcial) {
+        this.ordenEnCobroParcial.items = nuevosItems;
+        this.ordenEnCobroParcial.pagado = nuevoPagado;
+        this.ordenEnCobroParcial.pendiente = nuevoPendiente;
+      }
+      this.totalGanancias += montoCobro;
+      this.cobroParcialVisible = false;
+      this.cerrarDetallesOrden();
+    }).catch(err => {
+      console.error('Error cobrando parcialmente', err);
+      alert('Error al guardar el cobro parcial: ' + err.message);
+      this.cancelarCobroParcial();
+    });
+  }
+
+  cancelarCobroParcial(): void {
+    this.cobroParcialVisible = false;
   }
 } 
