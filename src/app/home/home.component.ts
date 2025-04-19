@@ -28,6 +28,19 @@ import { AuthService } from '../services/auth.service';
           </div>
         </div>
         
+        <!-- Card Mesero -->
+        <div class="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+          <div class="bg-yellow-500 p-5 text-white">
+            <h3 class="text-xl font-bold">Mesero</h3>
+          </div>
+          <div class="p-5">
+            <p class="text-gray-600 mb-4">Gestiona mesas y órdenes en tu restaurante.</p>
+            <a routerLink="/apps/mesero" class="block w-full text-center bg-yellow-500 hover:bg-yellow-600 text-white py-2 rounded-lg transition-colors">
+              Abrir
+            </a>
+          </div>
+        </div>
+        
         <!-- Más cards de aplicaciones -->
         <div class="bg-white rounded-xl shadow-md overflow-hidden opacity-60">
           <div class="bg-purple-500 p-5 text-white">

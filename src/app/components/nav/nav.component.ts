@@ -18,6 +18,7 @@ import { LoginGlowService } from '../../services/login-glow.service';
         <div class="flex items-center gap-4">
           <ng-container *ngIf="authService.isLoggedIn(); else notLoggedIn">
             <a routerLink="/apps/suscripciones" class="text-gray-600 hover:text-gray-900">Suscripciones</a>
+            <a routerLink="/apps/mesero" class="text-gray-600 hover:text-gray-900">Mesero</a>
             <a routerLink="/apps/calculadora" class="text-gray-600 hover:text-gray-900">Calculadora</a>
             
             <button 
