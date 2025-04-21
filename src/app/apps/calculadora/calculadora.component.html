@@ -388,10 +388,12 @@
     <div class="flex justify-between items-center mb-4">
       <h3 class="text-lg font-semibold">Comparar Cálculos</h3>
       <div class="flex items-center space-x-4">
-        <label class="flex items-center space-x-1 text-sm text-gray-700">
-          <input type="checkbox" [(ngModel)]="showOnlyPrices" class="form-checkbox" />
-          <span>Mostrar solo precios</span>
-        </label>
+        <label class="text-sm text-gray-700">Modo de vista:</label>
+        <select [(ngModel)]="viewMode" class="border rounded px-2 py-1 text-sm">
+          <option value="all">Todos</option>
+          <option value="prices">Solo precios</option>
+          <option value="profitMerchant">Ganancia y comerciante</option>
+        </select>
         <button (click)="closeCompareModal()" class="text-gray-500 hover:text-gray-700">✕</button>
       </div>
     </div>
@@ -400,19 +402,19 @@
         <thead>
           <tr>
             <th class="px-2 py-1 border-b">Nombre del cálculo</th>
-            <th *ngIf="!showOnlyPrices" class="px-2 py-1 border-b">Costo Total</th>
-            <th *ngIf="!showOnlyPrices" class="px-2 py-1 border-b">Ganancia (sin ganancia)</th>
+            <th *ngIf="viewMode==='all'" class="px-2 py-1 border-b">Costo Total</th>
+            <th *ngIf="viewMode!=='prices'" class="px-2 py-1 border-b">Ganancia</th>
             <th class="px-2 py-1 border-b">Precio Comerciante</th>
-            <th class="px-2 py-1 border-b">Precio Público</th>
+            <th *ngIf="viewMode!=='profitMerchant'" class="px-2 py-1 border-b">Precio Público</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-200">
           <tr *ngFor="let c of compareSummaries">
             <td class="px-2 py-1">{{ c.title }}</td>
-            <td *ngIf="!showOnlyPrices" class="px-2 py-1">{{ c.totalCost | number:'1.2-2' }}</td>
-            <td *ngIf="!showOnlyPrices" class="px-2 py-1">{{ c.profitWithoutProfit | number:'1.2-2' }}</td>
+            <td *ngIf="viewMode==='all'" class="px-2 py-1">{{ c.totalCost | number:'1.2-2' }}</td>
+            <td *ngIf="viewMode!=='prices'" class="px-2 py-1">{{ c.profitWithoutProfit | number:'1.2-2' }}</td>
             <td class="px-2 py-1">{{ c.merchantPrice | number:'1.2-2' }}</td>
-            <td class="px-2 py-1">{{ c.publicPrice | number:'1.2-2' }}</td>
+            <td *ngIf="viewMode!=='profitMerchant'" class="px-2 py-1">{{ c.publicPrice | number:'1.2-2' }}</td>
           </tr>
         </tbody>
       </table>

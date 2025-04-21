@@ -31,8 +31,8 @@ export class CalculadoraComponent implements OnInit, AfterViewInit {
 
   // Opciones avanzadas
   forceBaseCost = '';
-  forceMerchantFactor = '';
-  forcePublicFactor = '';
+  forceMerchantFactor = '1.5';
+  forcePublicFactor = '0';
   merchantRounding = '0';
   publicRounding = '0';
 
@@ -75,8 +75,8 @@ export class CalculadoraComponent implements OnInit, AfterViewInit {
   // Estado y datos para modal de comparar cálculos
   isCompareModalVisible = false;
   compareSummaries: { title: string; totalCost: number; profitWithoutProfit: number; merchantPrice: number; publicPrice: number }[] = [];
-  // Mostrar solo precios en modal comparar
-  showOnlyPrices = false;
+  // Modo de vista para el modal de comparación: 'all'|'prices'|'profitMerchant'
+  viewMode: 'all' | 'prices' | 'profitMerchant' = 'all';
 
   /** Ingredientes ordenados alfabéticamente por nombre */
   get sortedIngredients(): Ingredient[] {

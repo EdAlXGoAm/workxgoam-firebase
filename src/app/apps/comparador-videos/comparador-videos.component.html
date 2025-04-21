@@ -1,0 +1,120 @@
+<section class="container mx-auto px-4 py-8">
+  <header class="text-center mb-12">
+    <h1 class="text-4xl font-bold text-blue-600 mb-2 flex items-center justify-center">
+      <i class="fas fa-play-circle mr-3"></i> Comparador de Videos
+    </h1>
+    <p class="text-gray-600 max-w-2xl mx-auto">Busca, compara y analiza tus videos favoritos de YouTube. Selecciona hasta 2 videos para compararlos.</p>
+  </header>
+
+  <!-- Buscador -->
+  <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-md overflow-hidden p-6 mb-8">
+    <div class="flex items-center mb-4">
+      <i class="fas fa-search text-blue-500 mr-3 text-xl"></i>
+      <h2 class="text-2xl font-semibold text-gray-800">Buscar videos</h2>
+    </div>
+    <div class="flex flex-col md:flex-row gap-4 mb-4">
+      <input type="text" [(ngModel)]="searchQuery" placeholder="Buscar videos en YouTube..."
+             class="flex-grow px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <button (click)="searchVideos()"
+              [disabled]="isLoadingSearch"
+              class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 flex items-center justify-center">
+        <i *ngIf="!isLoadingSearch" class="fas fa-search mr-2"></i>
+        <i *ngIf="isLoadingSearch" class="fas fa-spinner fa-spin mr-2"></i>
+        {{ isLoadingSearch ? 'Buscando...' : 'Buscar' }}
+      </button>
+    </div>
+    <div class="search-results" *ngIf="searchResults.length > 0">
+      <div *ngFor="let result of searchResults" class="flex items-center p-3 border-b border-gray-200 hover:bg-gray-50 cursor-pointer"
+           (click)="selectSearchResult(result)">
+        <img [src]="result.thumbnail" alt="Miniatura" class="w-16 h-12 object-cover rounded mr-3">
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-gray-900 truncate">{{ result.title }}</p>
+          <p class="text-xs text-gray-500 truncate">{{ result.channel }}</p>
+        </div>
+        <i class="fas fa-plus text-blue-500 ml-2"></i>
+      </div>
+    </div>
+    <div *ngIf="isLoadingSearch && !searchResults.length" class="loader"></div>
+    <div class="border-t border-gray-200 mt-6 pt-6">
+      <div class="flex items-center mb-4">
+        <i class="fas fa-link text-blue-500 mr-3 text-xl"></i>
+        <h2 class="text-2xl font-semibold text-gray-800">O agregar por URL</h2>
+      </div>
+      <div class="flex flex-col md:flex-row gap-4">
+        <input type="text" [(ngModel)]="videoUrl" placeholder="Pega el enlace de YouTube aquí"
+               class="flex-grow px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <button (click)="addVideoByUrl()"
+                [disabled]="isProcessingAdd"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 flex items-center justify-center">
+          <i *ngIf="!isProcessingAdd" class="fas fa-plus mr-2"></i>
+          <i *ngIf="isProcessingAdd" class="fas fa-spinner fa-spin mr-2"></i>
+          {{ isProcessingAdd ? 'Procesando...' : 'Agregar' }}
+        </button>
+      </div>
+      <div *ngIf="errorMessage" class="text-red-500 mt-2">{{ errorMessage }}</div>
+    </div>
+  </div>
+
+  <!-- Reproductor individual -->
+  <div class="bg-black rounded-xl overflow-hidden mb-8" *ngIf="playerUrl">
+    <iframe [src]="playerUrl" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+  </div>
+
+  <!-- Vista comparación -->
+  <div class="comparison-view mb-8" *ngIf="player1Url && player2Url">
+    <div class="bg-black rounded-xl overflow-hidden" style="padding-bottom: 56.25%; position: relative;">
+      <iframe [src]="player1Url" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen
+              style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>
+    </div>
+    <div class="bg-black rounded-xl overflow-hidden" style="padding-bottom: 56.25%; position: relative;">
+      <iframe [src]="player2Url" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen
+              style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>
+    </div>
+  </div>
+
+  <!-- Estadísticas -->
+  <div class="stats-container p-6 mb-8" *ngIf="video1 && video2">
+    <h2 class="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+      <i class="fas fa-chart-bar text-blue-500 mr-3"></i> Comparación de estadísticas
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="stat-card bg-white p-4 rounded-lg shadow">
+        <h3 class="font-medium text-gray-800 mb-2">{{ video1.title }}</h3>
+        <div class="space-y-3">
+          <div><p class="text-sm text-gray-500">Vistas</p><p class="font-semibold">{{ formatNumber(video1.views) }}</p></div>
+          <div><p class="text-sm text-gray-500">Likes</p><p class="font-semibold">{{ formatNumber(video1.likes) }}</p></div>
+          <div><p class="text-sm text-gray-500">Comentarios</p><p class="font-semibold">{{ formatNumber(video1.comments) }}</p></div>
+          <div><p class="text-sm text-gray-500">Duración</p><p class="font-semibold">{{ video1.duration }}</p></div>
+          <div><p class="text-sm text-gray-500">Fecha de publicación</p><p class="font-semibold">{{ video1.publishedAt }}</p></div>
+        </div>
+      </div>
+      <div class="stat-card bg-white p-4 rounded-lg shadow">
+        <h3 class="font-medium text-gray-800 mb-2">{{ video2.title }}</h3>
+        <div class="space-y-3">
+          <div><p class="text-sm text-gray-500">Vistas</p><p class="font-semibold">{{ formatNumber(video2.views) }}</p></div>
+          <div><p class="text-sm text-gray-500">Likes</p><p class="font-semibold">{{ formatNumber(video2.likes) }}</p></div>
+          <div><p class="text-sm text-gray-500">Comentarios</p><p class="font-semibold">{{ formatNumber(video2.comments) }}</p></div>
+          <div><p class="text-sm text-gray-500">Duración</p><p class="font-semibold">{{ video2.duration }}</p></div>
+          <div><p class="text-sm text-gray-500">Fecha de publicación</p><p class="font-semibold">{{ video2.publishedAt }}</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lista de videos y botones -->
+  <div class="bg-white rounded-xl shadow-md overflow-hidden p-6">
+    <div class="flex items-center justify-between mb-6">
+      <div class="flex items-center"><i class="fas fa-list-ul text-blue-500 mr-3 text-xl"></i><h2 class="text-2xl font-semibold text-gray-800">Tus videos</h2><span *ngIf="selectedVideos.length > 0" class="ml-2 text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded-full">{{ selectedVideos.length }} seleccionado{{ selectedVideos.length > 1 ? 's' : '' }}</span></div>
+      <div class="flex items-center space-x-3"><button (click)="compareVideos()" *ngIf="selectedVideos.length === 2" class="compare-btn bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 flex items-center justify-center"><i class="fas fa-balance-scale mr-2"></i> Comparar</button><button (click)="clearAll()" class="text-red-500 hover:text-red-700 flex items-center"><i class="fas fa-trash mr-2"></i> Limpiar todo</button></div>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div *ngIf="videos.length === 0" class="text-center p-4 bg-gray-100 rounded-lg"><i class="fas fa-music text-gray-400 text-4xl mb-2"></i><p class="text-gray-500">Agrega tu primer video</p></div>
+      <div *ngFor="let video of videos" class="video-container bg-white rounded-lg overflow-hidden shadow-md cursor-pointer relative" [class.active-video]="currentVideoId === video.id || (selectedVideos.length === 1 && selectedVideos[0] === video.id)" (click)="playVideo(video)">
+        <input type="checkbox" class="video-checkbox" [checked]="selectedVideos.includes(video.id)" (change)="toggleSelection(video.id, $event)">
+        <div *ngIf="selectedVideos.includes(video.id)" class="video-overlay"></div>
+        <img [src]="video.thumbnail" alt="Miniatura" class="w-full h-40 object-cover">
+        <div class="p-3"><h3 class="font-medium text-gray-800 truncate">{{ video.title }}</h3><p class="text-xs text-gray-500 truncate mt-1">{{ video.channel }}</p><div class="flex justify-between items-center mt-2"><span class="text-xs text-gray-500">{{ formatNumber(video.views) }} vistas</span><button (click)="removeVideo(video.id, $event)" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button></div></div>
+      </div>
+    </div>
+  </div>
+</section> 

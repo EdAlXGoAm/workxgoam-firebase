@@ -37,6 +37,11 @@ export const routes: Routes = [
     canActivate: [authGuard]
   },
   { 
+    path: 'apps/comparador-videos', 
+    loadComponent: () => import('./apps/comparador-videos/comparador-videos.component').then(m => m.ComparadorVideosComponent),
+    canActivate: [authGuard]
+  },
+  { 
     path: '', 
     canActivate: [rootRedirectGuard],
     component: HomeComponent
