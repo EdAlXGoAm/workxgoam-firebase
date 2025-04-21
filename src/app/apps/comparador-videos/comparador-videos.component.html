@@ -6,6 +6,27 @@
     <p class="text-gray-600 max-w-2xl mx-auto">Busca, compara y analiza tus videos favoritos de YouTube. Selecciona hasta 2 videos para compararlos.</p>
   </header>
 
+  <!-- Sección de Playlists -->
+  <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-md overflow-hidden p-6 mb-8">
+    <div class="flex items-center mb-4">
+      <i class="fas fa-list text-blue-500 mr-3 text-xl"></i>
+      <h2 class="text-2xl font-semibold text-gray-800">Playlists</h2>
+    </div>
+    <div class="flex flex-col md:flex-row gap-4 items-center mb-4">
+      <select [(ngModel)]="selectedPlaylistId" (change)="onPlaylistChange()"
+              class="px-4 py-2 border border-gray-300 rounded-lg flex-shrink-0">
+        <option value="">-- Seleccionar playlist --</option>
+        <option *ngFor="let pl of playlists" [value]="pl.id">{{ pl.name }}</option>
+      </select>
+      <input type="text" [(ngModel)]="newPlaylistName" placeholder="Nueva playlist"
+             class="flex-grow px-4 py-2 border border-gray-300 rounded-lg focus:outline-none">
+      <button (click)="createPlaylist()"
+              class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
+        Crear
+      </button>
+    </div>
+  </div>
+
   <!-- Buscador -->
   <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-md overflow-hidden p-6 mb-8">
     <div class="flex items-center mb-4">

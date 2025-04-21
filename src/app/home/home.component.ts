@@ -78,6 +78,18 @@ import { AuthService } from '../services/auth.service';
             </a>
           </div>
         </div>
+        <!-- Card Comparador de Videos -->
+        <div class="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+          <div class="bg-pink-500 p-5 text-white">
+            <h3 class="text-xl font-bold">Comparador de Videos</h3>
+          </div>
+          <div class="p-5">
+            <p class="text-gray-600 mb-4">Busca y compara tus videos favoritos de YouTube.</p>
+            <a routerLink="/apps/comparador-videos" class="block w-full text-center bg-pink-500 hover:bg-pink-600 text-white py-2 rounded-lg transition-colors">
+              Abrir
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   `,

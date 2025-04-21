@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { RouterModule } from '@angular/router';
+import { PlaylistService, Playlist, VideoEntry } from '../../services/playlist.service';
 
 interface Video {
   id: string;
@@ -31,6 +32,10 @@ export class ComparadorVideosComponent implements OnInit {
   searchQuery = '';
   videoUrl = '';
   videos: Video[] = [];
+  playlists: Playlist[] = [];
+  selectedPlaylistId = '';
+  newPlaylistName = '';
+  private videoDocMap: { [videoId: string]: string } = {};
   selectedVideos: string[] = [];
   searchResults: any[] = [];
   isLoadingSearch = false;
@@ -43,11 +48,50 @@ export class ComparadorVideosComponent implements OnInit {
   video2: Video | null = null;
   currentVideoId: string | null = null;
 
-  constructor(private http: HttpClient, private sanitizer: DomSanitizer) {}
+  constructor(private http: HttpClient,
+              private sanitizer: DomSanitizer,
+              private playlistService: PlaylistService) {}
 
   ngOnInit(): void {
-    const stored = localStorage.getItem('youtubeVideos');
-    this.videos = stored ? JSON.parse(stored) : [];
+    // Cargar playlists disponibles
+    this.playlistService.getPlaylists().subscribe(pls => this.playlists = pls);
+  }
+
+  createPlaylist(): void {
+    if (!this.newPlaylistName.trim()) {
+      alert('Ingrese un nombre de playlist');
+      return;
+    }
+    this.playlistService.createPlaylist(this.newPlaylistName)
+      .then(() => this.newPlaylistName = '')
+      .catch(err => alert(err));
+  }
+
+  onPlaylistChange(): void {
+    if (!this.selectedPlaylistId) {
+      this.videos = [];
+      return;
+    }
+    this.playlistService.getVideos(this.selectedPlaylistId)
+      .subscribe(entries => {
+        this.videoDocMap = {};
+        this.videos = entries.map(entry => {
+          this.videoDocMap[entry.videoId] = entry.id!;
+          return {
+            id: entry.videoId,
+            url: entry.url,
+            thumbnail: entry.thumbnail,
+            title: entry.title,
+            channel: entry.channel,
+            views: entry.views,
+            likes: entry.likes,
+            comments: entry.comments,
+            duration: entry.duration,
+            publishedAt: entry.publishedAt,
+            description: entry.description
+          } as Video;
+        });
+      });
   }
 
   isValidYouTubeUrl(url: string): boolean {
@@ -62,6 +106,10 @@ export class ComparadorVideosComponent implements OnInit {
   }
 
   addVideoByUrl(): void {
+    if (!this.selectedPlaylistId) {
+      alert('Seleccione una playlist primero');
+      return;
+    }
     const url = this.videoUrl.trim();
     if (!this.isValidYouTubeUrl(url)) {
       this.errorMessage = 'Por favor ingresa un enlace válido de YouTube';
@@ -94,8 +142,8 @@ export class ComparadorVideosComponent implements OnInit {
           const snippet = item.snippet;
           const stats = item.statistics;
           const duration = this.formatDuration(item.contentDetails.duration);
-          this.videos.push({
-            id: videoId,
+          const videoData: VideoEntry = {
+            videoId,
             url: `https://www.youtube.com/embed/${videoId}`,
             thumbnail: thumbnailUrl,
             title: snippet.title,
@@ -106,9 +154,10 @@ export class ComparadorVideosComponent implements OnInit {
             duration,
             publishedAt: this.formatDate(snippet.publishedAt),
             description: snippet.description
-          });
-          localStorage.setItem('youtubeVideos', JSON.stringify(this.videos));
-          this.videoUrl = '';
+          };
+          this.playlistService.addVideoToPlaylist(this.selectedPlaylistId, videoData)
+            .then(() => this.videoUrl = '')
+            .catch(() => alert('Error al agregar el video'));
         },
         error: () => {
           alert('Error al obtener detalles del video');
@@ -151,6 +200,10 @@ export class ComparadorVideosComponent implements OnInit {
   }
 
   selectSearchResult(item: any) {
+    if (!this.selectedPlaylistId) {
+      alert('Seleccione una playlist primero');
+      return;
+    }
     if (this.videos.some(v => v.id === item.id)) {
       alert('Este video ya está en tu lista');
       return;
@@ -166,8 +219,8 @@ export class ComparadorVideosComponent implements OnInit {
           const snippet = detail.snippet;
           const stats = detail.statistics;
           const duration = this.formatDuration(detail.contentDetails.duration);
-          this.videos.push({
-            id: item.id,
+          const videoEntry: VideoEntry = {
+            videoId: item.id,
             url: `https://www.youtube.com/embed/${item.id}`,
             thumbnail: thumbnailUrl,
             title: snippet.title,
@@ -178,10 +231,13 @@ export class ComparadorVideosComponent implements OnInit {
             duration,
             publishedAt: this.formatDate(snippet.publishedAt),
             description: snippet.description
-          });
-          localStorage.setItem('youtubeVideos', JSON.stringify(this.videos));
-          this.searchResults = [];
-          this.searchQuery = '';
+          };
+          this.playlistService.addVideoToPlaylist(this.selectedPlaylistId, videoEntry)
+            .then(() => {
+              this.searchResults = [];
+              this.searchQuery = '';
+            })
+            .catch(() => alert('Error al agregar el video'));
         },
         error: () => alert('Error al obtener detalles del video')
       });
@@ -189,18 +245,20 @@ export class ComparadorVideosComponent implements OnInit {
 
   removeVideo(id: string, event?: Event) {
     event?.stopPropagation();
-    if (confirm('¿Seguro que quieres eliminar este video?')) {
-      this.videos = this.videos.filter(v => v.id !== id);
-      this.selectedVideos = this.selectedVideos.filter(i => i !== id);
-      localStorage.setItem('youtubeVideos', JSON.stringify(this.videos));
+    if (confirm(`¿Seguro que quieres eliminar este video de la playlist "${this.currentPlaylistName}"?`)) {
+      const docId = this.videoDocMap[id];
+      this.playlistService.removeVideoFromPlaylist(this.selectedPlaylistId, docId)
+        .catch(() => alert('Error al eliminar el video'));
     }
   }
 
   clearAll() {
-    if (confirm('¿Seguro que quieres eliminar todos los videos?')) {
-      this.videos = [];
+    if (confirm(`¿Seguro que quieres eliminar todos los videos de la playlist "${this.currentPlaylistName}"?`)) {
+      this.videos.forEach(v => {
+        const docId = this.videoDocMap[v.id];
+        this.playlistService.removeVideoFromPlaylist(this.selectedPlaylistId, docId);
+      });
       this.selectedVideos = [];
-      localStorage.removeItem('youtubeVideos');
     }
   }
 
@@ -260,5 +318,10 @@ export class ComparadorVideosComponent implements OnInit {
   formatNumber(num: number | string): string {
     if (!num || isNaN(+num)) return 'N/A';
     return (+num).toLocaleString();
+  }
+
+  get currentPlaylistName(): string {
+    const pl = this.playlists.find(p => p.id === this.selectedPlaylistId);
+    return pl ? pl.name : '';
   }
 } 

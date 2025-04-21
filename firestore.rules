@@ -38,6 +38,23 @@ service cloud.firestore {
       }
     }
 
+    // Playlists públicas y su subcolección de videos
+    match /playlists/{playlistId} {
+      // Todos pueden leer las playlists
+      allow read: if true;
+      // Solo usuarios autenticados pueden crear nuevas playlists
+      allow create: if request.auth != null;
+      // Solo el owner de la playlist puede actualizar o borrarla
+      allow update, delete: if request.auth != null && request.auth.uid == resource.data.ownerId;
+      // Subcolección de videos de la playlist
+      match /videos/{videoDocId} {
+        // Todos pueden leer los videos de una playlist
+        allow read: if true;
+        // Usuarios autenticados pueden agregar o eliminar videos
+        allow create, delete: if request.auth != null;
+      }
+    }
+
     // Por defecto denegar todo lo demás
     match /{document=**} {
       allow read, write: if false;
