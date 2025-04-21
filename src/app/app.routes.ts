@@ -32,6 +32,11 @@ export const routes: Routes = [
     canActivate: [authGuard]
   },
   { 
+    path: 'apps/upload-videos', 
+    loadComponent: () => import('./apps/upload-videos/upload-videos.component').then(m => m.UploadVideosComponent),
+    canActivate: [authGuard]
+  },
+  { 
     path: '', 
     canActivate: [rootRedirectGuard],
     component: HomeComponent

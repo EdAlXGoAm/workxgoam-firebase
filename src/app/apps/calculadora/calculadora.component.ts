@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CostCalculationService, CostItem, CostCalculation } from '../../services/cost-calculation.service';
 import Chart from 'chart.js/auto';
-import { IngredientService, Ingredient } from '../../services/ingredient.service';
+import { IngredientService, Ingredient, IngredientHistory } from '../../services/ingredient.service';
 import { Storage, ref, uploadString, getDownloadURL } from '@angular/fire/storage';
 
 @Component({
@@ -66,6 +66,17 @@ export class CalculadoraComponent implements OnInit, AfterViewInit {
 
   // Estado de modal de ingredientes
   openIngModal = false;
+
+  // Estado y métodos para historial de ingredientes
+  historyModalVisible = false;
+  historyRecords: IngredientHistory[] = [];
+  historyIngredientName = '';
+
+  // Estado y datos para modal de comparar cálculos
+  isCompareModalVisible = false;
+  compareSummaries: { title: string; totalCost: number; profitWithoutProfit: number; merchantPrice: number; publicPrice: number }[] = [];
+  // Mostrar solo precios en modal comparar
+  showOnlyPrices = false;
 
   /** Ingredientes ordenados alfabéticamente por nombre */
   get sortedIngredients(): Ingredient[] {
@@ -436,6 +447,8 @@ export class CalculadoraComponent implements OnInit, AfterViewInit {
   // Eliminar un cálculo guardado
   deleteSavedCalculation(calc: CostCalculation): void {
     if (!calc.id) return;
+    const confirmed = confirm('¿Está seguro de que desea eliminar este cálculo?');
+    if (!confirmed) return;
     this.calcService.deleteCalculation(calc.id)
       .then(success => {
         if (!success) {
@@ -603,5 +616,88 @@ export class CalculadoraComponent implements OnInit, AfterViewInit {
       a.click();
       window.URL.revokeObjectURL(url);
     }).catch(err => console.error('Error al exportar Excel:', err));
+  }
+
+  /** Abre el modal flotante con el historial de cambios */
+  openHistory(ing: Ingredient): void {
+    if (!ing.id) return;
+    this.ingredientService.getIngredientHistory(ing.id)
+      .subscribe(records => {
+        this.historyRecords = records;
+        this.historyIngredientName = ing.name;
+        this.historyModalVisible = true;
+      });
+  }
+
+  /** Cierra el modal de historial */
+  closeHistory(): void {
+    this.historyModalVisible = false;
+    this.historyRecords = [];
+    this.historyIngredientName = '';
+  }
+
+  // Calcula resumen de un cálculo guardado para comparación
+  calculateSummary(calc: CostCalculation) {
+    const sumWithoutCosts = calc.costsWithoutProfit.reduce((sum, c) => {
+      try { return sum + this.evaluateExpression(c.value); } catch { return sum; }
+    }, 0);
+    const ingredientCost = calc.selectedIngredients.reduce((sum, sel) => sum + this.getIngredientCost(sel), 0);
+    const sumWithout = sumWithoutCosts + ingredientCost;
+    const sumWith = calc.costsWithProfit.reduce((sum, c) => {
+      try { return sum + this.evaluateExpression(c.value); } catch { return sum; }
+    }, 0);
+    const laborH = this.evaluateExpression(calc.labor.hours) || 0;
+    const laborM = this.evaluateExpression(calc.labor.minutes) || 0;
+    const laborTotal = laborH + laborM / 60;
+    const laborCost = laborTotal * 34.85;
+    let baseCost = sumWithout + laborCost;
+    let forcedCost: number | null = null;
+    if (calc.forceBaseCost.trim()) {
+      try { forcedCost = this.evaluateExpression(calc.forceBaseCost); baseCost = forcedCost; } catch {}
+    }
+    const baseCostRounded = Math.round(baseCost);
+    let merchantFactor: number;
+    let fft: number | null = null;
+    if (calc.forceMerchantFactor.trim()) {
+      try { fft = this.evaluateExpression(calc.forceMerchantFactor); } catch {}
+    }
+    if (fft !== null) merchantFactor = fft;
+    else if (baseCostRounded < 77) merchantFactor = 3 - Math.atan(0.06316 * (baseCostRounded - 52.5));
+    else merchantFactor = 2;
+    const merchantPrice = baseCostRounded * merchantFactor;
+    const merchantPriceWithCosts = merchantPrice + sumWith;
+    const roundingM = this.evaluateExpression(calc.merchantRounding) || 0;
+    const merchantPriceFinal = Math.round(merchantPriceWithCosts + roundingM);
+    let publicFactor: number;
+    let publicPrice: number;
+    let fpft: number | null = null;
+    if (calc.forcePublicFactor.trim()) {
+      try { fpft = this.evaluateExpression(calc.forcePublicFactor); } catch {}
+    }
+    if (fpft !== null) {
+      publicFactor = fpft;
+      publicPrice = merchantPriceFinal * (1 + publicFactor);
+    } else if (merchantPriceFinal < 100) {
+      const cf = forcedCost !== null ? forcedCost : baseCostRounded;
+      publicFactor = 0.3 - 0.2 * Math.atan(0.01157 * (cf - 52.5));
+      publicPrice = merchantPriceFinal * (1 + publicFactor);
+    } else {
+      publicFactor = 0.2;
+      publicPrice = merchantPriceFinal * 1.2;
+    }
+    const publicPriceFinal = Math.round((publicPrice + (this.evaluateExpression(calc.publicRounding) || 0)) / 5) * 5;
+    const profitWithoutProfit = merchantPriceFinal - sumWith - (sumWithout + laborCost);
+    const totalCost = sumWithout + laborCost + sumWith;
+    return { title: calc.title, totalCost, profitWithoutProfit, merchantPrice: merchantPriceFinal, publicPrice: publicPriceFinal };
+  }
+
+  // Abre y cierra modal de comparar cálculos
+  openCompareModal(): void {
+    this.compareSummaries = this.savedCalculations.map(calc => this.calculateSummary(calc));
+    this.isCompareModalVisible = true;
+  }
+
+  closeCompareModal(): void {
+    this.isCompareModalVisible = false;
   }
 } 

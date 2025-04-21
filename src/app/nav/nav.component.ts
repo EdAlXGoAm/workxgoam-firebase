@@ -1,0 +1,2 @@
+            <a routerLink="/apps/calculadora" class="text-gray-600 hover:text-gray-900">Calculadora</a>
+            <a routerLink="/apps/upload-videos" class="text-gray-600 hover:text-gray-900">Upload Videos</a> 

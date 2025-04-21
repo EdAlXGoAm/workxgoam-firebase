@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
-import { Firestore, collection, collectionData, addDoc, doc, updateDoc, deleteDoc } from '@angular/fire/firestore';
+import { Firestore, collection, collectionData, addDoc, doc, updateDoc, deleteDoc, getDoc } from '@angular/fire/firestore';
+import { serverTimestamp } from 'firebase/firestore';
 import { Observable } from 'rxjs';
 
 export interface Ingredient {
@@ -8,6 +9,19 @@ export interface Ingredient {
   unit: string; // 'L', 'KG', 'PZ'
   packageSize: number; // Tamaño del empaque en unidades de 'unit'
   unitValue: number; // Valor monetario por paquete
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+/** Historial de cambios de un ingrediente */
+export interface IngredientHistory {
+  id?: string;
+  ingredientId: string;
+  name: string;
+  unit: string;
+  packageSize: number;
+  unitValue: number;
+  changedAt: any;
 }
 
 @Injectable({
@@ -27,7 +41,8 @@ export class IngredientService {
   // Añadir un ingrediente
   async addIngredient(ingredient: Omit<Ingredient, 'id'>): Promise<string | null> {
     try {
-      const docRef = await addDoc(collection(this.firestore, this.collPath), ingredient);
+      const data = { ...ingredient, createdAt: serverTimestamp() };
+      const docRef = await addDoc(collection(this.firestore, this.collPath), data);
       return docRef.id;
     } catch (error) {
       console.error('Error al añadir ingrediente:', error);
@@ -38,7 +53,16 @@ export class IngredientService {
   // Actualizar un ingrediente existente
   async updateIngredient(id: string, data: Partial<Omit<Ingredient, 'id'>>): Promise<boolean> {
     try {
-      await updateDoc(doc(this.firestore, this.collPath, id), data);
+      const docRef = doc(this.firestore, this.collPath, id);
+      // Respaldo de datos anteriores en historial
+      const snapshot = await getDoc(docRef);
+      if (snapshot.exists()) {
+        const old = snapshot.data();
+        const historyRef = collection(this.firestore, `${this.collPath}/${id}/history`);
+        await addDoc(historyRef, { ...old, changedAt: serverTimestamp(), ingredientId: id });
+      }
+      // Aplico actualización y guardo timestamp
+      await updateDoc(docRef, { ...data, updatedAt: serverTimestamp() });
       return true;
     } catch (error) {
       console.error('Error al actualizar ingrediente:', error);
@@ -55,5 +79,11 @@ export class IngredientService {
       console.error('Error al eliminar ingrediente:', error);
       return false;
     }
+  }
+
+  /** Obtiene el historial de cambios de un ingrediente */
+  getIngredientHistory(id: string): Observable<IngredientHistory[]> {
+    const historyColl = collection(this.firestore, `${this.collPath}/${id}/history`);
+    return collectionData(historyColl, { idField: 'id' }) as Observable<IngredientHistory[]>;
   }
 } 
