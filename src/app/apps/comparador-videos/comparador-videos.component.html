@@ -24,6 +24,40 @@
               class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
         Crear
       </button>
+      <button (click)="deletePlaylist()" [disabled]="!selectedPlaylistId"
+              class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">
+        Eliminar
+      </button>
+    </div>
+  </div>
+
+  <!-- Sección de Validadores -->
+  <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-md overflow-hidden p-6 mb-8">
+    <div class="flex items-center mb-4">
+      <i class="fas fa-user-check text-green-500 mr-3 text-xl"></i>
+      <h2 class="text-2xl font-semibold text-gray-800">Validadores</h2>
+    </div>
+    <div class="flex flex-col md:flex-row gap-4 items-center mb-4">
+      <select [(ngModel)]="selectedValidatorUid"
+              class="flex-grow px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+        <option value="">-- Seleccionar usuario --</option>
+        <option *ngFor="let user of allUsers" [value]="user.uid">
+          {{ user.displayName ? (user.displayName + ' (' + user.email + ')') : user.email }}
+        </option>
+      </select>
+      <button (click)="addValidator()"
+              [disabled]="!selectedValidatorUid"
+              class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
+        Agregar
+      </button>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <div *ngFor="let v of validators" class="bg-gray-200 px-3 py-1 rounded-full flex items-center space-x-2">
+        <span class="text-sm truncate max-w-xs">{{ getUserLabel(v) }}</span>
+        <button (click)="removeValidator(v)" class="text-red-500 hover:text-red-700">
+          <i class="fas fa-times text-xs"></i>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -134,7 +168,22 @@
         <input type="checkbox" class="video-checkbox" [checked]="selectedVideos.includes(video.id)" (change)="toggleSelection(video.id, $event)">
         <div *ngIf="selectedVideos.includes(video.id)" class="video-overlay"></div>
         <img [src]="video.thumbnail" alt="Miniatura" class="w-full h-40 object-cover">
-        <div class="p-3"><h3 class="font-medium text-gray-800 truncate">{{ video.title }}</h3><p class="text-xs text-gray-500 truncate mt-1">{{ video.channel }}</p><div class="flex justify-between items-center mt-2"><span class="text-xs text-gray-500">{{ formatNumber(video.views) }} vistas</span><button (click)="removeVideo(video.id, $event)" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button></div></div>
+        <div class="p-3">
+          <!-- Título, canal y eliminación -->
+          <h3 class="font-medium text-gray-800 truncate">{{ video.title }}</h3>
+          <p class="text-xs text-gray-500 truncate mt-1">{{ video.channel }}</p>
+          <div class="flex justify-between items-center mt-2">
+            <span class="text-xs text-gray-500">{{ formatNumber(video.views) }} vistas</span>
+            <button (click)="removeVideo(video.id, $event)" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>
+          </div>
+          <!-- Checkboxes de validación -->
+          <div class="flex mt-3 space-x-4">
+            <label *ngFor="let val of validators" class="flex items-center text-sm">
+              <input type="checkbox" [checked]="video.validations?.[val]" (change)="toggleValidation(video.id, val, $event)" [disabled]="val !== currentUserUid" class="mr-1" />
+              {{ getCheckboxLabel(val) }}
+            </label>
+          </div>
+        </div>
       </div>
     </div>
   </div>

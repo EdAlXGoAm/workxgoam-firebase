@@ -4,7 +4,10 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { RouterModule } from '@angular/router';
-import { PlaylistService, Playlist, VideoEntry } from '../../services/playlist.service';
+import { PlaylistService, VideoEntry } from '../../services/playlist.service';
+import { UserService, UserProfile } from '../../services/user.service';
+import { Firestore, doc, updateDoc } from '@angular/fire/firestore';
+import { AuthService } from '../../services/auth.service';
 
 interface Video {
   id: string;
@@ -18,6 +21,8 @@ interface Video {
   duration: string;
   publishedAt: string;
   description: string;
+  validations?: { [validatorId: string]: boolean };
+  createdAt?: any;
 }
 
 @Component({
@@ -32,7 +37,8 @@ export class ComparadorVideosComponent implements OnInit {
   searchQuery = '';
   videoUrl = '';
   videos: Video[] = [];
-  playlists: Playlist[] = [];
+  playlists: any[] = [];
+  allUsers: UserProfile[] = [];
   selectedPlaylistId = '';
   newPlaylistName = '';
   private videoDocMap: { [videoId: string]: string } = {};
@@ -47,14 +53,34 @@ export class ComparadorVideosComponent implements OnInit {
   video1: Video | null = null;
   video2: Video | null = null;
   currentVideoId: string | null = null;
+  validators: string[] = [];
+  selectedValidatorUid = '';
+  currentUserUid: string | null = null;
 
   constructor(private http: HttpClient,
               private sanitizer: DomSanitizer,
-              private playlistService: PlaylistService) {}
+              private playlistService: PlaylistService,
+              private firestore: Firestore,
+              private userService: UserService,
+              private authService: AuthService) {}
 
   ngOnInit(): void {
-    // Cargar playlists disponibles
-    this.playlistService.getPlaylists().subscribe(pls => this.playlists = pls);
+    this.authService.user$.subscribe(user => {
+      this.currentUserUid = user?.uid || null;
+    });
+    // Cargar todas las playlists
+    this.playlistService.getPlaylists().subscribe((pls: any[]) => {
+      this.playlists = pls;
+      // Seleccionar por defecto la primera playlist y cargar sus videos
+      if (pls.length > 0 && !this.selectedPlaylistId) {
+        this.selectedPlaylistId = pls[0].id;
+        this.onPlaylistChange();
+      }
+    });
+    // Cargar usuarios registrados
+    this.userService.getUsers().subscribe((us: UserProfile[]) => {
+      this.allUsers = us;
+    });
   }
 
   createPlaylist(): void {
@@ -63,35 +89,127 @@ export class ComparadorVideosComponent implements OnInit {
       return;
     }
     this.playlistService.createPlaylist(this.newPlaylistName)
-      .then(() => this.newPlaylistName = '')
-      .catch(err => alert(err));
+      .then(() => {
+        this.newPlaylistName = '';
+      })
+      .catch((err: any) => {
+        alert(err);
+      });
+  }
+
+  /** Eliminar la playlist seleccionada */
+  deletePlaylist(): void {
+    if (!this.selectedPlaylistId) {
+      alert('Seleccione una playlist primero');
+      return;
+    }
+    if (!confirm(`¿Seguro que quieres eliminar la playlist "${this.currentPlaylistName}"?`)) {
+      return;
+    }
+    this.playlistService.deletePlaylist(this.selectedPlaylistId)
+      .then(() => {
+        // Refrescar listas y limpiar selección
+        this.selectedPlaylistId = '';
+        this.videos = [];
+        this.validators = [];
+        this.playlistService.getPlaylists().subscribe((pls: any[]) => {
+          this.playlists = pls;
+        });
+      })
+      .catch(() => alert('Error al eliminar la playlist'));
   }
 
   onPlaylistChange(): void {
     if (!this.selectedPlaylistId) {
       this.videos = [];
+      this.validators = [];
       return;
     }
-    this.playlistService.getVideos(this.selectedPlaylistId)
-      .subscribe(entries => {
-        this.videoDocMap = {};
-        this.videos = entries.map(entry => {
-          this.videoDocMap[entry.videoId] = entry.id!;
-          return {
-            id: entry.videoId,
-            url: entry.url,
-            thumbnail: entry.thumbnail,
-            title: entry.title,
-            channel: entry.channel,
-            views: entry.views,
-            likes: entry.likes,
-            comments: entry.comments,
-            duration: entry.duration,
-            publishedAt: entry.publishedAt,
-            description: entry.description
-          } as Video;
-        });
+    // Obtener validadores de la playlist seleccionada
+    const pl = this.playlists.find(p => p.id === this.selectedPlaylistId) as any;
+    this.validators = pl?.validators || [];
+    // Cargar videos con sus validaciones y fecha de creación
+    this.playlistService.getVideos(this.selectedPlaylistId).subscribe((entries: any[]) => {
+      this.videoDocMap = {};
+      this.videos = entries.map(entry => {
+        this.videoDocMap[entry.videoId] = entry.id;
+        return {
+          id: entry.videoId,
+          url: entry.url,
+          thumbnail: entry.thumbnail,
+          title: entry.title,
+          channel: entry.channel,
+          views: entry.views,
+          likes: entry.likes,
+          comments: entry.comments,
+          duration: entry.duration,
+          publishedAt: entry.publishedAt,
+          description: entry.description,
+          validations: entry.validations || {},
+          createdAt: entry.createdAt
+        } as Video;
       });
+      this.sortVideos();
+    });
+  }
+
+  // Ordenar videos según validaciones y fecha de creación
+  sortVideos(): void {
+    if (this.validators.length === 0) {
+      this.videos.sort((a, b) =>
+        (new Date(a.createdAt).getTime() || 0) - (new Date(b.createdAt).getTime() || 0)
+      );
+    } else {
+      this.videos.sort((a, b) => {
+        const countA = this.validators.filter(v => a.validations?.[v]).length;
+        const countB = this.validators.filter(v => b.validations?.[v]).length;
+        if (countA !== countB) return countA - countB;
+        return (new Date(a.createdAt).getTime() || 0) - (new Date(b.createdAt).getTime() || 0);
+      });
+    }
+  }
+
+  // Marcar o desmarcar validación y reordenar
+  toggleValidation(videoId: string, validatorId: string, event: Event): void {
+    event.stopPropagation();
+    const status = (event.target as HTMLInputElement).checked;
+    const docId = this.videoDocMap[videoId];
+    // Actualizar validación en Firestore
+    const ref = doc(this.firestore, `playlists/${this.selectedPlaylistId}/videos/${docId}`);
+    updateDoc(ref, { [`validations.${validatorId}`]: status })
+      .then(() => this.sortVideos())
+      .catch(() => alert('Error al actualizar validación'));
+  }
+
+  // Agregar y quitar validadores de la playlist
+  addValidator(): void {
+    const v = this.selectedValidatorUid.trim();
+    if (!v) { alert('Seleccione un validador'); return; }
+    if (this.validators.includes(v)) { alert('Validador ya agregado'); return; }
+    const updated = [...this.validators, v];
+    // Actualizar validadores en Firestore
+    const ref = doc(this.firestore, 'playlists', this.selectedPlaylistId);
+    updateDoc(ref, { validators: updated })
+      .then(() => {
+        // Refrescar UI
+        this.validators = updated;
+      })
+      .catch(() => alert('Error actualizando validadores'));
+  }
+
+  removeValidator(v: string): void {
+    // Confirmar antes de eliminar validador
+    if (!confirm(`¿Seguro que quieres eliminar al validador "${v}"?`)) {
+      return;
+    }
+    const updated = this.validators.filter(x => x !== v);
+    const ref = doc(this.firestore, 'playlists', this.selectedPlaylistId);
+    updateDoc(ref, { validators: updated })
+      .then(() => {
+        // Refrescar UI
+        this.validators = updated;
+      })
+      .catch(() => alert('Error actualizando validadores'));
   }
 
   isValidYouTubeUrl(url: string): boolean {
@@ -323,5 +441,32 @@ export class ComparadorVideosComponent implements OnInit {
   get currentPlaylistName(): string {
     const pl = this.playlists.find(p => p.id === this.selectedPlaylistId);
     return pl ? pl.name : '';
+  }
+
+  /** Devuelve el nombre o email de un validador dado su UID */
+  getUserLabel(uid: string): string {
+    const user = this.allUsers.find(u => u.uid === uid);
+    return user ? (user.displayName ?? user.email ?? uid) : uid;
+  }
+
+  /** Devuelve etiqueta para el checkbox: Primer nombre + usuario (parte antes de @) */
+  getCheckboxLabel(uid: string): string {
+    const user = this.allUsers.find(u => u.uid === uid);
+    let firstName = '';
+    let emailPrefix = '';
+    if (user) {
+      if (user.displayName) {
+        firstName = user.displayName.split(' ')[0];
+      }
+      if (user.email) {
+        const parts = user.email.split('@');
+        emailPrefix = parts[0];
+        // si no hay displayName, usar emailPrefix como firstName
+        if (!firstName) {
+          firstName = emailPrefix;
+        }
+      }
+    }
+    return `${firstName} (${emailPrefix})`.trim();
   }
 } 

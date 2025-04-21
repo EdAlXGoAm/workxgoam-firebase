@@ -50,9 +50,17 @@ service cloud.firestore {
       match /videos/{videoDocId} {
         // Todos pueden leer los videos de una playlist
         allow read: if true;
-        // Usuarios autenticados pueden agregar o eliminar videos
-        allow create, delete: if request.auth != null;
+        // Usuarios autenticados pueden agregar, actualizar o eliminar videos
+        allow create, update, delete: if request.auth != null;
       }
+    }
+
+    // Sección de Usuarios (perfiles)
+    match /users/{userId} {
+      // Cualquier usuario autenticado puede leer la lista de usuarios
+      allow read: if request.auth != null;
+      // Cada usuario puede crear o actualizar su propio perfil
+      allow create, update: if request.auth != null && request.auth.uid == userId;
     }
 
     // Por defecto denegar todo lo demás
