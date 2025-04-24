@@ -3,6 +3,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { Firestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy, Timestamp } from '@angular/fire/firestore';
 import { v4 as uuidv4 } from 'uuid';
+import { HttpClientModule } from '@angular/common/http';
+import { PlatillosService } from '../../services/platillos.service';
 
 interface OrdenItem {
   id: string;        // identificador único
@@ -35,7 +37,7 @@ interface Mesa {
 @Component({
   selector: 'app-mesero',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, HttpClientModule],
   templateUrl: './mesero.component.html',
   styleUrls: ['./mesero.component.css']
 })
@@ -45,6 +47,7 @@ export class MeseroComponent implements OnInit {
   historialOrdenes: Orden[] = [];
   ordenesLlevar: Orden[] = [];
   ordenesWhatsapp: Orden[] = [];
+  platillos: any[] = [];
   siguienteNumeroOrden = 1;
   totalGanancias = 0;
   totalOrdenes = 0;
@@ -73,11 +76,12 @@ export class MeseroComponent implements OnInit {
   modoMontoEspecifico = false;
   montoEspecifico = 0;
 
-  constructor(private firestore: Firestore, private el: ElementRef) {}
+  constructor(private firestore: Firestore, private el: ElementRef, private platillosService: PlatillosService) {}
 
   ngOnInit(): void {
     this.cargarOrdenes();
     this.actualizarEstadisticas();
+    this.loadPlatillos();
   }
 
   cargarOrdenes(): void {
@@ -825,5 +829,12 @@ export class MeseroComponent implements OnInit {
 
   cancelarCobroParcial(): void {
     this.cobroParcialVisible = false;
+  }
+
+  loadPlatillos(): void {
+    this.platillosService.getPlatillos().subscribe({
+      next: (data) => { this.platillos = data; },
+      error: (error) => console.error('Error al cargar platillos:', error)
+    });
   }
 } 
