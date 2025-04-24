@@ -8,6 +8,7 @@ import { PlaylistService, VideoEntry } from '../../services/playlist.service';
 import { UserService, UserProfile } from '../../services/user.service';
 import { Firestore, doc, updateDoc } from '@angular/fire/firestore';
 import { AuthService } from '../../services/auth.service';
+import { environment } from '../../../environments/environment';
 
 interface Video {
   id: string;
@@ -33,7 +34,7 @@ interface Video {
   styleUrls: ['./comparador-videos.component.css']
 })
 export class ComparadorVideosComponent implements OnInit {
-  YOUTUBE_API_KEY = 'AIzaSyDRbb3BWx_9kLbuUJnFif17aYzXv1ygoUs';
+  YOUTUBE_API_KEY = environment.youtubeApiKey;
   searchQuery = '';
   videoUrl = '';
   videos: Video[] = [];
@@ -172,12 +173,23 @@ export class ComparadorVideosComponent implements OnInit {
   // Marcar o desmarcar validación y reordenar
   toggleValidation(videoId: string, validatorId: string, event: Event): void {
     event.stopPropagation();
-    const status = (event.target as HTMLInputElement).checked;
+    event.preventDefault();
+    const checkbox = event.target as HTMLInputElement;
+    const status = checkbox.checked;
     const docId = this.videoDocMap[videoId];
     // Actualizar validación en Firestore
     const ref = doc(this.firestore, `playlists/${this.selectedPlaylistId}/videos/${docId}`);
     updateDoc(ref, { [`validations.${validatorId}`]: status })
-      .then(() => this.sortVideos())
+      .then(() => {
+        // Actualizar localmente sin recargar ni reordenar
+        const video = this.videos.find(v => v.id === videoId);
+        if (video) {
+          video.validations = {
+            ...video.validations,
+            [validatorId]: status
+          };
+        }
+      })
       .catch(() => alert('Error al actualizar validación'));
   }
 
