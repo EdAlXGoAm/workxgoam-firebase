@@ -42,6 +42,11 @@ export const routes: Routes = [
     canActivate: [authGuard]
   },
   { 
+    path: 'apps/task-tracker', 
+    loadComponent: () => import('./apps/task-tracker/task-tracker.component').then(m => m.TaskTrackerComponent),
+    canActivate: [authGuard]
+  },
+  { 
     path: '', 
     canActivate: [rootRedirectGuard],
     component: HomeComponent

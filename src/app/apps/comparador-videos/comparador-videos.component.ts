@@ -9,6 +9,7 @@ import { UserService, UserProfile } from '../../services/user.service';
 import { Firestore, doc, updateDoc } from '@angular/fire/firestore';
 import { AuthService } from '../../services/auth.service';
 import { environment } from '../../../environments/environment';
+declare const gapi: any;
 
 interface Video {
   id: string;
@@ -35,6 +36,9 @@ interface Video {
 })
 export class ComparadorVideosComponent implements OnInit {
   YOUTUBE_API_KEY = environment.youtubeApiKey;
+  youtubeClientId = environment.youtubeClientId;
+  private ytScope = 'https://www.googleapis.com/auth/youtube';
+  private ytPlaylistId = '';
   searchQuery = '';
   videoUrl = '';
   videos: Video[] = [];
@@ -66,6 +70,15 @@ export class ComparadorVideosComponent implements OnInit {
               private authService: AuthService) {}
 
   ngOnInit(): void {
+    // Inicializar cliente de Google API para YouTube
+    gapi.load('client:auth2', () => {
+      gapi.client.init({
+        apiKey: this.YOUTUBE_API_KEY,
+        clientId: this.youtubeClientId,
+        discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest'],
+        scope: this.ytScope
+      });
+    });
     this.authService.user$.subscribe(user => {
       this.currentUserUid = user?.uid || null;
     });
@@ -410,7 +423,12 @@ export class ComparadorVideosComponent implements OnInit {
     this.video1 = null;
     this.video2 = null;
     this.currentVideoId = video.id;
-    this.playerUrl = this.sanitizer.bypassSecurityTrustResourceUrl(video.url + '?autoplay=1');
+    // Simular playlist local: reproducir automáticamente videos siguientes
+    const allIds = this.videos.map(v => v.id);
+    const nextIds = allIds.filter(id => id !== video.id);
+    const playlistParam = nextIds.join(',');
+    const src = `${video.url}?autoplay=1&playlist=${playlistParam}`;
+    this.playerUrl = this.sanitizer.bypassSecurityTrustResourceUrl(src);
   }
 
   compareVideos(): void {
@@ -480,5 +498,51 @@ export class ComparadorVideosComponent implements OnInit {
       }
     }
     return `${firstName} (${emailPrefix})`.trim();
+  }
+
+  // Autenticarse con Google YouTube
+  loginYt(): Promise<any> {
+    return gapi.auth2.getAuthInstance().signIn();
+  }
+
+  // Crear playlist en cuenta de YouTube
+  async crearPlaylistYT(title: string, description: string): Promise<any> {
+    const res = await gapi.client.youtube.playlists.insert({
+      part: 'snippet,status',
+      resource: {
+        snippet: { title, description },
+        status: { privacyStatus: 'private' }
+      }
+    });
+    return res.result;
+  }
+
+  // Agregar videos a la playlist de YouTube
+  async agregarVideosYT(videoIds: string[]): Promise<void> {
+    for (const id of videoIds) {
+      await gapi.client.youtube.playlistItems.insert({
+        part: 'snippet',
+        resource: {
+          snippet: {
+            playlistId: this.ytPlaylistId,
+            resourceId: { kind: 'youtube#video', videoId: id }
+          }
+        }
+      });
+    }
+  }
+
+  // Exportar la playlist actual a YouTube
+  async onClickCrearYT(): Promise<void> {
+    if (!gapi.auth2.getAuthInstance().isSignedIn.get()) {
+      await this.loginYt();
+    }
+    const title = this.currentPlaylistName || 'Mi Playlist de Comparador';
+    const desc = 'Playlist exportada desde Comparador de Videos';
+    const playlist = await this.crearPlaylistYT(title, desc);
+    this.ytPlaylistId = playlist.id;
+    const ids = this.videos.map(v => v.id);
+    await this.agregarVideosYT(ids);
+    alert('Playlist creada en YouTube con ' + ids.length + ' videos.');
   }
 } 
