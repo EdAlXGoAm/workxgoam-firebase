@@ -7,6 +7,8 @@ import { Environment } from '../models/environment.model';
   providedIn: 'root'
 })
 export class EnvironmentService {
+  public static readonly COLLECTION_PREFIX = 'task-tracker_';
+
   constructor(
     private firestore: Firestore,
     private authService: AuthService
@@ -16,7 +18,7 @@ export class EnvironmentService {
     const user = this.authService.getCurrentUser();
     if (!user) throw new Error('Usuario no autenticado');
 
-    const environmentsRef = collection(this.firestore, 'environments');
+    const environmentsRef = collection(this.firestore, `${EnvironmentService.COLLECTION_PREFIX}environments`);
     const now = new Date().toISOString();
 
     const newEnvironment = {
@@ -34,7 +36,7 @@ export class EnvironmentService {
     const user = this.authService.getCurrentUser();
     if (!user) throw new Error('Usuario no autenticado');
 
-    const environmentRef = doc(this.firestore, 'environments', environmentId);
+    const environmentRef = doc(this.firestore, `${EnvironmentService.COLLECTION_PREFIX}environments`, environmentId);
     const now = new Date().toISOString();
 
     await updateDoc(environmentRef, {
@@ -47,7 +49,7 @@ export class EnvironmentService {
     const user = this.authService.getCurrentUser();
     if (!user) throw new Error('Usuario no autenticado');
 
-    const environmentRef = doc(this.firestore, 'environments', environmentId);
+    const environmentRef = doc(this.firestore, `${EnvironmentService.COLLECTION_PREFIX}environments`, environmentId);
     await deleteDoc(environmentRef);
   }
 
@@ -55,7 +57,7 @@ export class EnvironmentService {
     const user = this.authService.getCurrentUser();
     if (!user) throw new Error('Usuario no autenticado');
 
-    const environmentsRef = collection(this.firestore, 'environments');
+    const environmentsRef = collection(this.firestore, `${EnvironmentService.COLLECTION_PREFIX}environments`);
     const q = query(environmentsRef, where('userId', '==', user.uid));
     const querySnapshot = await getDocs(q);
     

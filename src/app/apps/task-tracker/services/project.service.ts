@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { Firestore, collection, addDoc, updateDoc, deleteDoc, doc, query, where, getDocs } from '@angular/fire/firestore';
 import { AuthService } from '../../../services/auth.service';
 import { Project } from '../models/project.model';
+import { EnvironmentService } from './environment.service';
 
 @Injectable({
   providedIn: 'root'
@@ -16,7 +17,7 @@ export class ProjectService {
     const user = this.authService.getCurrentUser();
     if (!user) throw new Error('Usuario no autenticado');
 
-    const projectsRef = collection(this.firestore, 'projects');
+    const projectsRef = collection(this.firestore, `${EnvironmentService.COLLECTION_PREFIX}projects`);
     const now = new Date().toISOString();
 
     const newProject = {
@@ -34,7 +35,7 @@ export class ProjectService {
     const user = this.authService.getCurrentUser();
     if (!user) throw new Error('Usuario no autenticado');
 
-    const projectRef = doc(this.firestore, 'projects', projectId);
+    const projectRef = doc(this.firestore, `${EnvironmentService.COLLECTION_PREFIX}projects`, projectId);
     const now = new Date().toISOString();
 
     await updateDoc(projectRef, {
@@ -47,7 +48,7 @@ export class ProjectService {
     const user = this.authService.getCurrentUser();
     if (!user) throw new Error('Usuario no autenticado');
 
-    const projectRef = doc(this.firestore, 'projects', projectId);
+    const projectRef = doc(this.firestore, `${EnvironmentService.COLLECTION_PREFIX}projects`, projectId);
     await deleteDoc(projectRef);
   }
 
@@ -55,7 +56,7 @@ export class ProjectService {
     const user = this.authService.getCurrentUser();
     if (!user) throw new Error('Usuario no autenticado');
 
-    const projectsRef = collection(this.firestore, 'projects');
+    const projectsRef = collection(this.firestore, `${EnvironmentService.COLLECTION_PREFIX}projects`);
     const q = query(projectsRef, where('userId', '==', user.uid));
     const querySnapshot = await getDocs(q);
     
@@ -69,7 +70,7 @@ export class ProjectService {
     const user = this.authService.getCurrentUser();
     if (!user) throw new Error('Usuario no autenticado');
 
-    const projectsRef = collection(this.firestore, 'projects');
+    const projectsRef = collection(this.firestore, `${EnvironmentService.COLLECTION_PREFIX}projects`);
     const q = query(
       projectsRef,
       where('userId', '==', user.uid),

@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { Firestore, collection, addDoc, updateDoc, deleteDoc, doc, query, where, getDocs } from '@angular/fire/firestore';
 import { AuthService } from '../../../services/auth.service';
 import { Task } from '../models/task.model';
+import { EnvironmentService } from './environment.service';
 
 @Injectable({
   providedIn: 'root'
@@ -16,7 +17,7 @@ export class TaskService {
     const user = this.authService.getCurrentUser();
     if (!user) throw new Error('Usuario no autenticado');
 
-    const tasksRef = collection(this.firestore, 'tasks');
+    const tasksRef = collection(this.firestore, `${EnvironmentService.COLLECTION_PREFIX}tasks`);
     const now = new Date().toISOString();
 
     const newTask = {
@@ -38,7 +39,7 @@ export class TaskService {
     const user = this.authService.getCurrentUser();
     if (!user) throw new Error('Usuario no autenticado');
 
-    const taskRef = doc(this.firestore, 'tasks', taskId);
+    const taskRef = doc(this.firestore, `${EnvironmentService.COLLECTION_PREFIX}tasks`, taskId);
     const now = new Date().toISOString();
 
     await updateDoc(taskRef, {
@@ -51,7 +52,7 @@ export class TaskService {
     const user = this.authService.getCurrentUser();
     if (!user) throw new Error('Usuario no autenticado');
 
-    const taskRef = doc(this.firestore, 'tasks', taskId);
+    const taskRef = doc(this.firestore, `${EnvironmentService.COLLECTION_PREFIX}tasks`, taskId);
     await deleteDoc(taskRef);
   }
 
@@ -59,7 +60,7 @@ export class TaskService {
     const user = this.authService.getCurrentUser();
     if (!user) throw new Error('Usuario no autenticado');
 
-    const tasksRef = collection(this.firestore, 'tasks');
+    const tasksRef = collection(this.firestore, `${EnvironmentService.COLLECTION_PREFIX}tasks`);
     const q = query(tasksRef, where('userId', '==', user.uid));
     const querySnapshot = await getDocs(q);
     
@@ -73,7 +74,7 @@ export class TaskService {
     const user = this.authService.getCurrentUser();
     if (!user) throw new Error('Usuario no autenticado');
 
-    const taskRef = doc(this.firestore, 'tasks', taskId);
+    const taskRef = doc(this.firestore, `${EnvironmentService.COLLECTION_PREFIX}tasks`, taskId);
     const now = new Date().toISOString();
 
     await updateDoc(taskRef, {
@@ -87,7 +88,7 @@ export class TaskService {
     const user = this.authService.getCurrentUser();
     if (!user) throw new Error('Usuario no autenticado');
 
-    const taskRef = doc(this.firestore, 'tasks', taskId);
+    const taskRef = doc(this.firestore, `${EnvironmentService.COLLECTION_PREFIX}tasks`, taskId);
     const now = new Date().toISOString();
 
     await updateDoc(taskRef, {

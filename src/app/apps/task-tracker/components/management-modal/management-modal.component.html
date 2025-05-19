@@ -1,0 +1,161 @@
+<!-- Modal Backdrop -->
+<div *ngIf="showModal" class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 p-4">
+  <!-- Modal Content -->
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl transform transition-all">
+    <!-- Modal Header -->
+    <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200">
+      <h3 class="text-xl font-semibold text-gray-800">Gestionar Entornos y Proyectos</h3>
+      <button (click)="close()" class="text-gray-400 hover:text-gray-600 transition">
+        <i class="fas fa-times fa-lg"></i>
+      </button>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="px-6 py-3 border-b border-gray-200">
+      <nav class="flex space-x-4">
+        <button 
+          (click)="selectTab('environments')" 
+          [class.border-indigo-600]="activeTab === 'environments'"
+          [class.text-indigo-600]="activeTab === 'environments'"
+          [class.border-transparent]="activeTab !== 'environments'"
+          [class.text-gray-500]="activeTab !== 'environments'"
+          class="pb-2 px-1 border-b-2 font-medium text-sm hover:text-indigo-500 focus:outline-none">
+          Entornos
+        </button>
+        <button 
+          (click)="selectTab('projects')" 
+          [class.border-indigo-600]="activeTab === 'projects'"
+          [class.text-indigo-600]="activeTab === 'projects'"
+          [class.border-transparent]="activeTab !== 'projects'"
+          [class.text-gray-500]="activeTab !== 'projects'"
+          class="pb-2 px-1 border-b-2 font-medium text-sm hover:text-indigo-500 focus:outline-none">
+          Proyectos
+        </button>
+      </nav>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="p-6" style="max-height: 60vh; overflow-y: auto;">
+      <!-- Environments Tab Content -->
+      <div *ngIf="activeTab === 'environments'">
+        <h4 class="text-lg font-semibold text-gray-700 mb-4">Entornos</h4>
+        <!-- Form to add/edit environment -->
+        <div class="bg-gray-50 p-4 rounded-lg mb-6">
+          <h5 class="text-md font-semibold text-gray-700 mb-3">{{ isEditingEnvironment ? 'Editar Entorno' : 'Agregar Nuevo Entorno' }}</h5>
+          <form (ngSubmit)="saveEnvironment()" class="space-y-4">
+            <div>
+              <label for="envName" class="block text-sm font-medium text-gray-700">Nombre</label>
+              <input type="text" id="envName" name="envName" [(ngModel)]="currentEnvironment.name" required 
+                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+            </div>
+            <div>
+              <label for="envDescription" class="block text-sm font-medium text-gray-700">Descripción (Opcional)</label>
+              <textarea id="envDescription" name="envDescription" [(ngModel)]="currentEnvironment.description" rows="3"
+                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></textarea>
+            </div>
+            <div>
+              <label for="envColor" class="block text-sm font-medium text-gray-700">Color</label>
+              <input type="color" id="envColor" name="envColor" [(ngModel)]="currentEnvironment.color"
+                     class="mt-1 block w-full h-10 px-1 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+            </div>
+            <div class="flex justify-end space-x-3">
+              <button type="button" (click)="resetEnvironmentForm()" *ngIf="isEditingEnvironment || currentEnvironment.name || currentEnvironment.description"
+                      class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none">
+                Cancelar
+              </button>
+              <button type="submit"
+                      class="px-4 py-2 bg-indigo-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                {{ isEditingEnvironment ? 'Guardar Cambios' : 'Crear Entorno' }}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- List of environments -->
+        <h5 class="text-md font-semibold text-gray-700 mb-3">Entornos Existentes</h5>
+        <div *ngIf="environments.length === 0" class="text-center text-gray-500 py-4">
+          No hay entornos creados.
+        </div>
+        <ul *ngIf="environments.length > 0" class="space-y-3">
+          <li *ngFor="let env of environments" class="bg-white p-4 rounded-lg shadow flex justify-between items-center">
+            <div>
+              <p class="font-semibold text-gray-800">{{ env.name }}</p>
+              <p class="text-sm text-gray-600">{{ env.description || 'Sin descripción' }}</p>
+            </div>
+            <div class="space-x-2 flex-shrink-0">
+              <button (click)="editEnvironment(env)" class="p-2 text-indigo-600 hover:text-indigo-800">
+                <i class="fas fa-pencil-alt"></i>
+              </button>
+              <button (click)="deleteEnvironment(env.id)" class="p-2 text-red-500 hover:text-red-700">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Projects Tab Content -->
+      <div *ngIf="activeTab === 'projects'">
+        <h4 class="text-lg font-semibold text-gray-700 mb-4">Proyectos</h4>
+        <!-- Form to add/edit project -->
+        <div class="bg-gray-50 p-4 rounded-lg mb-6">
+          <h5 class="text-md font-semibold text-gray-700 mb-3">{{ isEditingProject ? 'Editar Proyecto' : 'Agregar Nuevo Proyecto' }}</h5>
+          <form (ngSubmit)="saveProject()" class="space-y-4">
+            <div>
+              <label for="projectName" class="block text-sm font-medium text-gray-700">Nombre</label>
+              <input type="text" id="projectName" name="projectName" [(ngModel)]="currentProject.name" required
+                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+            </div>
+            <div>
+              <label for="projectDescription" class="block text-sm font-medium text-gray-700">Descripción (Opcional)</label>
+              <textarea id="projectDescription" name="projectDescription" [(ngModel)]="currentProject.description" rows="3"
+                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></textarea>
+            </div>
+            <div>
+              <label for="projectEnvironment" class="block text-sm font-medium text-gray-700">Entorno</label>
+              <select id="projectEnvironment" name="projectEnvironment" [(ngModel)]="currentProject.environment" required
+                      class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white">
+                <option [ngValue]="null" disabled>Selecciona un entorno</option>
+                <option *ngFor="let env of environments" [value]="env.id">{{ env.name }}</option>
+              </select>
+            </div>
+            <div class="flex justify-end space-x-3">
+              <button type="button" (click)="resetProjectForm()" *ngIf="isEditingProject || currentProject.name"
+                      class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none">
+                Cancelar
+              </button>
+              <button type="submit"
+                      class="px-4 py-2 bg-indigo-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                {{ isEditingProject ? 'Guardar Cambios' : 'Crear Proyecto' }}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- List of projects -->
+        <h5 class="text-md font-semibold text-gray-700 mb-3">Proyectos Existentes</h5>
+        <div *ngIf="projects.length === 0" class="text-center text-gray-500 py-4">
+          No hay proyectos creados.
+        </div>
+        <ul *ngIf="projects.length > 0" class="space-y-3">
+          <li *ngFor="let proj of projects" class="bg-white p-4 rounded-lg shadow flex justify-between items-center">
+            <div>
+              <p class="font-semibold text-gray-800">{{ proj.name }}</p>
+              <p class="text-sm text-gray-600">{{ proj.description || 'Sin descripción' }}</p>
+              <p class="text-xs text-indigo-600 mt-1">Entorno: {{ getEnvironmentName(proj.environment) || 'N/A' }}</p>
+            </div>
+            <div class="space-x-2 flex-shrink-0">
+              <button (click)="editProject(proj)" class="p-2 text-indigo-600 hover:text-indigo-800">
+                <i class="fas fa-pencil-alt"></i>
+              </button>
+              <button (click)="deleteProject(proj.id)" class="p-2 text-red-500 hover:text-red-700">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+  </div> <!-- End of Modal Content -->
+</div> <!-- End of Modal Backdrop --> 

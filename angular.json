@@ -72,7 +72,7 @@
           },
           "defaultConfiguration": "development",
           "options": {
-            "allowedHosts": ["work.aixgoam.com"]
+            "allowedHosts": ["work.aixgoam.com", "localhost", "0.0.0.0", "192.168.1.*"]
           }
         },
         "extract-i18n": {
