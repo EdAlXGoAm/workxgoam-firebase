@@ -11,11 +11,12 @@ import { Task } from './models/task.model';
 import { Project } from './models/project.model';
 import { Environment } from './models/environment.model';
 import { ManagementModalComponent } from './components/management-modal/management-modal.component';
+import { TimelineSvgComponent } from './components/timeline-svg/timeline-svg.component';
 
 @Component({
   selector: 'app-task-tracker',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent],
+  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, TimelineSvgComponent],
   template: `
     <div class="min-h-screen bg-gray-50">
       <!-- Header -->
@@ -47,6 +48,9 @@ import { ManagementModalComponent } from './components/management-modal/manageme
             <div class="flex space-x-2 mb-4 md:mb-0">
               <button (click)="switchView('board')" [class.bg-indigo-600]="currentView === 'board'" [class.text-white]="currentView === 'board'" [class.bg-white]="currentView !== 'board'" [class.text-gray-700]="currentView !== 'board'" class="px-4 py-2 rounded-lg font-medium hover:bg-gray-100">
                 <i class="fas fa-columns mr-2"></i>Tablero
+              </button>
+              <button (click)="switchView('timeline')" [class.bg-indigo-600]="currentView === 'timeline'" [class.text-white]="currentView === 'timeline'" [class.bg-white]="currentView !== 'timeline'" [class.text-gray-700]="currentView !== 'timeline'" class="px-4 py-2 rounded-lg font-medium hover:bg-gray-100">
+                <i class="fas fa-stream mr-2"></i>Línea del Tiempo
               </button>
               <button (click)="openManagementModal()" class="px-4 py-2 rounded-lg font-medium bg-gray-200 text-gray-700 hover:bg-gray-300">
                 <i class="fas fa-cog mr-2"></i>Gestionar
@@ -97,6 +101,12 @@ import { ManagementModalComponent } from './components/management-modal/manageme
                 </div>
               </div>
             </div>
+          </div>
+
+          <!-- Timeline View -->
+          <div *ngIf="currentView === 'timeline'" class="w-full bg-white rounded-lg shadow-md p-4">
+            <h2 class="text-xl font-bold mb-4">Línea del Tiempo (Hoy)</h2>
+            <app-timeline-svg [tasks]="getTodayTasks()"></app-timeline-svg>
           </div>
         </div>
       </main>
@@ -731,7 +741,7 @@ import { ManagementModalComponent } from './components/management-modal/manageme
   `]
 })
 export class TaskTrackerComponent implements OnInit {
-  currentView: 'board' = 'board';
+  currentView: 'board' | 'timeline' = 'board';
   showNewTaskModal = false;
   searchQuery = '';
   userName = '';
@@ -880,7 +890,7 @@ export class TaskTrackerComponent implements OnInit {
     } as Environment));
   }
 
-  switchView(view: 'board') {
+  switchView(view: 'board' | 'timeline') {
     this.currentView = view;
   }
 
@@ -1302,5 +1312,21 @@ export class TaskTrackerComponent implements OnInit {
   getEnvironmentName(envId: string): string | undefined {
     const env = this.environments.find(e => e.id === envId);
     return env?.name;
+  }
+
+  getTodayTasks(): Task[] {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return this.tasks.filter(task => {
+      if (!task.start) return false;
+      const taskDate = new Date(task.start);
+      return (
+        taskDate.getFullYear() === yyyy &&
+        String(taskDate.getMonth() + 1).padStart(2, '0') === mm &&
+        String(taskDate.getDate()).padStart(2, '0') === dd
+      );
+    });
   }
 } 
