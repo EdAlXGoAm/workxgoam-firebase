@@ -73,9 +73,16 @@ import { TimelineSvgComponent } from './components/timeline-svg/timeline-svg.com
           <!-- Board View -->
           <div *ngIf="currentView === 'board'" class="w-full bg-white rounded-lg shadow-md p-4">
             <h2 class="text-xl font-bold mb-4">Vista de Tablero</h2>
+            <!-- Timeline View integrada -->
+            <div class="mb-6">
+              <h3 class="text-lg font-semibold mb-2">Línea del Tiempo (Hoy)</h3>
+              <app-timeline-svg [tasks]="getTodayTasks()" [environments]="environments"></app-timeline-svg>
+            </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div *ngFor="let env of environments" class="board-column p-4">
-                <h3 class="font-semibold mb-4" [style.color]="env.color">{{env.name}}</h3>
+                <h3 class="font-semibold mb-4 p-2 rounded-md text-black"
+                    [style.background-color]="env.color + 'aa'" 
+                    [style.color]="'black'">{{env.name}}</h3>
                 <div class="space-y-3">
                   <div *ngFor="let task of getTasksByEnvironment(env.id)"
                        class="task-card bg-white p-3 rounded-lg shadow-sm border border-gray-200 relative"
@@ -106,7 +113,7 @@ import { TimelineSvgComponent } from './components/timeline-svg/timeline-svg.com
           <!-- Timeline View -->
           <div *ngIf="currentView === 'timeline'" class="w-full bg-white rounded-lg shadow-md p-4">
             <h2 class="text-xl font-bold mb-4">Línea del Tiempo (Hoy)</h2>
-            <app-timeline-svg [tasks]="getTodayTasks()"></app-timeline-svg>
+            <app-timeline-svg [tasks]="getTodayTasks()" [environments]="environments"></app-timeline-svg>
           </div>
         </div>
       </main>
@@ -1113,7 +1120,9 @@ export class TaskTrackerComponent implements OnInit {
   }
 
   getTasksByEnvironment(environmentId: string): Task[] {
-    return this.filteredTasks.filter(task => task.environment === environmentId);
+    return this.filteredTasks
+      .filter(task => task.environment === environmentId)
+      .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
   }
 
   formatDate(dateString: string): string {
