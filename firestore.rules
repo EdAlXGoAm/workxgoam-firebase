@@ -26,6 +26,13 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
     
+    // Colección pública de cálculos de impresión 3D
+    match /print3DCalculations/{calcId} {
+      // Todos pueden leer
+      allow read: if true;
+      // Sólo usuarios autenticados pueden crear/editar/borrar
+      allow write: if request.auth != null;
+    }
 
     // Ingredientes
     match /ingredients/{ingredientId} {
@@ -62,25 +69,25 @@ service cloud.firestore {
       // Cada usuario puede crear o actualizar su propio perfil
       allow create, update: if request.auth != null && request.auth.uid == userId;
     }
-
-    // Tareas
-    match /tasks/{taskId} {
+    
+    // task-tracker_Tareas
+    match /task-tracker_tasks/{taskId} {
       allow read: if request.auth != null && request.auth.uid == resource.data.userId;
       allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
       allow update: if request.auth != null && request.auth.uid == resource.data.userId;
       allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
     }
 
-    // Proyectos
-    match /projects/{projectId} {
+    // task-tracker_Proyectos
+    match /task-tracker_projects/{projectId} {
       allow read: if request.auth != null && request.auth.uid == resource.data.userId;
       allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
       allow update: if request.auth != null && request.auth.uid == resource.data.userId;
       allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
     }
 
-    // Ambientes
-    match /environments/{environmentId} {
+    // task-tracker_Ambientes
+    match /task-tracker_environments/{environmentId} {
       allow read: if request.auth != null && request.auth.uid == resource.data.userId;
       allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
       allow update: if request.auth != null && request.auth.uid == resource.data.userId;

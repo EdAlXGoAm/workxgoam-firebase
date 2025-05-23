@@ -1,0 +1,400 @@
+<div class="container mx-auto px-4 py-8 max-w-7xl">
+  <!-- Lista de cálculos guardados -->
+  <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+    <h2 class="text-xl font-bold text-gray-800 mb-2">Cálculos de Impresión 3D Guardados</h2>
+    <div *ngIf="savedCalculations.length > 0; else noSaved">
+      <table class="w-full text-left">
+        <thead>
+          <tr>
+            <th class="py-2 px-4">Título</th>
+            <th class="py-2 px-4">Fecha</th>
+            <th class="py-2 px-4">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let calc of savedCalculations" class="border-t">
+            <td class="py-2 px-4">{{ calc.title }}</td>
+            <td class="py-2 px-4">{{ calc.createdAt | date:'short' }}</td>
+            <td class="py-2 px-4 space-x-2">
+              <button (click)="loadCalculation(calc)" class="text-indigo-600 hover:underline">Cargar</button>
+              <button (click)="deleteSavedCalculation(calc)" class="text-red-600 hover:underline">Eliminar</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <ng-template #noSaved>
+      <p class="text-gray-500">No hay cálculos de impresión 3D guardados.</p>
+    </ng-template>
+  </div>
+
+  <!-- Encabezado -->
+  <header class="mb-8 text-center">
+    <h1 class="text-4xl font-bold text-purple-700 mb-2">Calculadora de Costos de Impresión 3D</h1>
+    <p class="text-gray-600">Calcula precios de impresiones 3D basado en filamento, electricidad y depreciación</p>
+    <h3 class="text-lg font-semibold text-gray-800 mb-4">"{{ calculationTitle || 'Cálculo Nuevo' }}"</h3>
+  </header>
+
+  <!-- Grid principal -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Columna izquierda (inputs) -->
+    <div class="lg:col-span-2 space-y-6">
+      
+      <!-- Información de Impresión -->
+      <div class="bg-white rounded-lg shadow-md p-4">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Información de Impresión 3D</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Peso (gramos)</label>
+            <input [(ngModel)]="weightGrams" (ngModelChange)="calculatePrices()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="ej: 50" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Número de piezas</label>
+            <input [(ngModel)]="pieces" (ngModelChange)="calculatePrices()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="1" />
+          </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Tiempo de impresión - Horas</label>
+            <input [(ngModel)]="printHours" (ngModelChange)="calculatePrices()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="ej: 2" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Tiempo de impresión - Minutos</label>
+            <input [(ngModel)]="printMinutes" (ngModelChange)="calculatePrices()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="ej: 30" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Mano de obra -->
+      <div class="bg-white rounded-lg shadow-md p-4">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Mano de obra</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Horas</label>
+            <input [(ngModel)]="laborHours" (ngModelChange)="calculatePrices()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="0" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Minutos</label>
+            <input [(ngModel)]="laborMinutes" (ngModelChange)="calculatePrices()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="0" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Opciones avanzadas -->
+      <div class="bg-white rounded-lg shadow-md p-4">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Configuración de Costos</h2>
+        <div class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Costo filamento por kg ($)</label>
+              <input [(ngModel)]="filamentCostPerKg" (ngModelChange)="calculatePrices()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Tarifa electricidad por hora ($)</label>
+              <input [(ngModel)]="electricityRatePerHour" (ngModelChange)="calculatePrices()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500" />
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Depreciación por minuto ($)</label>
+              <input [(ngModel)]="printerDepreciationPerMinute" (ngModelChange)="calculatePrices()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Tarifa mano obra por hora ($)</label>
+              <input [(ngModel)]="laborRatePerHour" (ngModelChange)="calculatePrices()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Costo forzado para factores (opcional)</label>
+            <input [(ngModel)]="forcedCostForFactors" (ngModelChange)="calculatePrices()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Opcional" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Costos adicionales -->
+      <div class="bg-white rounded-lg shadow-md p-4">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-semibold text-gray-800">Costos adicionales</h2>
+          <button (click)="addAdditionalCost()" class="bg-purple-100 text-purple-700 px-3 py-1 rounded-md text-sm font-medium hover:bg-purple-200 transition">+ Nuevo</button>
+        </div>
+        <div class="space-y-2 mb-4 max-h-60 overflow-y-auto custom-scrollbar">
+          <div *ngFor="let cost of additionalCosts; let i = index" class="flex items-center space-x-2">
+            <input [(ngModel)]="cost.description" class="flex-1 px-2 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-purple-500" placeholder="Descripción" />
+            <input [(ngModel)]="cost.value" (ngModelChange)="calculatePrices()" class="w-24 px-2 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-purple-500" placeholder="Valor" />
+            <button (click)="removeAdditionalCost(i)" class="text-red-500 hover:text-red-700">✕</button>
+          </div>
+        </div>
+        <div class="border-t pt-3">
+          <p class="font-semibold text-gray-700">Total Adicionales: {{ sumAdditionalCosts() | currency:'USD':'symbol':'1.2-2' }}</p>
+        </div>
+      </div>
+
+      <!-- Botón Calcular -->
+      <div class="text-center">
+        <button (click)="calculatePrices()" class="bg-purple-600 text-white px-6 py-3 rounded-md font-medium hover:bg-purple-700 transition transform hover:scale-105 shadow-lg">Calcular Precios</button>
+      </div>
+    </div>
+
+    <!-- Columna derecha (resultados y gráficas) -->
+    <div class="space-y-6">
+      <!-- Resultados -->
+      <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Desglose de Costos</h2>
+        <div class="space-y-3">
+          <div class="flex justify-between">
+            <span class="text-sm text-gray-600">Filamento:</span>
+            <span class="font-semibold">{{ resultFilamentCost | currency:'USD':'symbol':'1.2-2' }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-sm text-gray-600">Electricidad:</span>
+            <span class="font-semibold">{{ resultElectricityCost | currency:'USD':'symbol':'1.2-2' }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-sm text-gray-600">Depreciación:</span>
+            <span class="font-semibold">{{ resultDepreciationCost | currency:'USD':'symbol':'1.2-2' }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-sm text-gray-600">Mano de obra:</span>
+            <span class="font-semibold">{{ resultLaborCost | currency:'USD':'symbol':'1.2-2' }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-sm text-gray-600">Adicionales:</span>
+            <span class="font-semibold">{{ resultAdditionalCost | currency:'USD':'symbol':'1.2-2' }}</span>
+          </div>
+          <div class="border-t pt-3 flex justify-between">
+            <span class="text-sm text-gray-600">Costo total:</span>
+            <span class="text-lg font-bold">{{ resultTotalCost | currency:'USD':'symbol':'1.2-2' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Precios finales -->
+      <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Precios Finales</h2>
+        <div class="space-y-4">
+          <div class="bg-indigo-50 p-4 rounded-lg">
+            <p class="text-sm text-indigo-600 mb-1">Precio al comerciante</p>
+            <p class="text-2xl font-bold text-indigo-700">{{ resultMerchantPrice | currency:'USD':'symbol':'1.0-0' }}</p>
+            <p class="text-xs text-gray-500">Factor: {{ resultMerchantFactor | number:'1.3-3' }}</p>
+          </div>
+          <div class="bg-purple-50 p-4 rounded-lg">
+            <p class="text-sm text-purple-600 mb-1">Precio al público</p>
+            <p class="text-2xl font-bold text-purple-700">{{ resultPublicPrice | currency:'USD':'symbol':'1.0-0' }}</p>
+            <p class="text-xs text-gray-500">Factor: {{ resultPublicFactor | number:'1.3-3' }}</p>
+          </div>
+          <div class="space-y-2">
+            <div class="flex justify-between">
+              <span class="text-sm text-gray-600">Mi ganancia:</span>
+              <span class="font-semibold text-green-600">{{ resultMyProfit | currency:'USD':'symbol':'1.2-2' }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-sm text-gray-600">Ganancia comerciante:</span>
+              <span class="font-semibold text-blue-600">{{ resultMerchantProfit | currency:'USD':'symbol':'1.2-2' }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gráficas -->
+      <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Factores de Ganancia</h2>
+        <div class="grid grid-cols-1 gap-4">
+          <canvas #merchantFactorChartCanvas></canvas>
+          <canvas #publicFactorChartCanvas></canvas>
+        </div>
+      </div>
+
+      <!-- Extra info / Guardar -->
+      <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Información Extra</h2>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Título del cálculo</label>
+            <input [(ngModel)]="calculationTitle" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Links relacionados (uno por línea)</label>
+            <textarea [(ngModel)]="calculationLinksText" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"></textarea>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Imágenes (máx 3) - Ctrl+V para pegar</label>
+            <div class="grid grid-cols-3 gap-2">
+              <div *ngFor="let _ of [0,1,2]; let i = index" class="border-2 border-dashed border-gray-300 rounded-lg p-2 h-24 flex items-center justify-center cursor-pointer hover:border-purple-400 transition" (click)="handleImageClick(i)">
+                <img *ngIf="getImageToShow(i)" [src]="getImageToShow(i)" class="max-w-full max-h-full object-contain" />
+                <span *ngIf="!getImageToShow(i)" class="text-xs text-gray-500 text-center">Click para pegar imagen</span>
+              </div>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">Las imágenes se guardan automáticamente en Firebase Storage al guardar el cálculo.</p>
+          </div>
+          <div class="flex space-x-2">
+            <button (click)="saveCalculation()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition flex-1">{{ currentLoadedId ? 'Actualizar' : 'Guardar' }} Cálculo</button>
+            <button (click)="openCompareModal()" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition">Comparar</button>
+          </div>
+          <div class="pt-2">
+            <button (click)="openAdvertisingComparator()" class="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-3 rounded-md hover:from-purple-700 hover:to-pink-700 transition font-medium shadow-lg">
+              📊 Comparador Publicitario
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para visualizar imagen -->
+<div *ngIf="modalVisible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" (click)="closeModal()">
+  <div class="bg-white rounded-lg p-4 max-w-3xl max-h-3xl overflow-auto" (click)="$event.stopPropagation()">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="text-lg font-semibold">Vista de Imagen</h3>
+      <div class="space-x-2">
+        <button (click)="removeCurrentImage()" class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600">Eliminar</button>
+        <button (click)="closeModal()" class="bg-gray-500 text-white px-3 py-1 rounded text-sm hover:bg-gray-600">Cerrar</button>
+      </div>
+    </div>
+    <img [src]="getImageToShow(currentImageIndex)" class="max-w-full max-h-96 object-contain mx-auto" />
+  </div>
+</div>
+
+<!-- Modal de comparación básico -->
+<div *ngIf="isCompareModalVisible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" (click)="closeCompareModal()">
+  <div class="bg-white rounded-lg p-6 max-w-4xl max-h-3xl overflow-auto" (click)="$event.stopPropagation()">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="text-xl font-semibold">Comparar Cálculos de Impresión 3D</h3>
+      <button (click)="closeCompareModal()" class="bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600">Cerrar</button>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="bg-gray-100">
+            <th class="text-left p-2">Título</th>
+            <th class="text-left p-2">Costo Total</th>
+            <th class="text-left p-2">Precio Comerciante</th>
+            <th class="text-left p-2">Precio Público</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let summary of compareSummaries" class="border-t">
+            <td class="p-2">{{ summary.title }}</td>
+            <td class="p-2">{{ summary.totalCost | currency:'USD':'symbol':'1.2-2' }}</td>
+            <td class="p-2">{{ summary.merchantPrice | currency:'USD':'symbol':'1.0-0' }}</td>
+            <td class="p-2">{{ summary.publicPrice | currency:'USD':'symbol':'1.0-0' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Comparador Publicitario -->
+<div *ngIf="isAdvertisingComparatorVisible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" (click)="closeAdvertisingComparator()">
+  <div class="bg-white rounded-lg w-full max-w-7xl max-h-full overflow-auto" (click)="$event.stopPropagation()">
+    <!-- Header del modal -->
+    <div class="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center z-10">
+      <h3 class="text-2xl font-bold text-gray-800">📊 Comparador Publicitario</h3>
+      <button (click)="closeAdvertisingComparator()" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition">Cerrar</button>
+    </div>
+
+    <!-- Contenido del modal -->
+    <div class="p-6">
+      <div *ngIf="advertisingCalculations.length === 0" class="text-center py-12 text-gray-500">
+        <p class="text-lg">No hay cálculos guardados para mostrar</p>
+        <p class="text-sm mt-2">Guarda algunos cálculos para usar el comparador publicitario</p>
+      </div>
+
+      <!-- Cuadrícula de productos -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div *ngFor="let calc of advertisingCalculations; let calcIndex = index" class="bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300">
+          
+          <!-- Slider de imágenes -->
+          <div class="image-slider relative">
+            <div *ngIf="calc.images.length > 0; else noImages" class="image-slider-container" 
+                 [style.transform]="'translateX(-' + (calc.currentImageIndex * 100) + '%)'">
+              <img *ngFor="let image of calc.images" 
+                   [src]="image" 
+                   class="slider-image cursor-pointer" 
+                   (click)="openImageZoom(image)"
+                   (touchstart)="onSliderTouchStart($event, calcIndex)"
+                   (touchend)="onSliderTouchEnd($event, calcIndex)" />
+            </div>
+
+            <!-- Controles del slider -->
+            <div *ngIf="calc.images.length > 1">
+              <button class="slider-controls slider-prev" (click)="changeSlideImage(calcIndex, 'prev')">❮</button>
+              <button class="slider-controls slider-next" (click)="changeSlideImage(calcIndex, 'next')">❯</button>
+              
+              <!-- Dots indicadores -->
+              <div class="slider-dots">
+                <div *ngFor="let image of calc.images; let imageIndex = index" 
+                     class="slider-dot" 
+                     [class.active]="imageIndex === calc.currentImageIndex"
+                     (click)="goToSlideImage(calcIndex, imageIndex)">
+                </div>
+              </div>
+            </div>
+
+            <ng-template #noImages>
+              <div class="no-images-placeholder">
+                Sin imágenes
+              </div>
+            </ng-template>
+          </div>
+
+          <!-- Información del producto -->
+          <div class="p-4">
+            <!-- Título -->
+            <h4 class="text-lg font-bold text-gray-800 mb-3 truncate" [title]="calc.title">{{ calc.title }}</h4>
+
+            <!-- Costos básicos -->
+            <div class="space-y-2 mb-4">
+              <div class="flex justify-between text-sm text-gray-600">
+                <span>Costo filamento:</span>
+                <span class="font-medium">{{ calc.filamentCost | currency:'USD':'symbol':'1.2-2' }}</span>
+              </div>
+              <div class="flex justify-between text-sm text-gray-600">
+                <span>Costo total:</span>
+                <span class="font-medium">{{ calc.totalCost | currency:'USD':'symbol':'1.2-2' }}</span>
+              </div>
+            </div>
+
+            <!-- Precios principales (font más grande y bold) -->
+            <div class="space-y-3 border-t pt-3">
+              <!-- Precio al comerciante -->
+              <div class="bg-indigo-50 p-3 rounded-lg">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-xl font-bold text-indigo-700">{{ calc.merchantPrice | currency:'USD':'symbol':'1.0-0' }}</p>
+                    <p class="text-xs text-indigo-600">Precio al comerciante</p>
+                  </div>
+                  <div class="text-right">
+                    <p class="text-xs text-gray-500">Mi ganancia</p>
+                    <p class="text-sm font-semibold text-green-600">{{ calc.myProfit | currency:'USD':'symbol':'1.0-0' }}</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Precio al público -->
+              <div class="bg-purple-50 p-3 rounded-lg">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-xl font-bold text-purple-700">{{ calc.publicPrice | currency:'USD':'symbol':'1.0-0' }}</p>
+                    <p class="text-xs text-purple-600">Precio al público</p>
+                  </div>
+                  <div class="text-right">
+                    <p class="text-xs text-gray-500">Ganancia comerciante</p>
+                    <p class="text-sm font-semibold text-blue-600">{{ calc.merchantProfit | currency:'USD':'symbol':'1.0-0' }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de zoom para imágenes -->
+<div *ngIf="zoomModalVisible" class="zoom-modal" (click)="closeImageZoom()">
+  <button class="zoom-close" (click)="closeImageZoom()">✕</button>
+  <img [src]="zoomImageSrc" class="zoom-image" (click)="$event.stopPropagation()" />
+</div> 

@@ -32,6 +32,11 @@ export const routes: Routes = [
     canActivate: [authGuard]
   },
   { 
+    path: 'apps/calculadora-3d', 
+    loadComponent: () => import('./apps/calculadora-3d/calculadora-3d.component').then(m => m.Calculadora3DComponent),
+    canActivate: [authGuard]
+  },
+  { 
     path: 'apps/upload-videos', 
     loadComponent: () => import('./apps/upload-videos/upload-videos.component').then(m => m.UploadVideosComponent),
     canActivate: [authGuard]

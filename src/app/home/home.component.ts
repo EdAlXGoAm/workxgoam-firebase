@@ -41,31 +41,6 @@ import { AuthService } from '../services/auth.service';
           </div>
         </div>
         
-        <!-- Más cards de aplicaciones -->
-        <div class="bg-white rounded-xl shadow-md overflow-hidden opacity-60">
-          <div class="bg-purple-500 p-5 text-white">
-            <h3 class="text-xl font-bold">Finanzas</h3>
-          </div>
-          <div class="p-5">
-            <p class="text-gray-600 mb-4">Próximamente: Gestiona tus finanzas personales.</p>
-            <button disabled class="block w-full text-center bg-gray-300 text-gray-500 py-2 rounded-lg cursor-not-allowed">
-              Próximamente
-            </button>
-          </div>
-        </div>
-        
-        <div class="bg-white rounded-xl shadow-md overflow-hidden opacity-60">
-          <div class="bg-green-500 p-5 text-white">
-            <h3 class="text-xl font-bold">Notas</h3>
-          </div>
-          <div class="p-5">
-            <p class="text-gray-600 mb-4">Próximamente: Toma notas y guarda información importante.</p>
-            <button disabled class="block w-full text-center bg-gray-300 text-gray-500 py-2 rounded-lg cursor-not-allowed">
-              Próximamente
-            </button>
-          </div>
-        </div>
-        
         <!-- Card Calculadora -->
         <div class="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow">
           <div class="bg-indigo-500 p-5 text-white">
@@ -78,6 +53,20 @@ import { AuthService } from '../services/auth.service';
             </a>
           </div>
         </div>
+
+        <!-- Card Calculadora 3D -->
+        <div class="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+          <div class="bg-purple-500 p-5 text-white">
+            <h3 class="text-xl font-bold">Calculadora 3D</h3>
+          </div>
+          <div class="p-5">
+            <p class="text-gray-600 mb-4">Calcula costos de impresiones 3D basado en filamento, electricidad y depreciación.</p>
+            <a routerLink="/apps/calculadora-3d" class="block w-full text-center bg-purple-500 hover:bg-purple-600 text-white py-2 rounded-lg transition-colors">
+              Abrir
+            </a>
+          </div>
+        </div>
+        
         <!-- Card Comparador de Videos -->
         <div class="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow">
           <div class="bg-pink-500 p-5 text-white">
@@ -101,6 +90,31 @@ import { AuthService } from '../services/auth.service';
             <a routerLink="/apps/task-tracker" class="block w-full text-center bg-teal-500 hover:bg-teal-600 text-white py-2 rounded-lg transition-colors">
               Abrir
             </a>
+          </div>
+        </div>
+
+        <!-- Más cards de aplicaciones -->
+        <div class="bg-white rounded-xl shadow-md overflow-hidden opacity-60">
+          <div class="bg-green-500 p-5 text-white">
+            <h3 class="text-xl font-bold">Finanzas</h3>
+          </div>
+          <div class="p-5">
+            <p class="text-gray-600 mb-4">Próximamente: Gestiona tus finanzas personales.</p>
+            <button disabled class="block w-full text-center bg-gray-300 text-gray-500 py-2 rounded-lg cursor-not-allowed">
+              Próximamente
+            </button>
+          </div>
+        </div>
+        
+        <div class="bg-white rounded-xl shadow-md overflow-hidden opacity-60">
+          <div class="bg-gray-500 p-5 text-white">
+            <h3 class="text-xl font-bold">Notas</h3>
+          </div>
+          <div class="p-5">
+            <p class="text-gray-600 mb-4">Próximamente: Toma notas y guarda información importante.</p>
+            <button disabled class="block w-full text-center bg-gray-300 text-gray-500 py-2 rounded-lg cursor-not-allowed">
+              Próximamente
+            </button>
           </div>
         </div>
       </div>
