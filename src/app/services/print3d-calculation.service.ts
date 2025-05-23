@@ -38,6 +38,7 @@ export interface Print3DAdvancedOptions {
   printerDepreciationPerMinute: string; // Depreciación de impresora por minuto
   laborRatePerHour: string; // Tarifa de mano de obra por hora
   forcedCostForFactors: string; // Costo forzado para cálculo de factores
+  forcedPublicPrice: string; // Precio al público forzado (opcional)
   additionalCosts: string; // Costos adicionales
 }
 
@@ -151,18 +152,62 @@ export class Print3DCalculationService {
   async updateCalculation(
     id: string, 
     data: Partial<Omit<Print3DCalculation, 'id' | 'userId'>>,
-    imageDataUrls?: (string | null)[]
+    imageDataUrls?: (string | null)[],
+    existingImageUrls?: string[],
+    originalImageUrls?: string[]
   ): Promise<boolean> {
     try {
-      // Si hay nuevas imágenes, subirlas
-      if (imageDataUrls && imageDataUrls.some(img => img !== null)) {
-        // Eliminar imágenes anteriores
-        await this.deleteImages(id);
+      // Si hay nuevas imágenes, procesarlas de manera inteligente
+      if (imageDataUrls && (imageDataUrls.some(img => img !== null) || originalImageUrls)) {
+        const finalImageUrls: string[] = [];
         
-        // Subir nuevas imágenes
-        const imageUrls = await this.uploadImages(id, imageDataUrls);
-        data.images = imageUrls;
+        for (let i = 0; i < 3; i++) {
+          const newImage = imageDataUrls[i];
+          const currentUrl = existingImageUrls?.[i];
+          const originalUrl = originalImageUrls?.[i];
+          
+          if (newImage !== null && newImage !== undefined) {
+            // Hay una nueva imagen para esta posición
+            // Eliminar la imagen anterior si existe
+            if (originalUrl) {
+              try {
+                const oldRef = ref(this.storage, `calculations_3d/${id}/${i}`);
+                await deleteObject(oldRef);
+              } catch (e) {
+                // Ignorar errores si la imagen no existe
+              }
+            }
+            
+            // Subir la nueva imagen
+            try {
+              const storageRef = ref(this.storage, `calculations_3d/${id}/${i}`);
+              await uploadString(storageRef, newImage, 'data_url');
+              const url = await getDownloadURL(storageRef);
+              finalImageUrls.push(url);
+            } catch (e) {
+              console.error('Error subiendo imagen en posición', i, e);
+              // Si hay una imagen original, mantenerla
+              if (originalUrl) {
+                finalImageUrls.push(originalUrl);
+              }
+            }
+          } else if (currentUrl && currentUrl.trim() !== '') {
+            // No hay nueva imagen, pero hay una imagen actual (no eliminada)
+            finalImageUrls.push(currentUrl);
+          } else if (originalUrl && (!currentUrl || currentUrl.trim() === '')) {
+            // La imagen fue eliminada (había original pero ya no hay actual)
+            try {
+              const oldRef = ref(this.storage, `calculations_3d/${id}/${i}`);
+              await deleteObject(oldRef);
+            } catch (e) {
+              // Ignorar errores si la imagen no existe
+            }
+          }
+        }
+        
+        data.images = finalImageUrls;
       }
+      // Si no se pasan imageDataUrls, no tocar el campo images (preservar las existentes)
 
       await updateDoc(doc(this.firestore, 'print3DCalculations', id), { ...data });
       return true;

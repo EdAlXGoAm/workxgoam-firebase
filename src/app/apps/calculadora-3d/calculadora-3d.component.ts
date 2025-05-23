@@ -170,6 +170,7 @@ export class Calculadora3DComponent implements OnInit, AfterViewInit {
   printerDepreciationPerMinute = '0.02';
   laborRatePerHour = '50';
   forcedCostForFactors = '';
+  forcedPublicPrice = ''; // Nuevo campo para precio al público forzado
   
   // Costos adicionales
   additionalCosts: Print3DCostItem[] = [];
@@ -199,6 +200,7 @@ export class Calculadora3DComponent implements OnInit, AfterViewInit {
   calculationLinksText = '';
   images: (string | null)[] = [null, null, null]; // Data URLs para edición local
   imageUrls: string[] = []; // URLs de Firebase Storage para mostrar
+  originalImageUrls: string[] = []; // URLs originales para detectar eliminaciones
   currentImageIndex = 0;
   modalVisible = false;
 
@@ -312,18 +314,73 @@ export class Calculadora3DComponent implements OnInit, AfterViewInit {
         costForFactors = this.evaluateExpression(calc.advancedOptions.forcedCostForFactors);
       }
       
-      // Calcular factores y precios
-      const resultMerchantFactor = this.print3dService.calculateMerchantFactor(costForFactors);
-      const merchantPriceRaw = resultTotalCost * resultMerchantFactor;
-      const resultMerchantPrice = this.print3dService.roundMerchantPrice(merchantPriceRaw);
+      // Declarar variables para precios y factores
+      let resultMerchantPrice: number;
+      let resultPublicPrice: number;
+      let resultMyProfit: number;
+      let resultMerchantProfit: number;
+      let resultMerchantFactor: number;
+      let resultPublicFactor: number;
       
-      const resultPublicFactor = this.print3dService.calculatePublicFactor(resultMerchantPrice, costForFactors);
-      const publicPriceRaw = resultMerchantPrice * (1 + resultPublicFactor);
-      const resultPublicPrice = this.print3dService.roundPublicPrice(publicPriceRaw);
-      
-      // Ganancias
-      const resultMyProfit = resultMerchantPrice - resultTotalCost;
-      const resultMerchantProfit = resultPublicPrice - resultMerchantPrice;
+      // Verificar si hay precio al público forzado
+      if (calc.advancedOptions.forcedPublicPrice && calc.advancedOptions.forcedPublicPrice.trim()) {
+        // Lógica para precio al público forzado
+        const forcedPublic = this.evaluateExpression(calc.advancedOptions.forcedPublicPrice);
+        
+        // Calcular precio al comerciante inicial (comerciante gana 20%)
+        let initialMerchantPrice = this.print3dService.roundMerchantPrice(forcedPublic / 1.2);
+        let initialMyProfit = initialMerchantPrice - resultTotalCost;
+        let initialMerchantProfit = forcedPublic - initialMerchantPrice;
+        let totalProfits = initialMyProfit + initialMerchantProfit;
+        
+        // Verificar si mi ganancia es al menos 60% del total
+        const myProfitPercentage = totalProfits > 0 ? (initialMyProfit / totalProfits) : 0;
+        
+        if (myProfitPercentage < 0.6) {
+          // Ajustar a proporción 60/40
+          const totalAvailableProfit = forcedPublic - resultTotalCost;
+          const myTargetProfit = totalAvailableProfit * 0.6;
+          const merchantTargetProfit = totalAvailableProfit * 0.4;
+          
+          resultMerchantPrice = this.print3dService.roundMerchantPrice(resultTotalCost + myTargetProfit);
+          resultPublicPrice = this.print3dService.roundPublicPrice(forcedPublic);
+          
+          // Calcular factores basados en los precios ajustados
+          resultMerchantFactor = resultMerchantPrice / resultTotalCost;
+          resultPublicFactor = merchantTargetProfit / resultMerchantPrice;
+          
+          // Ganancias ajustadas
+          resultMyProfit = resultMerchantPrice - resultTotalCost;
+          resultMerchantProfit = resultPublicPrice - resultMerchantPrice;
+        } else {
+          // Usar cálculo inicial (comerciante gana 20%)
+          resultPublicPrice = this.print3dService.roundPublicPrice(forcedPublic);
+          resultMerchantPrice = initialMerchantPrice;
+          
+          // Calcular factores basados en los precios calculados
+          resultMerchantFactor = resultMerchantPrice / resultTotalCost;
+          resultPublicFactor = 0.2; // Factor fijo del 20% para el comerciante
+          
+          // Ganancias
+          resultMyProfit = resultMerchantPrice - resultTotalCost;
+          resultMerchantProfit = resultPublicPrice - resultMerchantPrice;
+        }
+        
+      } else {
+        // Lógica normal con factores automáticos
+        // Calcular factores y precios
+        resultMerchantFactor = this.print3dService.calculateMerchantFactor(costForFactors);
+        const merchantPriceRaw = resultTotalCost * resultMerchantFactor;
+        resultMerchantPrice = this.print3dService.roundMerchantPrice(merchantPriceRaw);
+        
+        resultPublicFactor = this.print3dService.calculatePublicFactor(resultMerchantPrice, costForFactors);
+        const publicPriceRaw = resultMerchantPrice * (1 + resultPublicFactor);
+        resultPublicPrice = this.print3dService.roundPublicPrice(publicPriceRaw);
+        
+        // Ganancias
+        resultMyProfit = resultMerchantPrice - resultTotalCost;
+        resultMerchantProfit = resultPublicPrice - resultMerchantPrice;
+      }
 
       return {
         id: calc.id,
@@ -397,18 +454,65 @@ export class Calculadora3DComponent implements OnInit, AfterViewInit {
         costForFactors = this.evaluateExpression(this.forcedCostForFactors);
       }
       
-      // Calcular factores y precios
-      this.resultMerchantFactor = this.print3dService.calculateMerchantFactor(costForFactors);
-      const merchantPriceRaw = this.resultTotalCost * this.resultMerchantFactor;
-      this.resultMerchantPrice = this.print3dService.roundMerchantPrice(merchantPriceRaw);
-      
-      this.resultPublicFactor = this.print3dService.calculatePublicFactor(this.resultMerchantPrice, costForFactors);
-      const publicPriceRaw = this.resultMerchantPrice * (1 + this.resultPublicFactor);
-      this.resultPublicPrice = this.print3dService.roundPublicPrice(publicPriceRaw);
-      
-      // Ganancias
-      this.resultMyProfit = this.resultMerchantPrice - this.resultTotalCost;
-      this.resultMerchantProfit = this.resultPublicPrice - this.resultMerchantPrice;
+      // Verificar si hay precio al público forzado
+      if (this.forcedPublicPrice.trim()) {
+        // Lógica para precio al público forzado
+        const forcedPublic = this.evaluateExpression(this.forcedPublicPrice);
+        
+        // Calcular precio al comerciante inicial (comerciante gana 20%)
+        let initialMerchantPrice = this.print3dService.roundMerchantPrice(forcedPublic / 1.2);
+        let initialMyProfit = initialMerchantPrice - this.resultTotalCost;
+        let initialMerchantProfit = forcedPublic - initialMerchantPrice;
+        let totalProfits = initialMyProfit + initialMerchantProfit;
+        
+        // Verificar si mi ganancia es al menos 60% del total
+        const myProfitPercentage = totalProfits > 0 ? (initialMyProfit / totalProfits) : 0;
+        
+        if (myProfitPercentage < 0.6) {
+          // Ajustar a proporción 60/40
+          const totalAvailableProfit = forcedPublic - this.resultTotalCost;
+          const myTargetProfit = totalAvailableProfit * 0.6;
+          const merchantTargetProfit = totalAvailableProfit * 0.4;
+          
+          this.resultMerchantPrice = this.print3dService.roundMerchantPrice(this.resultTotalCost + myTargetProfit);
+          this.resultPublicPrice = this.print3dService.roundPublicPrice(forcedPublic);
+          
+          // Calcular factores basados en los precios ajustados
+          this.resultMerchantFactor = this.resultMerchantPrice / this.resultTotalCost;
+          this.resultPublicFactor = merchantTargetProfit / this.resultMerchantPrice;
+          
+          // Ganancias ajustadas
+          this.resultMyProfit = this.resultMerchantPrice - this.resultTotalCost;
+          this.resultMerchantProfit = this.resultPublicPrice - this.resultMerchantPrice;
+        } else {
+          // Usar cálculo inicial (comerciante gana 20%)
+          this.resultPublicPrice = this.print3dService.roundPublicPrice(forcedPublic);
+          this.resultMerchantPrice = initialMerchantPrice;
+          
+          // Calcular factores basados en los precios calculados
+          this.resultMerchantFactor = this.resultMerchantPrice / this.resultTotalCost;
+          this.resultPublicFactor = 0.2; // Factor fijo del 20% para el comerciante
+          
+          // Ganancias
+          this.resultMyProfit = this.resultMerchantPrice - this.resultTotalCost;
+          this.resultMerchantProfit = this.resultPublicPrice - this.resultMerchantPrice;
+        }
+        
+      } else {
+        // Lógica normal con factores automáticos
+        // Calcular factores y precios
+        this.resultMerchantFactor = this.print3dService.calculateMerchantFactor(costForFactors);
+        const merchantPriceRaw = this.resultTotalCost * this.resultMerchantFactor;
+        this.resultMerchantPrice = this.print3dService.roundMerchantPrice(merchantPriceRaw);
+        
+        this.resultPublicFactor = this.print3dService.calculatePublicFactor(this.resultMerchantPrice, costForFactors);
+        const publicPriceRaw = this.resultMerchantPrice * (1 + this.resultPublicFactor);
+        this.resultPublicPrice = this.print3dService.roundPublicPrice(publicPriceRaw);
+        
+        // Ganancias
+        this.resultMyProfit = this.resultMerchantPrice - this.resultTotalCost;
+        this.resultMerchantProfit = this.resultPublicPrice - this.resultMerchantPrice;
+      }
       
       // Actualizar gráficas
       this.updateCharts(this.resultTotalCost, costForFactors);
@@ -511,21 +615,35 @@ export class Calculadora3DComponent implements OnInit, AfterViewInit {
         printerDepreciationPerMinute: this.printerDepreciationPerMinute,
         laborRatePerHour: this.laborRatePerHour,
         forcedCostForFactors: this.forcedCostForFactors,
+        forcedPublicPrice: this.forcedPublicPrice,
         additionalCosts: this.sumAdditionalCosts().toString()
       },
       additionalCosts: this.additionalCosts,
-      images: [] // Se manejará en el servicio
+      images: this.imageUrls // Preservar las imágenes actuales por defecto
     };
 
     try {
       if (this.currentLoadedId) {
         // Actualizar cálculo existente
         const hasNewImages = this.images.some(img => img !== null);
-        await this.print3dService.updateCalculation(
-          this.currentLoadedId, 
-          calculation,
-          hasNewImages ? this.images : undefined
-        );
+        const hasImageDeletions = this.hasImageDeletions();
+        
+        if (hasNewImages || hasImageDeletions) {
+          // Solo manejar imágenes si hay cambios
+          await this.print3dService.updateCalculation(
+            this.currentLoadedId, 
+            calculation,
+            this.images,
+            this.imageUrls,
+            this.originalImageUrls
+          );
+        } else {
+          // No hay cambios en imágenes, actualizar solo los demás datos
+          await this.print3dService.updateCalculation(
+            this.currentLoadedId, 
+            calculation
+          );
+        }
         alert('Cálculo actualizado exitosamente');
       } else {
         // Crear nuevo cálculo
@@ -578,12 +696,14 @@ export class Calculadora3DComponent implements OnInit, AfterViewInit {
     this.printerDepreciationPerMinute = calc.advancedOptions.printerDepreciationPerMinute;
     this.laborRatePerHour = calc.advancedOptions.laborRatePerHour;
     this.forcedCostForFactors = calc.advancedOptions.forcedCostForFactors;
+    this.forcedPublicPrice = calc.advancedOptions.forcedPublicPrice || ''; // Valor por defecto si no existe
     
     // Cargar costos adicionales
     this.additionalCosts = [...calc.additionalCosts];
     
     // Cargar URLs de imágenes de Storage
     this.imageUrls = calc.images || [];
+    this.originalImageUrls = [...(calc.images || [])]; // Copiar las URLs originales
     this.images = [null, null, null]; // Limpiar imágenes locales
     
     // Recalcular
@@ -649,6 +769,7 @@ export class Calculadora3DComponent implements OnInit, AfterViewInit {
   removeCurrentImage(): void {
     this.images[this.currentImageIndex] = null;
     if (this.imageUrls[this.currentImageIndex]) {
+      // Marcar que se debe eliminar esta imagen de Storage
       this.imageUrls = [...this.imageUrls];
       this.imageUrls[this.currentImageIndex] = '';
     }
@@ -752,5 +873,18 @@ export class Calculadora3DComponent implements OnInit, AfterViewInit {
     }
 
     delete (calc as any).touchStartX;
+  }
+
+  hasImageDeletions(): boolean {
+    // Comprobar si alguna imagen original fue eliminada (está en original pero no en current o está vacía)
+    for (let i = 0; i < this.originalImageUrls.length; i++) {
+      const originalUrl = this.originalImageUrls[i];
+      const currentUrl = this.imageUrls[i];
+      
+      if (originalUrl && originalUrl.trim() !== '' && (!currentUrl || currentUrl.trim() === '')) {
+        return true;
+      }
+    }
+    return false;
   }
 } 
