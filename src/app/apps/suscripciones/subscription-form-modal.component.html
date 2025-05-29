@@ -1,0 +1,105 @@
+<!-- Modal del formulario para agregar/editar suscripción -->
+<div *ngIf="isVisible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 form-modal" (click)="onBackdropClick($event)">
+  <div class="bg-white rounded-xl p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto fade-in" (click)="$event.stopPropagation()">
+    <div class="flex justify-between items-center mb-6">
+      <h3 class="text-xl font-bold text-gray-800">{{ isEditing ? 'Editar Suscripción' : 'Agregar Suscripción' }}</h3>
+      <button (click)="closeModal()" class="text-gray-400 hover:text-gray-600 transition">
+        <i class="fas fa-times text-xl"></i>
+      </button>
+    </div>
+    
+    <form (ngSubmit)="onSubmitForm()">
+      <!-- Nombre y Emoji -->
+      <div class="mb-4">
+        <label for="modal-name" class="block text-sm font-medium text-gray-700 mb-1">Nombre del Servicio</label>
+        <div class="flex">
+          <div class="relative">
+            <button type="button" (click)="toggleEmojiPicker()" class="emoji-button h-full px-3 py-2 border border-gray-300 rounded-l-lg flex items-center justify-center hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" [ngClass]="{'ring-2 ring-indigo-500': showEmojiPicker}">
+              <span class="text-xl">{{ subscriptionForm.emoji }}</span>
+            </button>
+            <!-- Selector de emojis -->
+            <div *ngIf="showEmojiPicker" class="emoji-picker absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-50 w-64">
+              <div class="flex flex-wrap gap-2">
+                <button 
+                  type="button" 
+                  *ngFor="let emoji of availableEmojis" 
+                  (click)="selectEmoji(emoji)"
+                  class="emoji-option text-2xl w-10 h-10 flex items-center justify-center hover:bg-gray-100 rounded cursor-pointer transition">
+                  {{ emoji }}
+                </button>
+              </div>
+            </div>
+          </div>
+          <input type="text" id="modal-name" name="name" [(ngModel)]="subscriptionForm.name" placeholder="Netflix, Spotify, etc." 
+                class="w-full px-3 py-2 border border-gray-300 rounded-r-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 border-l-0">
+        </div>
+      </div>
+      
+      <!-- Costo y Moneda -->
+      <div class="grid grid-cols-2 gap-4 mb-4">
+        <div>
+          <label for="modal-cost" class="block text-sm font-medium text-gray-700 mb-1">Costo</label>
+          <input type="number" id="modal-cost" name="cost" [(ngModel)]="subscriptionForm.cost" min="0" step="0.01" placeholder="0.00" 
+                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+        </div>
+        <div>
+          <label for="modal-currency" class="block text-sm font-medium text-gray-700 mb-1">Moneda</label>
+          <select id="modal-currency" name="currency" [(ngModel)]="subscriptionForm.currency"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+            <option value="MXN">MXN</option>
+            <option value="USD">USD</option>
+          </select>
+        </div>
+      </div>
+      
+      <!-- Fecha de Inicio -->
+      <div class="mb-4">
+        <label for="modal-startDate" class="block text-sm font-medium text-gray-700 mb-1">Fecha de Inicio</label>
+        <input type="date" id="modal-startDate" name="startDate" [(ngModel)]="subscriptionForm.startDate"
+               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+      </div>
+      
+      <!-- Fecha de Fin (opcional) -->
+      <div class="mb-4">
+        <label for="modal-endDate" class="block text-sm font-medium text-gray-700 mb-1">Fecha de Fin (opcional)</label>
+        <input type="date" id="modal-endDate" name="endDate" [(ngModel)]="subscriptionForm.endDate"
+               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+      </div>
+      
+      <!-- Es Recurrente -->
+      <div class="mb-4">
+        <div class="flex items-center">
+          <input type="checkbox" id="modal-isRecurring" name="isRecurring" [(ngModel)]="subscriptionForm.isRecurring"
+                 class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+          <label for="modal-isRecurring" class="ml-2 block text-sm text-gray-700">Suscripción Recurrente</label>
+        </div>
+        <p class="text-xs text-gray-500 mt-1">Marca esta opción si la suscripción se renueva automáticamente cada mes.</p>
+      </div>
+      
+      <!-- Categoría -->
+      <div class="mb-6">
+        <label for="modal-category" class="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+        <select id="modal-category" name="category" [(ngModel)]="subscriptionForm.category"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+          <option value="entertainment">Entretenimiento</option>
+          <option value="productivity">Productividad</option>
+          <option value="education">Educación</option>
+          <option value="tools">Herramientas</option>
+          <option value="other">Otros</option>
+        </select>
+      </div>
+      
+      <!-- Botones -->
+      <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
+        <button type="button" (click)="closeModal()" 
+                class="px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+          Cancelar
+        </button>
+        <button type="submit" 
+                class="px-6 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+          {{ isEditing ? 'Actualizar' : 'Agregar' }} Suscripción
+        </button>
+      </div>
+    </form>
+  </div>
+</div> 

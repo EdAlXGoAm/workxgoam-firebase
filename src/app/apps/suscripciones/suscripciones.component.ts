@@ -4,11 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { Subscription as RxSubscription, Subscription as SubType, Subject, takeUntil } from 'rxjs';
 import { SubscriptionService, Subscription } from '../../services/subscription.service';
+import { SubscriptionFormModalComponent, SubscriptionFormData } from './subscription-form-modal.component';
 
 @Component({
   selector: 'app-suscripciones',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, SubscriptionFormModalComponent],
   templateUrl: './suscripciones.component.html',
   styleUrls: ['./suscripciones.component.css']
 })
@@ -22,12 +23,15 @@ export class SuscripcionesComponent implements OnInit, OnDestroy {
   
   // Variables para la gestión de suscripciones
   subscriptions: Subscription[] = [];
-  isEditing: boolean = false;
-  currentEditId: string | null = null;
   showConfirmModal: boolean = false;
   showDeleteModal: boolean = false;
+  showFormModal: boolean = false;
   subscriptionToDelete: string | null = null;
   isLoading: boolean = true;
+  
+  // Variables para el modal del formulario
+  modalSubscriptionData: SubscriptionFormData | null = null;
+  isEditingModal: boolean = false;
   
   // Variables para el ordenamiento de suscripciones
   sortCriteria: string = 'alphabetical'; // 'start_date', 'end_date', 'alphabetical'
@@ -36,29 +40,6 @@ export class SuscripcionesComponent implements OnInit, OnDestroy {
 
   // Para limpiar suscripciones cuando se destruye el componente
   private destroy$ = new Subject<void>();
-  
-  // Lista de emojis disponibles
-  availableEmojis: string[] = [
-    '📱', '💻', '🎮', '🎬', '🎵', '📺', '📚', '🏋️', '🎨', '🎲', 
-    '☁️', '📝', '🎓', '🔍', '🛍️', '🏠', '🍿', '🎧', '📰', '📷',
-    '🎭', '🚗', '✈️', '🏦', '💼', '🛒', '🎟️', '🍔', '☕', '🍕'
-  ];
-  
-  // Variable para controlar la visibilidad del selector de emojis
-  showEmojiPicker: boolean = false;
-  
-  // Formulario para suscripción
-  subscriptionForm = {
-    id: null as string | null,
-    name: '',
-    emoji: '📱', // Emoji por defecto
-    cost: 0,
-    currency: 'MXN',
-    startDate: '',
-    endDate: '',
-    isRecurring: false,
-    category: 'entertainment'
-  };
   
   // Variables para resumen
   totalSubscriptions: number = 0;
@@ -90,15 +71,36 @@ export class SuscripcionesComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
   
-  // Método para seleccionar un emoji
-  selectEmoji(emoji: string): void {
-    this.subscriptionForm.emoji = emoji;
-    this.showEmojiPicker = false;
+  // Métodos para manejar el modal del formulario
+  openFormModal(): void {
+    this.isEditingModal = false;
+    this.modalSubscriptionData = null;
+    this.showFormModal = true;
   }
-  
-  // Método para mostrar/ocultar el selector de emojis
-  toggleEmojiPicker(): void {
-    this.showEmojiPicker = !this.showEmojiPicker;
+
+  openEditModal(id: string): void {
+    const subscription = this.subscriptions.find(sub => sub.id === id);
+    if (!subscription) return;
+
+    this.isEditingModal = true;
+    this.modalSubscriptionData = {
+      id: subscription.id || null,
+      name: subscription.name,
+      emoji: subscription.emoji || '📱',
+      cost: subscription.cost,
+      currency: subscription.currency,
+      startDate: subscription.startDate,
+      endDate: subscription.endDate || '',
+      isRecurring: subscription.isRecurring,
+      category: subscription.category
+    };
+    this.showFormModal = true;
+  }
+
+  closeFormModal(): void {
+    this.showFormModal = false;
+    this.modalSubscriptionData = null;
+    this.isEditingModal = false;
   }
   
   // Métodos para el manejo del calendario
@@ -122,12 +124,15 @@ export class SuscripcionesComponent implements OnInit, OnDestroy {
       const currentDayDate = new Date(this.currentDate.getFullYear(), this.currentDate.getMonth(), i);
       const subscriptionsForDay = this.getSubscriptionsForDay(currentDayDate);
       const isToday = this.isCurrentDay(i);
+      const isPast = this.isPastDay(i);
       
       this.calendarDays.push({
         day: i,
         isToday: isToday,
+        isPastDay: isPast,
         subscriptions: subscriptionsForDay,
-        totalCost: subscriptionsForDay.reduce((sum, sub) => sum + sub.costMXN, 0)
+        totalCost: subscriptionsForDay.reduce((sum, sub) => sum + sub.costMXN, 0),
+        isEmpty: false
       });
     }
     
@@ -145,6 +150,15 @@ export class SuscripcionesComponent implements OnInit, OnDestroy {
       this.currentDate.getFullYear() === today.getFullYear() &&
       day === today.getDate()
     );
+  }
+  
+  // Método para determinar si un día es anterior al día actual
+  isPastDay(day: number): boolean {
+    const today = new Date();
+    const dayDate = new Date(this.currentDate.getFullYear(), this.currentDate.getMonth(), day);
+    const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    
+    return dayDate < todayDate;
   }
   
   // Utilidad para normalizar una fecha a YYYY-MM-DD sin tiempo ni zona horaria
@@ -218,31 +232,26 @@ export class SuscripcionesComponent implements OnInit, OnDestroy {
   }
   
   // Métodos para gestión de suscripciones
-  async submitForm(): Promise<void> {
-    if (!this.subscriptionForm.name || this.subscriptionForm.cost <= 0 || !this.subscriptionForm.startDate) {
-      this.showNotification('Por favor complete todos los campos requeridos', 'error');
-      return;
-    }
-    
-    if (this.isEditing && this.currentEditId) {
+  async onModalSubmit(formData: SubscriptionFormData): Promise<void> {
+    if (this.isEditingModal && formData.id) {
       // Editar suscripción existente
       const updateData = {
-        name: this.subscriptionForm.name,
-        emoji: this.subscriptionForm.emoji,
-        cost: this.subscriptionForm.cost,
-        currency: this.subscriptionForm.currency,
-        startDate: this.subscriptionForm.startDate,
-        endDate: this.subscriptionForm.endDate || null,
-        isRecurring: this.subscriptionForm.isRecurring,
-        category: this.subscriptionForm.category,
-        color: this.subscriptionService.getCategoryColor(this.subscriptionForm.category)
+        name: formData.name,
+        emoji: formData.emoji,
+        cost: formData.cost,
+        currency: formData.currency,
+        startDate: formData.startDate,
+        endDate: formData.endDate || null,
+        isRecurring: formData.isRecurring,
+        category: formData.category,
+        color: this.subscriptionService.getCategoryColor(formData.category)
       };
       
-      const success = await this.subscriptionService.updateSubscription(this.currentEditId, updateData);
+      const success = await this.subscriptionService.updateSubscription(formData.id, updateData);
       
       if (success) {
         this.showNotification('Suscripción actualizada correctamente', 'success');
-        this.resetForm();
+        this.closeFormModal();
         this.sortSubscriptions();
       } else {
         this.showNotification('Error al actualizar la suscripción', 'error');
@@ -250,17 +259,17 @@ export class SuscripcionesComponent implements OnInit, OnDestroy {
     } else {
       // Añadir nueva suscripción
       const newSubscription = {
-        name: this.subscriptionForm.name,
-        emoji: this.subscriptionForm.emoji,
-        cost: this.subscriptionForm.cost,
+        name: formData.name,
+        emoji: formData.emoji,
+        cost: formData.cost,
         costMXN: 0, // Se calcula en el servicio
         costUSD: 0, // Se calcula en el servicio
-        currency: this.subscriptionForm.currency,
-        startDate: this.subscriptionForm.startDate,
-        endDate: this.subscriptionForm.endDate || null,
-        isRecurring: this.subscriptionForm.isRecurring,
-        category: this.subscriptionForm.category,
-        color: this.subscriptionService.getCategoryColor(this.subscriptionForm.category),
+        currency: formData.currency,
+        startDate: formData.startDate,
+        endDate: formData.endDate || null,
+        isRecurring: formData.isRecurring,
+        category: formData.category,
+        color: this.subscriptionService.getCategoryColor(formData.category),
         userId: '' // Se asigna en el servicio
       };
       
@@ -268,33 +277,12 @@ export class SuscripcionesComponent implements OnInit, OnDestroy {
       
       if (id) {
         this.showNotification('Suscripción agregada correctamente', 'success');
-        this.resetForm();
+        this.closeFormModal();
         this.sortSubscriptions();
       } else {
         this.showNotification('Error al añadir la suscripción', 'error');
       }
     }
-  }
-  
-  editSubscription(id: string): void {
-    const subscription = this.subscriptions.find(sub => sub.id === id);
-    if (!subscription) return;
-    
-    this.isEditing = true;
-    this.currentEditId = id;
-    
-    this.subscriptionForm = {
-      id: subscription.id || null,
-      name: subscription.name,
-      
-      emoji: subscription.emoji || '📱', // Usar emoji actual o el predeterminado si no existe
-      cost: subscription.cost,
-      currency: subscription.currency,
-      startDate: subscription.startDate,
-      endDate: subscription.endDate || '',
-      isRecurring: subscription.isRecurring,
-      category: subscription.category
-    };
   }
   
   async deleteSubscription(id: string): Promise<void> {
@@ -308,11 +296,6 @@ export class SuscripcionesComponent implements OnInit, OnDestroy {
     if (success) {
       this.showNotification('Suscripción eliminada', 'info');
       
-      // Si estábamos editando esta suscripción, resetear el formulario
-      if (this.isEditing && this.currentEditId === id) {
-        this.resetForm();
-      }
-      
       this.sortSubscriptions();
     } else {
       this.showNotification('Error al eliminar la suscripción', 'error');
@@ -322,24 +305,6 @@ export class SuscripcionesComponent implements OnInit, OnDestroy {
   cancelDeleteSubscription(): void {
     this.showDeleteModal = false;
     this.subscriptionToDelete = null;
-  }
-  
-  resetForm(): void {
-    this.isEditing = false;
-    this.currentEditId = null;
-    this.showEmojiPicker = false;
-    
-    this.subscriptionForm = {
-      id: null,
-      name: '',
-      emoji: '📱',
-      cost: 0,
-      currency: 'MXN',
-      startDate: '',
-      endDate: '',
-      isRecurring: false,
-      category: 'entertainment'
-    };
   }
   
   confirmClearAll(): void {
