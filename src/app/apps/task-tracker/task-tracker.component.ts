@@ -12,11 +12,12 @@ import { Project } from './models/project.model';
 import { Environment } from './models/environment.model';
 import { ManagementModalComponent } from './components/management-modal/management-modal.component';
 import { TimelineSvgComponent } from './components/timeline-svg/timeline-svg.component';
+import { MuiTimePickerComponent } from './components/mui-time-picker/mui-time-picker.component';
 
 @Component({
   selector: 'app-task-tracker',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, TimelineSvgComponent],
+  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, TimelineSvgComponent, MuiTimePickerComponent],
   template: `
     <div class="min-h-screen bg-gray-50">
       <!-- Header -->
@@ -80,30 +81,109 @@ import { TimelineSvgComponent } from './components/timeline-svg/timeline-svg.com
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div *ngFor="let env of environments" class="board-column p-4">
-                <h3 class="font-semibold mb-4 p-2 rounded-md text-black"
-                    [style.background-color]="env.color + 'aa'" 
-                    [style.color]="'black'">{{env.name}}</h3>
-                <div class="space-y-3">
-                  <div *ngFor="let task of getTasksByEnvironment(env.id)"
-                       class="task-card bg-white p-3 rounded-lg shadow-sm border border-gray-200 relative"
-                       [class.status-completed]="task.status === 'completed'"
-                       [class.status-in-progress]="task.status === 'in-progress'"
-                       [class.status-pending]="task.status === 'pending'">
-                    <button (click)="onTaskContextMenu($event, task)" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
-                      <i class="fas fa-ellipsis-v"></i>
+                <div class="flex items-center justify-between mb-4">
+                  <h3 class="font-semibold p-2 rounded-md text-black flex-1"
+                      [style.background-color]="env.color + 'aa'" 
+                      [style.color]="'black'">{{env.name}}</h3>
+                  <button (click)="onEnvironmentContextMenu($event, env)" class="p-1 text-gray-500 hover:text-gray-700 ml-2">
+                    <i class="fas fa-ellipsis-v"></i>
+                  </button>
+                </div>
+                
+                <!-- Proyectos dentro del ambiente -->
+                <div class="space-y-4">
+                  <div *ngFor="let project of getProjectsByEnvironment(env.id)" class="project-section">
+                    <!-- Header del proyecto con botón agregar -->
+                    <div class="flex items-center justify-between mb-2 p-2 bg-gray-50 rounded-lg">
+                      <div class="flex items-center gap-2">
+                        <button (click)="onProjectContextMenu($event, project)" class="p-1 text-gray-500 hover:text-gray-700">
+                          <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <h4 class="text-sm font-medium text-gray-700">
+                          <i class="fas fa-folder mr-1"></i>{{project.name}}
+                        </h4>
+                      </div>
+                      <button 
+                        (click)="openNewTaskModalForProject(env.id, project.id)"
+                        class="bg-indigo-600 text-white px-2 py-1 rounded text-xs hover:bg-indigo-700 transition-colors"
+                        title="Agregar tarea a {{project.name}}">
+                        <i class="fas fa-plus mr-1"></i>Agregar
+                      </button>
+                    </div>
+                    
+                    <!-- Tareas del proyecto -->
+                    <div class="space-y-2 ml-2">
+                      <div *ngFor="let task of getTasksByProject(project.id)"
+                           class="task-card bg-white p-3 rounded-lg shadow-sm border border-gray-200 relative"
+                           [class.status-completed]="task.status === 'completed'"
+                           [class.status-in-progress]="task.status === 'in-progress'"
+                           [class.status-pending]="task.status === 'pending'">
+                        <button (click)="onTaskContextMenu($event, task)" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
+                          <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <div class="flex items-center justify-between mb-2">
+                          <span class="text-lg">{{task.emoji}}</span>
+                          <span class="text-xs px-2 py-1 rounded" [class]="'priority-' + task.priority">
+                            {{task.priority}}
+                          </span>
+                        </div>
+                        <h4 class="font-medium">{{task.name}}</h4>
+                        <p class="text-sm text-gray-600 mt-1">{{task.description}}</p>
+                        <div class="mt-2 text-xs text-gray-500">
+                          <div>Inicio: {{formatDate(task.start)}}</div>
+                          <div>Fin: {{formatDate(task.end)}}</div>
+                        </div>
+                      </div>
+                      
+                      <!-- Mensaje si el proyecto no tiene tareas -->
+                      <div *ngIf="getTasksByProject(project.id).length === 0" class="text-center py-4">
+                        <p class="text-gray-500 text-sm">No hay tareas en este proyecto</p>
+                        <button 
+                          (click)="openNewTaskModalForProject(env.id, project.id)"
+                          class="mt-2 text-indigo-600 hover:text-indigo-800 text-sm">
+                          <i class="fas fa-plus mr-1"></i>Crear primera tarea
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Tareas sin proyecto asignado dentro del ambiente -->
+                  <div *ngIf="getTasksWithoutProjectInEnvironment(env.id).length > 0" class="project-section">
+                    <div class="flex items-center justify-between mb-2 p-2 bg-yellow-50 rounded-lg border border-yellow-200">
+                      <h4 class="text-sm font-medium text-yellow-700">
+                        <i class="fas fa-exclamation-triangle mr-1"></i>Sin proyecto asignado
+                      </h4>
+                    </div>
+                    <div class="space-y-2 ml-2">
+                      <div *ngFor="let task of getTasksWithoutProjectInEnvironment(env.id)"
+                           class="task-card bg-white p-3 rounded-lg shadow-sm border border-yellow-200 relative">
+                        <button (click)="onTaskContextMenu($event, task)" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
+                          <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <div class="flex items-center justify-between mb-2">
+                          <span class="text-lg">{{task.emoji}}</span>
+                          <span class="text-xs px-2 py-1 rounded" [class]="'priority-' + task.priority">
+                            {{task.priority}}
+                          </span>
+                        </div>
+                        <h4 class="font-medium">{{task.name}}</h4>
+                        <p class="text-sm text-gray-600 mt-1">{{task.description}}</p>
+                        <div class="mt-2 text-xs text-gray-500">
+                          <div>Inicio: {{formatDate(task.start)}}</div>
+                          <div>Fin: {{formatDate(task.end)}}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Mensaje si el ambiente no tiene proyectos -->
+                  <div *ngIf="getProjectsByEnvironment(env.id).length === 0" class="text-center py-6">
+                    <p class="text-gray-500 text-sm mb-2">No hay proyectos en este ambiente</p>
+                    <button 
+                      (click)="openNewProjectModal()"
+                      class="bg-gray-200 text-gray-700 px-3 py-2 rounded text-sm hover:bg-gray-300 transition-colors">
+                      <i class="fas fa-plus mr-1"></i>Crear proyecto
                     </button>
-                    <div class="flex items-center justify-between mb-2">
-                      <span class="text-lg">{{task.emoji}}</span>
-                      <span class="text-xs px-2 py-1 rounded" [class]="'priority-' + task.priority">
-                        {{task.priority}}
-                      </span>
-                    </div>
-                    <h4 class="font-medium">{{task.name}}</h4>
-                    <p class="text-sm text-gray-600 mt-1">{{task.description}}</p>
-                    <div class="mt-2 text-xs text-gray-500">
-                      <div>Inicio: {{formatDate(task.start)}}</div>
-                      <div>Fin: {{formatDate(task.end)}}</div>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -267,12 +347,54 @@ import { TimelineSvgComponent } from './components/timeline-svg/timeline-svg.com
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Fecha y hora de inicio</label>
-                  <input type="datetime-local" [(ngModel)]="newTask.start" name="start" class="w-full px-3 py-2 border rounded-lg" required>
+                  <div class="grid grid-cols-2 gap-2">
+                    <div>
+                      <label class="block text-xs text-gray-500 mb-1">Fecha</label>
+                      <input 
+                        type="date" 
+                        [(ngModel)]="newTaskStartDate"
+                        (ngModelChange)="onNewTaskDateChange('start', $event)"
+                        name="newTaskStartDate"
+                        class="w-full px-3 py-2 border rounded-lg text-sm" 
+                        required>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-gray-500 mb-1">Hora</label>
+                      <app-mui-time-picker
+                        [(ngModel)]="newTaskStartTime"
+                        (timeChange)="onNewTaskStartTimeChange($event)"
+                        name="newTaskStartTime"
+                        label="Hora de inicio"
+                        placeholder="HH:MM">
+                      </app-mui-time-picker>
+                    </div>
+                  </div>
                 </div>
                 
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Fecha y hora de fin</label>
-                  <input type="datetime-local" [(ngModel)]="newTask.end" name="end" class="w-full px-3 py-2 border rounded-lg" required>
+                  <div class="grid grid-cols-2 gap-2">
+                    <div>
+                      <label class="block text-xs text-gray-500 mb-1">Fecha</label>
+                      <input 
+                        type="date" 
+                        [(ngModel)]="newTaskEndDate"
+                        (ngModelChange)="onNewTaskDateChange('end', $event)"
+                        name="newTaskEndDate"
+                        class="w-full px-3 py-2 border rounded-lg text-sm" 
+                        required>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-gray-500 mb-1">Hora</label>
+                      <app-mui-time-picker
+                        [(ngModel)]="newTaskEndTime"
+                        (timeChange)="onNewTaskEndTimeChange($event)"
+                        name="newTaskEndTime"
+                        label="Hora de fin"
+                        placeholder="HH:MM">
+                      </app-mui-time-picker>
+                    </div>
+                  </div>
                 </div>
               </div>
               
@@ -323,7 +445,27 @@ import { TimelineSvgComponent } from './components/timeline-svg/timeline-svg.com
               
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Fecha límite de fin</label>
-                <input type="datetime-local" [(ngModel)]="newTask.deadline" name="deadline" class="w-full px-3 py-2 border rounded-lg">
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">Fecha</label>
+                    <input 
+                      type="date" 
+                      [(ngModel)]="newTaskDeadlineDate"
+                      (ngModelChange)="onNewTaskDateChange('deadline', $event)"
+                      name="newTaskDeadlineDate"
+                      class="w-full px-3 py-2 border rounded-lg text-sm">
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">Hora</label>
+                    <app-mui-time-picker
+                      [(ngModel)]="newTaskDeadlineTime"
+                      (timeChange)="onNewTaskDeadlineTimeChange($event)"
+                      name="newTaskDeadlineTime"
+                      label="Hora límite"
+                      placeholder="HH:MM">
+                    </app-mui-time-picker>
+                  </div>
+                </div>
               </div>
               
               <div>
@@ -393,11 +535,6 @@ import { TimelineSvgComponent } from './components/timeline-svg/timeline-svg.com
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Nombre del ambiente</label>
                 <input type="text" [(ngModel)]="newEnvironment.name" name="environmentName" class="w-full px-3 py-2 border rounded-lg" required>
-              </div>
-              
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
-                <textarea [(ngModel)]="newEnvironment.description" name="environmentDescription" rows="3" class="w-full px-3 py-2 border rounded-lg"></textarea>
               </div>
               
               <div>
@@ -493,6 +630,34 @@ import { TimelineSvgComponent } from './components/timeline-svg/timeline-svg.com
         </div>
       </div>
 
+      <!-- Environment Context Menu -->
+      <div *ngIf="showEnvironmentContextMenu" 
+           class="context-menu" 
+           [style.left]="environmentContextMenuPosition.x + 'px'" 
+           [style.top]="environmentContextMenuPosition.y + 'px'"
+           (click)="$event.stopPropagation()">
+        <div class="context-menu-item" (click)="createProjectForEnvironment(selectedEnvironment!.id)">
+          <i class="fas fa-folder-plus"></i>
+          <span>Crear Proyecto</span>
+        </div>
+        <div class="context-menu-item context-menu-item-danger" (click)="deleteEnvironment(selectedEnvironment!)">
+          <i class="fas fa-trash"></i>
+          <span>Eliminar Ambiente</span>
+        </div>
+      </div>
+
+      <!-- Project Context Menu -->
+      <div *ngIf="showProjectContextMenu" 
+           class="context-menu" 
+           [style.left]="projectContextMenuPosition.x + 'px'" 
+           [style.top]="projectContextMenuPosition.y + 'px'"
+           (click)="$event.stopPropagation()">
+        <div class="context-menu-item context-menu-item-danger" (click)="deleteProject(selectedProject!)">
+          <i class="fas fa-trash"></i>
+          <span>Eliminar Proyecto</span>
+        </div>
+      </div>
+
       <!-- Edit Task Modal -->
       <div *ngIf="showEditTaskModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-screen overflow-y-auto">
@@ -531,12 +696,54 @@ import { TimelineSvgComponent } from './components/timeline-svg/timeline-svg.com
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Fecha y hora de inicio</label>
-                  <input type="datetime-local" [(ngModel)]="selectedTask!.start" name="start" class="w-full px-3 py-2 border rounded-lg" required>
+                  <div class="grid grid-cols-2 gap-2">
+                    <div>
+                      <label class="block text-xs text-gray-500 mb-1">Fecha</label>
+                      <input 
+                        type="date" 
+                        [(ngModel)]="editTaskStartDate"
+                        (ngModelChange)="onEditTaskDateChange('start', $event)"
+                        name="editTaskStartDate"
+                        class="w-full px-3 py-2 border rounded-lg text-sm" 
+                        required>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-gray-500 mb-1">Hora</label>
+                      <app-mui-time-picker
+                        [(ngModel)]="editTaskStartTime"
+                        (timeChange)="onEditTaskStartTimeChange($event)"
+                        name="editTaskStartTime"
+                        label="Hora de inicio"
+                        placeholder="HH:MM">
+                      </app-mui-time-picker>
+                    </div>
+                  </div>
                 </div>
                 
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Fecha y hora de fin</label>
-                  <input type="datetime-local" [(ngModel)]="selectedTask!.end" name="end" class="w-full px-3 py-2 border rounded-lg" required>
+                  <div class="grid grid-cols-2 gap-2">
+                    <div>
+                      <label class="block text-xs text-gray-500 mb-1">Fecha</label>
+                      <input 
+                        type="date" 
+                        [(ngModel)]="editTaskEndDate"
+                        (ngModelChange)="onEditTaskDateChange('end', $event)"
+                        name="editTaskEndDate"
+                        class="w-full px-3 py-2 border rounded-lg text-sm" 
+                        required>
+                    </div>
+                    <div>
+                      <label class="block text-xs text-gray-500 mb-1">Hora</label>
+                      <app-mui-time-picker
+                        [(ngModel)]="editTaskEndTime"
+                        (timeChange)="onEditTaskEndTimeChange($event)"
+                        name="editTaskEndTime"
+                        label="Hora de fin"
+                        placeholder="HH:MM">
+                      </app-mui-time-picker>
+                    </div>
+                  </div>
                 </div>
               </div>
               
@@ -587,7 +794,27 @@ import { TimelineSvgComponent } from './components/timeline-svg/timeline-svg.com
               
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Fecha límite de fin</label>
-                <input type="datetime-local" [(ngModel)]="selectedTask!.deadline" name="deadline" class="w-full px-3 py-2 border rounded-lg">
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">Fecha</label>
+                    <input 
+                      type="date" 
+                      [(ngModel)]="editTaskDeadlineDate"
+                      (ngModelChange)="onEditTaskDateChange('deadline', $event)"
+                      name="editTaskDeadlineDate"
+                      class="w-full px-3 py-2 border rounded-lg text-sm">
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">Hora</label>
+                    <app-mui-time-picker
+                      [(ngModel)]="editTaskDeadlineTime"
+                      (timeChange)="onEditTaskDeadlineTimeChange($event)"
+                      name="editTaskDeadlineTime"
+                      label="Hora límite"
+                      placeholder="HH:MM">
+                    </app-mui-time-picker>
+                  </div>
+                </div>
               </div>
               
               <div>
@@ -713,6 +940,15 @@ import { TimelineSvgComponent } from './components/timeline-svg/timeline-svg.com
       background: #f3f4f6;
     }
 
+    .context-menu-item-danger {
+      color: #dc2626;
+    }
+
+    .context-menu-item-danger:hover {
+      background: #fef2f2;
+      color: #b91c1c;
+    }
+
     .task-options {
       position: absolute;
       top: 8px;
@@ -744,6 +980,16 @@ import { TimelineSvgComponent } from './components/timeline-svg/timeline-svg.com
     }
     .status-pending {
       border-left: 4px solid #3b82f6;
+    }
+
+    .project-section {
+      border-left: 3px solid #e5e7eb;
+      padding-left: 8px;
+      margin-left: 4px;
+    }
+
+    .project-section:hover {
+      border-left-color: #6366f1;
     }
   `]
 })
@@ -781,7 +1027,6 @@ export class TaskTrackerComponent implements OnInit {
   filteredProjects: Project[] = [];
   newEnvironment: Partial<Environment> = {
     name: '',
-    description: '',
     color: '#3B82F6'
   };
   
@@ -797,6 +1042,16 @@ export class TaskTrackerComponent implements OnInit {
   showHidden = false;
   selectableProjectsForNewTask: Project[] = [];
 
+  // Variables para menú contextual de ambientes
+  showEnvironmentContextMenu = false;
+  environmentContextMenuPosition = { x: 0, y: 0 };
+  selectedEnvironment: Environment | null = null;
+
+  // Variables para menú contextual de proyectos
+  showProjectContextMenu = false;
+  projectContextMenuPosition = { x: 0, y: 0 };
+  selectedProject: Project | null = null;
+
   // Propiedades para tareas huérfanas
   orphanedTasks: Task[] = [];
   selectedOrphanedTasks: { [taskId: string]: boolean } = {};
@@ -804,6 +1059,21 @@ export class TaskTrackerComponent implements OnInit {
   projectForAssigningOrphans: string = '';
   isAssigningOrphanedTasks: boolean = false;
   selectableProjectsForEditTask: Project[] = [];
+
+  // Propiedades para manejar fechas y horas por separado
+  newTaskStartDate: string = '';
+  newTaskStartTime: string = '';
+  newTaskEndDate: string = '';
+  newTaskEndTime: string = '';
+  newTaskDeadlineDate: string = '';
+  newTaskDeadlineTime: string = '';
+  
+  editTaskStartDate: string = '';
+  editTaskStartTime: string = '';
+  editTaskEndDate: string = '';
+  editTaskEndTime: string = '';
+  editTaskDeadlineDate: string = '';
+  editTaskDeadlineTime: string = '';
 
   constructor(
     private authService: AuthService,
@@ -906,6 +1176,17 @@ export class TaskTrackerComponent implements OnInit {
     this.showNewTaskModal = true;
   }
 
+  openNewTaskModalForProject(environmentId: string, projectId: string) {
+    this.resetNewTask();
+    // Preseleccionar ambiente primero
+    this.newTask.environment = environmentId;
+    // Cargar proyectos disponibles para el ambiente
+    this.onNewTaskEnvironmentChange();
+    // Ahora preseleccionar el proyecto (después de que se carguen los proyectos disponibles)
+    this.newTask.project = projectId;
+    this.showNewTaskModal = true;
+  }
+
   closeNewTaskModal() {
     this.showNewTaskModal = false;
   }
@@ -959,17 +1240,43 @@ export class TaskTrackerComponent implements OnInit {
       reminders: [],
       fragments: []
     };
-    this.setDefaultTimes();
+    
+    // Establecer tiempos por defecto directamente
+    const now = new Date();
+    const msQuarter = 15 * 60 * 1000; // 15 minutos en milisegundos
+    
+    // Hora de inicio: el próximo múltiplo de 15 minutos después de la hora actual
+    const startTime = new Date(Math.ceil(now.getTime() / msQuarter) * msQuarter);
+    
+    // Hora de fin: 15 minutos después de la hora de inicio
+    const endTime = new Date(startTime.getTime() + msQuarter);
+    
+    // Formatear y establecer los valores
+    this.newTask.start = this.formatDateTimeLocalForDefaults(startTime);
+    this.newTask.end = this.formatDateTimeLocalForDefaults(endTime);
+    
+    // Inicializar fechas y horas separadas directamente desde los Date objects para evitar conversiones
+    this.newTaskStartDate = startTime.toISOString().split('T')[0];
+    this.newTaskStartTime = `${startTime.getHours().toString().padStart(2, '0')}:${startTime.getMinutes().toString().padStart(2, '0')}`;
+    this.newTaskEndDate = endTime.toISOString().split('T')[0];
+    this.newTaskEndTime = `${endTime.getHours().toString().padStart(2, '0')}:${endTime.getMinutes().toString().padStart(2, '0')}`;
+    
+    // Deadline por defecto vacío
+    this.newTaskDeadlineDate = '';
+    this.newTaskDeadlineTime = '';
+    
     this.onNewTaskEnvironmentChange();
   }
 
-  private setDefaultTimes() {
-    const now = new Date();
-    const msQuarter = 15 * 60 * 1000;
-    const startTime = new Date(Math.ceil(now.getTime() / msQuarter) * msQuarter);
-    const endTime = new Date(startTime.getTime() + 4 * msQuarter);
-    this.newTask.start = this.formatDateTimeLocal(startTime);
-    this.newTask.end = this.formatDateTimeLocal(endTime);
+  private formatDateTimeLocalForDefaults(date: Date): string {
+    // Crear el formato datetime-local directamente en hora local
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
   }
 
   private formatDateTimeLocal(date: Date): string {
@@ -1068,7 +1375,31 @@ export class TaskTrackerComponent implements OnInit {
       reminders: [],
       fragments: []
     };
-    this.setDefaultTimes();
+    
+    // Establecer tiempos por defecto directamente
+    const now = new Date();
+    const msQuarter = 15 * 60 * 1000; // 15 minutos en milisegundos
+    
+    // Hora de inicio: el próximo múltiplo de 15 minutos después de la hora actual
+    const startTime = new Date(Math.ceil(now.getTime() / msQuarter) * msQuarter);
+    
+    // Hora de fin: 15 minutos después de la hora de inicio
+    const endTime = new Date(startTime.getTime() + msQuarter);
+    
+    // Formatear y establecer los valores
+    this.newTask.start = this.formatDateTimeLocalForDefaults(startTime);
+    this.newTask.end = this.formatDateTimeLocalForDefaults(endTime);
+    
+    // Inicializar fechas y horas separadas directamente desde los Date objects para evitar conversiones
+    this.newTaskStartDate = startTime.toISOString().split('T')[0];
+    this.newTaskStartTime = `${startTime.getHours().toString().padStart(2, '0')}:${startTime.getMinutes().toString().padStart(2, '0')}`;
+    this.newTaskEndDate = endTime.toISOString().split('T')[0];
+    this.newTaskEndTime = `${endTime.getHours().toString().padStart(2, '0')}:${endTime.getMinutes().toString().padStart(2, '0')}`;
+    
+    // Deadline por defecto vacío
+    this.newTaskDeadlineDate = '';
+    this.newTaskDeadlineTime = '';
+    
     this.onNewTaskEnvironmentChange();
   }
 
@@ -1097,7 +1428,6 @@ export class TaskTrackerComponent implements OnInit {
   private resetNewEnvironment() {
     this.newEnvironment = {
       name: '',
-      description: '',
       color: '#3B82F6'
     };
   }
@@ -1111,8 +1441,8 @@ export class TaskTrackerComponent implements OnInit {
   }
 
   getTaskProgress(task: Task): number {
-    const start = new Date(task.start);
-    const end = new Date(task.end);
+    const start = new Date(task.start + (task.start.includes('Z') ? '' : 'Z'));
+    const end = new Date(task.end + (task.end.includes('Z') ? '' : 'Z'));
     const now = new Date();
     const total = end.getTime() - start.getTime();
     const current = now.getTime() - start.getTime();
@@ -1122,11 +1452,38 @@ export class TaskTrackerComponent implements OnInit {
   getTasksByEnvironment(environmentId: string): Task[] {
     return this.filteredTasks
       .filter(task => task.environment === environmentId)
-      .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+      .sort((a, b) => {
+        const dateA = new Date(a.start + (a.start.includes('Z') ? '' : 'Z')).getTime();
+        const dateB = new Date(b.start + (b.start.includes('Z') ? '' : 'Z')).getTime();
+        return dateA - dateB;
+      });
+  }
+
+  getProjectsByEnvironment(environmentId: string): Project[] {
+    return this.projects.filter(project => project.environment === environmentId);
+  }
+
+  getTasksByProject(projectId: string): Task[] {
+    return this.filteredTasks
+      .filter(task => task.project === projectId)
+      .sort((a, b) => {
+        const dateA = new Date(a.start + (a.start.includes('Z') ? '' : 'Z')).getTime();
+        const dateB = new Date(b.start + (b.start.includes('Z') ? '' : 'Z')).getTime();
+        return dateA - dateB;
+      });
+  }
+
+  getProjectName(projectId: string): string {
+    const project = this.projects.find(p => p.id === projectId);
+    return project ? project.name : 'Sin proyecto';
   }
 
   formatDate(dateString: string): string {
-    const date = new Date(dateString);
+    if (!dateString) return '';
+    
+    // El string viene de la base de datos en UTC, convertir a hora local
+    const date = new Date(dateString + (dateString.includes('Z') ? '' : 'Z')); // Asegurar que se interprete como UTC
+    
     return date.toLocaleString('es-ES', {
       day: '2-digit',
       month: '2-digit',
@@ -1143,10 +1500,33 @@ export class TaskTrackerComponent implements OnInit {
     this.showContextMenu = true;
   }
 
+  onEnvironmentContextMenu(event: MouseEvent, environment: Environment) {
+    event.preventDefault();
+    event.stopPropagation();
+    this.selectedEnvironment = environment;
+    this.environmentContextMenuPosition = { x: event.clientX, y: event.clientY };
+    this.showEnvironmentContextMenu = true;
+  }
+
+  onProjectContextMenu(event: MouseEvent, project: Project) {
+    event.preventDefault();
+    event.stopPropagation();
+    this.selectedProject = project;
+    this.projectContextMenuPosition = { x: event.clientX, y: event.clientY };
+    this.showProjectContextMenu = true;
+  }
+
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent) {
+    // Solo cerrar los context menus, no otros modales
     if (this.showContextMenu) {
       this.closeContextMenu();
+    }
+    if (this.showEnvironmentContextMenu) {
+      this.closeEnvironmentContextMenu();
+    }
+    if (this.showProjectContextMenu) {
+      this.closeProjectContextMenu();
     }
   }
 
@@ -1154,9 +1534,55 @@ export class TaskTrackerComponent implements OnInit {
     this.showContextMenu = false;
   }
 
+  closeEnvironmentContextMenu() {
+    this.showEnvironmentContextMenu = false;
+  }
+
+  closeProjectContextMenu() {
+    this.showProjectContextMenu = false;
+  }
+
   async editTask(task: Task) {
     this.selectedTask = JSON.parse(JSON.stringify(task));
+    
+    // Inicializar fechas y horas separadas para edición ANTES de cargar proyectos
+    if (this.selectedTask && this.selectedTask.start) {
+      const startDateTime = this.splitDateTime(this.selectedTask.start);
+      this.editTaskStartDate = startDateTime.date;
+      this.editTaskStartTime = startDateTime.time;
+    } else {
+      // Proporcionar valores por defecto válidos
+      const now = new Date();
+      this.editTaskStartDate = now.toISOString().split('T')[0];
+      this.editTaskStartTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    }
+    
+    if (this.selectedTask && this.selectedTask.end) {
+      const endDateTime = this.splitDateTime(this.selectedTask.end);
+      this.editTaskEndDate = endDateTime.date;
+      this.editTaskEndTime = endDateTime.time;
+    } else {
+      // Proporcionar valores por defecto válidos (1 hora después del inicio)
+      const now = new Date();
+      const endTime = new Date(now.getTime() + 60 * 60 * 1000); // +1 hora
+      this.editTaskEndDate = endTime.toISOString().split('T')[0];
+      this.editTaskEndTime = `${endTime.getHours().toString().padStart(2, '0')}:${endTime.getMinutes().toString().padStart(2, '0')}`;
+    }
+    
+    if (this.selectedTask && this.selectedTask.deadline) {
+      const deadlineDateTime = this.splitDateTime(this.selectedTask.deadline);
+      this.editTaskDeadlineDate = deadlineDateTime.date;
+      this.editTaskDeadlineTime = deadlineDateTime.time;
+    } else {
+      // Para deadline, permitir valores vacíos, pero proporcionar defecto si es necesario
+      this.editTaskDeadlineDate = '';
+      this.editTaskDeadlineTime = '23:59'; // Valor por defecto para el time picker
+    }
+    
+    // Cargar proyectos disponibles para el ambiente seleccionado
     this.onEditTaskEnvironmentChange();
+    
+    // Abrir el modal después de inicializar todo
     this.showEditTaskModal = true;
     this.closeContextMenu();
   }
@@ -1205,7 +1631,9 @@ export class TaskTrackerComponent implements OnInit {
     if (!this.selectedTask) return;
     
     try {
-      await this.taskService.updateTask(this.selectedTask.id, this.selectedTask);
+      // Excluir campos del sistema que no deben actualizarse
+      const { id, userId, createdAt, ...updates } = this.selectedTask;
+      await this.taskService.updateTask(this.selectedTask.id, updates);
       await this.loadTasks();
       this.showEditTaskModal = false;
       this.selectedTask = null;
@@ -1330,12 +1758,265 @@ export class TaskTrackerComponent implements OnInit {
     const dd = String(today.getDate()).padStart(2, '0');
     return this.tasks.filter(task => {
       if (!task.start) return false;
-      const taskDate = new Date(task.start);
+      // Convertir la fecha UTC de la base de datos a hora local
+      const taskDate = new Date(task.start + (task.start.includes('Z') ? '' : 'Z'));
       return (
         taskDate.getFullYear() === yyyy &&
         String(taskDate.getMonth() + 1).padStart(2, '0') === mm &&
         String(taskDate.getDate()).padStart(2, '0') === dd
       );
     });
+  }
+
+  // Métodos para manejar fecha y hora por separado
+  combineDateTime(date: string, time: string): string {
+    if (!date || !time) return '';
+    const [hours, minutes] = time.split(':');
+    
+    // Crear fecha en zona horaria local
+    const year = parseInt(date.substring(0, 4));
+    const month = parseInt(date.substring(5, 7)) - 1; // Los meses en JS son 0-11
+    const day = parseInt(date.substring(8, 10));
+    
+    const dateTime = new Date(year, month, day, parseInt(hours), parseInt(minutes), 0, 0);
+    
+    // Convertir a UTC para guardar en la base de datos (esto es lo correcto)
+    return dateTime.toISOString().slice(0, 16);
+  }
+
+  splitDateTime(dateTimeString: string): { date: string, time: string } {
+    if (!dateTimeString) return { date: '', time: '' };
+    
+    // El string viene de la base de datos en UTC, necesitamos convertir a hora local
+    const dateTime = new Date(dateTimeString + (dateTimeString.includes('Z') ? '' : 'Z')); // Asegurar que se interprete como UTC
+    
+    // Convertir a hora local del usuario
+    const year = dateTime.getFullYear();
+    const month = String(dateTime.getMonth() + 1).padStart(2, '0');
+    const day = String(dateTime.getDate()).padStart(2, '0');
+    const hours = String(dateTime.getHours()).padStart(2, '0');
+    const minutes = String(dateTime.getMinutes()).padStart(2, '0');
+    
+    const date = `${year}-${month}-${day}`;
+    const time = `${hours}:${minutes}`;
+    
+    return { date, time };
+  }
+
+  onNewTaskStartTimeChange(time: string) {
+    this.newTaskStartTime = time;
+    this.updateNewTaskDateTime('start');
+  }
+
+  onNewTaskEndTimeChange(time: string) {
+    this.newTaskEndTime = time;
+    this.updateNewTaskDateTime('end');
+  }
+
+  onNewTaskDeadlineTimeChange(time: string) {
+    this.newTaskDeadlineTime = time;
+    this.updateNewTaskDateTime('deadline');
+  }
+
+  onEditTaskStartTimeChange(time: string) {
+    this.editTaskStartTime = time;
+    this.updateEditTaskDateTime('start');
+  }
+
+  onEditTaskEndTimeChange(time: string) {
+    this.editTaskEndTime = time;
+    this.updateEditTaskDateTime('end');
+  }
+
+  onEditTaskDeadlineTimeChange(time: string) {
+    this.editTaskDeadlineTime = time;
+    this.updateEditTaskDateTime('deadline');
+  }
+
+  private updateNewTaskDateTime(field: 'start' | 'end' | 'deadline') {
+    let dateValue = '';
+    let timeValue = '';
+    
+    switch (field) {
+      case 'start':
+        dateValue = this.newTaskStartDate;
+        timeValue = this.newTaskStartTime;
+        break;
+      case 'end':
+        dateValue = this.newTaskEndDate;
+        timeValue = this.newTaskEndTime;
+        break;
+      case 'deadline':
+        dateValue = this.newTaskDeadlineDate;
+        timeValue = this.newTaskDeadlineTime;
+        break;
+    }
+
+    const combinedDateTime = this.combineDateTime(dateValue, timeValue);
+    
+    if (field === 'deadline') {
+      this.newTask.deadline = combinedDateTime || null;
+    } else {
+      (this.newTask as any)[field] = combinedDateTime;
+    }
+  }
+
+  private updateEditTaskDateTime(field: 'start' | 'end' | 'deadline') {
+    if (!this.selectedTask) return;
+    
+    let dateValue = '';
+    let timeValue = '';
+    
+    switch (field) {
+      case 'start':
+        dateValue = this.editTaskStartDate;
+        timeValue = this.editTaskStartTime;
+        break;
+      case 'end':
+        dateValue = this.editTaskEndDate;
+        timeValue = this.editTaskEndTime;
+        break;
+      case 'deadline':
+        dateValue = this.editTaskDeadlineDate;
+        timeValue = this.editTaskDeadlineTime;
+        break;
+    }
+
+    const combinedDateTime = this.combineDateTime(dateValue, timeValue);
+    
+    if (field === 'deadline') {
+      this.selectedTask.deadline = combinedDateTime || null;
+    } else {
+      (this.selectedTask as any)[field] = combinedDateTime;
+    }
+  }
+
+  onNewTaskDateChange(field: 'start' | 'end' | 'deadline', date: string) {
+    switch (field) {
+      case 'start':
+        this.newTaskStartDate = date;
+        break;
+      case 'end':
+        this.newTaskEndDate = date;
+        break;
+      case 'deadline':
+        this.newTaskDeadlineDate = date;
+        break;
+    }
+    this.updateNewTaskDateTime(field);
+  }
+
+  onEditTaskDateChange(field: 'start' | 'end' | 'deadline', date: string) {
+    switch (field) {
+      case 'start':
+        this.editTaskStartDate = date;
+        break;
+      case 'end':
+        this.editTaskEndDate = date;
+        break;
+      case 'deadline':
+        this.editTaskDeadlineDate = date;
+        break;
+    }
+    this.updateEditTaskDateTime(field);
+  }
+
+  getTasksWithoutProjectInEnvironment(environmentId: string): Task[] {
+    return this.filteredTasks.filter(task => 
+      task.environment === environmentId && (!task.project || task.project === '')
+    );
+  }
+
+  createProjectForEnvironment(environmentId: string) {
+    // Preseleccionar el ambiente en el nuevo proyecto
+    this.newProject.environment = environmentId;
+    this.openNewProjectModal();
+    this.closeEnvironmentContextMenu();
+  }
+
+  async deleteEnvironment(environment: Environment) {
+    const hasProjects = this.projects.some(p => p.environment === environment.id);
+    const hasTasks = this.tasks.some(t => t.environment === environment.id);
+    
+    let confirmMessage = `¿Estás seguro de que quieres eliminar el ambiente "${environment.name}"?`;
+    
+    if (hasProjects || hasTasks) {
+      confirmMessage += '\n\nEste ambiente contiene:';
+      if (hasProjects) {
+        const projectCount = this.projects.filter(p => p.environment === environment.id).length;
+        confirmMessage += `\n- ${projectCount} proyecto(s)`;
+      }
+      if (hasTasks) {
+        const taskCount = this.tasks.filter(t => t.environment === environment.id).length;
+        confirmMessage += `\n- ${taskCount} tarea(s)`;
+      }
+      confirmMessage += '\n\nTodos los proyectos y tareas de este ambiente también serán eliminados.';
+    }
+    
+    if (confirm(confirmMessage)) {
+      try {
+        // Eliminar todas las tareas del ambiente
+        const tasksToDelete = this.tasks.filter(t => t.environment === environment.id);
+        for (const task of tasksToDelete) {
+          await this.taskService.deleteTask(task.id);
+        }
+        
+        // Eliminar todos los proyectos del ambiente
+        const projectsToDelete = this.projects.filter(p => p.environment === environment.id);
+        for (const project of projectsToDelete) {
+          await this.projectService.deleteProject(project.id);
+        }
+        
+        // Eliminar el ambiente
+        await this.environmentService.deleteEnvironment(environment.id);
+        
+        // Recargar datos
+        await this.loadInitialData();
+        
+        alert(`Ambiente "${environment.name}" eliminado exitosamente.`);
+      } catch (error) {
+        console.error('Error al eliminar el ambiente:', error);
+        alert(`Error al eliminar el ambiente: ${error}`);
+      }
+    }
+    this.closeEnvironmentContextMenu();
+  }
+
+  async deleteProject(project: Project) {
+    const projectTasks = this.tasks.filter(t => t.project === project.id);
+    
+    let confirmMessage = `¿Estás seguro de que quieres eliminar el proyecto "${project.name}"?`;
+    
+    if (projectTasks.length > 0) {
+      confirmMessage += `\n\nEste proyecto contiene ${projectTasks.length} tarea(s) que serán desvinculadas del proyecto y se convertirán en tareas sin proyecto asignado.`;
+    }
+    
+    if (confirm(confirmMessage)) {
+      try {
+        // Desvincular tareas del proyecto (no eliminarlas, solo quitar la referencia)
+        for (const task of projectTasks) {
+          await this.taskService.updateTask(task.id, { 
+            project: '',
+            // Mantener el ambiente para que no se conviertan en huérfanas
+          });
+        }
+        
+        // Eliminar el proyecto
+        await this.projectService.deleteProject(project.id);
+        
+        // Recargar datos
+        await this.loadInitialData();
+        
+        if (projectTasks.length > 0) {
+          alert(`Proyecto "${project.name}" eliminado exitosamente. ${projectTasks.length} tarea(s) fueron desvinculadas del proyecto.`);
+        } else {
+          alert(`Proyecto "${project.name}" eliminado exitosamente.`);
+        }
+      } catch (error) {
+        console.error('Error al eliminar el proyecto:', error);
+        alert(`Error al eliminar el proyecto: ${error}`);
+      }
+    }
+    this.closeProjectContextMenu();
   }
 } 

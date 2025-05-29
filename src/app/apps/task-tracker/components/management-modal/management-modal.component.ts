@@ -75,7 +75,9 @@ export class ManagementModalComponent implements OnInit {
     }
     try {
       if (this.isEditingEnvironment && this.currentEnvironment.id) {
-        await this.environmentService.updateEnvironment(this.currentEnvironment.id, this.currentEnvironment);
+        // Excluir campos del sistema que no deben actualizarse
+        const { id, userId, createdAt, ...updates } = this.currentEnvironment;
+        await this.environmentService.updateEnvironment(this.currentEnvironment.id, updates);
       } else {
         await this.environmentService.createEnvironment(this.currentEnvironment as Omit<Environment, 'id'>);
       }
@@ -134,7 +136,8 @@ export class ManagementModalComponent implements OnInit {
     }
     try {
       if (this.isEditingProject && this.currentProject.id) {
-        await this.projectService.updateProject(this.currentProject.id, this.currentProject);
+        const { id, userId, createdAt, ...updates } = this.currentProject;
+        await this.projectService.updateProject(this.currentProject.id, updates);
       } else {
         const projectData = { ...this.currentProject, environment: this.currentProject.environment || '' };
         await this.projectService.createProject(projectData as Omit<Project, 'id' | 'userId' | 'createdAt' | 'updatedAt'>);

@@ -76,7 +76,7 @@ export class TimelineSvgComponent {
   @Input() tasks: Task[] = [];
   @Input() environments: Environment[] = [];
 
-  svgWidth = 900; // Ancho total del SVG
+  svgWidth = 450; // Ancho total del SVG
   sectionHeight = 100; // Altura de cada sección de 8 horas
   svgHeight = this.sectionHeight * 3; // Altura total del SVG
 
@@ -86,6 +86,13 @@ export class TimelineSvgComponent {
     Array.from({length: 8}, (_, i) => i + 16)   // 16-23
   ];
   
+  // Método utilitario para convertir fechas UTC de la base de datos a hora local
+  private parseUTCToLocal(dateTimeString: string): Date {
+    // Asegurar que el string se interprete como UTC añadiendo 'Z' si no lo tiene
+    const utcString = dateTimeString + (dateTimeString.includes('Z') ? '' : 'Z');
+    return new Date(utcString);
+  }
+
   // Devuelve la posición X para una hora dentro de una sección (0-23)
   // sectionStartHour es la hora de inicio de la sección (0, 8, o 16)
   getX(hourInDay: number, sectionStartHour: number): number {
@@ -95,7 +102,7 @@ export class TimelineSvgComponent {
   }
 
   getTaskX(task: Task, sectionStartHour: number): number {
-    const taskActualStart = new Date(task.start);
+    const taskActualStart = this.parseUTCToLocal(task.start);
     const taskActualStartHour = taskActualStart.getHours() + taskActualStart.getMinutes() / 60;
 
     // Determinar el inicio de la porción visible de la tarea dentro de esta sección
@@ -108,8 +115,8 @@ export class TimelineSvgComponent {
   }
 
   getTaskWidth(task: Task, sectionStartHour: number): number {
-    const start = new Date(task.start);
-    const end = new Date(task.end);
+    const start = this.parseUTCToLocal(task.start);
+    const end = this.parseUTCToLocal(task.end);
     
     let taskStartHour = start.getHours() + start.getMinutes() / 60;
     let taskEndHour = end.getHours() + end.getMinutes() / 60;
@@ -130,8 +137,8 @@ export class TimelineSvgComponent {
     const sectionEndHour = sectionStartHour + 8;
 
     return this.tasks.filter(task => {
-      const taskStart = new Date(task.start);
-      const taskEnd = new Date(task.end);
+      const taskStart = this.parseUTCToLocal(task.start);
+      const taskEnd = this.parseUTCToLocal(task.end);
       const taskStartHour = taskStart.getHours() + taskStart.getMinutes() / 60;
       const taskEndHour = taskEnd.getHours() + taskEnd.getMinutes() / 60;
 
