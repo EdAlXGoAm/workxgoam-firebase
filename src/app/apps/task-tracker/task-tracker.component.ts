@@ -77,8 +77,8 @@ import { PrioritySelectorComponent } from './components/priority-selector/priori
             <h2 class="text-xl font-bold mb-4">Vista de Tablero</h2>
             <!-- Timeline View integrada -->
             <div class="mb-6">
-              <h3 class="text-lg font-semibold mb-2">Línea del Tiempo (Hoy)</h3>
-              <app-timeline-svg [tasks]="getTodayTasks()" [environments]="environments"></app-timeline-svg>
+              <h3 class="text-lg font-semibold mb-2">Línea del Tiempo</h3>
+              <app-timeline-svg [tasks]="tasks" [environments]="environments"></app-timeline-svg>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div *ngFor="let env of environments" class="board-column p-4">
@@ -217,8 +217,8 @@ import { PrioritySelectorComponent } from './components/priority-selector/priori
 
           <!-- Timeline View -->
           <div *ngIf="currentView === 'timeline'" class="w-full bg-white rounded-lg shadow-md p-4">
-            <h2 class="text-xl font-bold mb-4">Línea del Tiempo (Hoy)</h2>
-            <app-timeline-svg [tasks]="getTodayTasks()" [environments]="environments"></app-timeline-svg>
+            <h2 class="text-xl font-bold mb-4">Línea del Tiempo</h2>
+            <app-timeline-svg [tasks]="tasks" [environments]="environments"></app-timeline-svg>
           </div>
         </div>
       </main>
@@ -552,32 +552,104 @@ import { PrioritySelectorComponent } from './components/priority-selector/priori
 
       <!-- New Environment Modal -->
       <div *ngIf="showNewEnvironmentModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all">
+          <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200">
+            <h3 class="text-xl font-semibold text-gray-800">Nuevo Ambiente</h3>
+            <button (click)="closeNewEnvironmentModal()" class="text-gray-400 hover:text-gray-600 transition">
+              <i class="fas fa-times fa-lg"></i>
+            </button>
+          </div>
           <div class="p-6">
-            <div class="flex justify-between items-center mb-4">
-              <h3 class="text-xl font-bold">Nuevo Ambiente</h3>
-              <button (click)="closeNewEnvironmentModal()" class="text-gray-500 hover:text-gray-700">
-                <i class="fas fa-times"></i>
-              </button>
-            </div>
-            
             <form (ngSubmit)="saveNewEnvironment()" class="space-y-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Nombre del ambiente</label>
-                <input type="text" [(ngModel)]="newEnvironment.name" name="environmentName" class="w-full px-3 py-2 border rounded-lg" required>
+                <label for="envName" class="block text-sm font-medium text-gray-700 mb-1">Nombre del Ambiente</label>
+                <input type="text" id="envName" name="envName" [(ngModel)]="newEnvironment.name" required 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                       placeholder="Ingresa el nombre del ambiente">
               </div>
-              
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Color</label>
-                <input type="color" [(ngModel)]="newEnvironment.color" name="environmentColor" class="w-full h-10 px-3 py-2 border rounded-lg">
+                <label class="block text-sm font-medium text-gray-700 mb-3">Color</label>
+                
+                <!-- Colores sugeridos -->
+                <div class="mb-6">
+                  <p class="text-xs text-gray-500 mb-3">Colores sugeridos:</p>
+                  <div class="flex flex-wrap gap-2">
+                    <button
+                      *ngFor="let color of suggestedColors"
+                      type="button"
+                      (click)="selectSuggestedColor(color)"
+                      class="w-8 h-8 rounded-full border-2 hover:scale-110 transition-transform focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                      [style.background-color]="color"
+                      [class.border-gray-800]="newEnvironment.color === color"
+                      [class.border-gray-300]="newEnvironment.color !== color"
+                      [title]="color">
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Color Picker Personalizado -->
+                <div class="mb-4">
+                  <p class="text-xs text-gray-500 mb-3">O elige un color personalizado:</p>
+                  <div class="flex gap-4">
+                    <!-- Área principal del color picker -->
+                    <div class="relative">
+                      <div 
+                        class="w-48 h-32 border border-gray-300 rounded-lg cursor-crosshair relative overflow-hidden"
+                        [style.background]="'linear-gradient(to right, white, hsl(' + colorPickerHue + ', 100%, 50%)), linear-gradient(to top, black, transparent)'"
+                        (click)="onColorAreaClick($event)">
+                        
+                        <!-- Indicador de posición -->
+                        <div 
+                          class="absolute w-3 h-3 border-2 border-white rounded-full transform -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                          [style.left]="colorPickerSaturation + '%'"
+                          [style.top]="(100 - colorPickerLightness) + '%'"
+                          style="box-shadow: 0 0 0 1px rgba(0,0,0,0.3);">
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Barra de matiz -->
+                    <div class="relative">
+                      <div 
+                        class="w-6 h-32 border border-gray-300 rounded cursor-pointer"
+                        style="background: linear-gradient(to bottom, 
+                          hsl(0, 100%, 50%) 0%, 
+                          hsl(60, 100%, 50%) 16.66%, 
+                          hsl(120, 100%, 50%) 33.33%, 
+                          hsl(180, 100%, 50%) 50%, 
+                          hsl(240, 100%, 50%) 66.66%, 
+                          hsl(300, 100%, 50%) 83.33%, 
+                          hsl(360, 100%, 50%) 100%)"
+                        (click)="onHueBarClick($event)">
+                        
+                        <!-- Indicador de matiz -->
+                        <div 
+                          class="absolute w-full h-0.5 bg-white border border-gray-400 transform -translate-y-1/2 pointer-events-none"
+                          [style.top]="(colorPickerHue / 360) * 100 + '%'">
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Vista previa -->
+                    <div class="flex flex-col items-center gap-2">
+                      <p class="text-xs text-gray-500">Vista previa:</p>
+                      <div 
+                        class="w-16 h-16 border border-gray-300 rounded-lg"
+                        [style.background-color]="newEnvironment.color || '#3B82F6'">
+                      </div>
+                      <p class="text-xs font-mono text-gray-600">{{ newEnvironment.color || '#3B82F6' }}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
-              
               <div class="flex justify-end space-x-3 pt-4">
-                <button type="button" (click)="closeNewEnvironmentModal()" class="px-4 py-2 border rounded-lg font-medium">
+                <button type="button" (click)="closeNewEnvironmentModal()"
+                        class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none">
                   Cancelar
                 </button>
-                <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700">
-                  Guardar Ambiente
+                <button type="submit"
+                        class="px-4 py-2 bg-indigo-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                  Crear Ambiente
                 </button>
               </div>
             </form>
@@ -1152,6 +1224,25 @@ export class TaskTrackerComponent implements OnInit {
   isAssigningOrphanedTasks: boolean = false;
   selectableProjectsForEditTask: Project[] = [];
 
+  // Colores sugeridos para entornos
+  suggestedColors: string[] = [
+    '#3B82F6', // Azul
+    '#10B981', // Verde
+    '#F59E0B', // Amarillo
+    '#EF4444', // Rojo
+    '#8B5CF6', // Púrpura
+    '#F97316', // Naranja
+    '#06B6D4', // Cyan
+    '#84CC16', // Lima
+    '#EC4899', // Rosa
+    '#6B7280'  // Gris
+  ];
+
+  // Propiedades para el color picker personalizado
+  colorPickerHue: number = 220; // Hue para el azul por defecto
+  colorPickerSaturation: number = 76; // Saturación por defecto
+  colorPickerLightness: number = 60; // Luminosidad por defecto
+
   // Propiedades para manejar fechas y horas por separado
   newTaskStartDate: string = '';
   newTaskStartTime: string = '';
@@ -1361,6 +1452,9 @@ export class TaskTrackerComponent implements OnInit {
     this.newTaskDeadlineTime = '';
     
     this.onNewTaskEnvironmentChange();
+    
+    // Calcular duración inicial automáticamente
+    this.updateNewTaskDuration();
   }
 
   private formatDateTimeLocalForDefaults(date: Date): string {
@@ -1432,6 +1526,7 @@ export class TaskTrackerComponent implements OnInit {
 
   openNewEnvironmentModal() {
     this.showNewEnvironmentModal = true;
+    this.initializeColorPicker();
   }
 
   closeNewEnvironmentModal() {
@@ -1439,6 +1534,13 @@ export class TaskTrackerComponent implements OnInit {
   }
 
   openNewProjectModal() {
+    // Preseleccionar el ambiente si ya hay uno seleccionado en la tarea
+    if (this.showNewTaskModal && this.newTask && this.newTask.environment) {
+      this.newProject.environment = this.newTask.environment;
+    } else if (this.showEditTaskModal && this.selectedTask && this.selectedTask.environment) {
+      this.newProject.environment = this.selectedTask.environment;
+    }
+    
     this.showNewProjectModal = true;
   }
 
@@ -1496,12 +1598,25 @@ export class TaskTrackerComponent implements OnInit {
     this.newTaskDeadlineTime = '';
     
     this.onNewTaskEnvironmentChange();
+    
+    // Calcular duración inicial automáticamente
+    this.updateNewTaskDuration();
   }
 
   async saveNewEnvironment() {
     try {
-      await this.environmentService.createEnvironment(this.newEnvironment as Omit<Environment, 'id' | 'userId' | 'createdAt' | 'updatedAt'>);
+      const createdEnvironmentId = await this.environmentService.createEnvironment(this.newEnvironment as Omit<Environment, 'id' | 'userId' | 'createdAt' | 'updatedAt'>);
       await this.loadEnvironments();
+      
+      // Auto-seleccionar el nuevo ambiente en la tarea
+      if (this.showNewTaskModal && this.newTask) {
+        this.newTask.environment = createdEnvironmentId;
+        this.onNewTaskEnvironmentChange(); // Cargar proyectos disponibles para el nuevo ambiente
+      } else if (this.showEditTaskModal && this.selectedTask) {
+        this.selectedTask.environment = createdEnvironmentId;
+        this.onEditTaskEnvironmentChange(); // Cargar proyectos disponibles para el nuevo ambiente
+      }
+      
       this.closeNewEnvironmentModal();
       this.resetNewEnvironment();
     } catch (error) {
@@ -1511,8 +1626,26 @@ export class TaskTrackerComponent implements OnInit {
 
   async saveNewProject() {
     try {
-      await this.projectService.createProject(this.newProject as Omit<Project, 'id' | 'userId' | 'createdAt' | 'updatedAt'>);
+      const createdProjectId = await this.projectService.createProject(this.newProject as Omit<Project, 'id' | 'userId' | 'createdAt' | 'updatedAt'>);
       await this.loadProjects();
+      
+      // Auto-seleccionar el nuevo proyecto en la tarea
+      if (this.showNewTaskModal && this.newTask) {
+        // También asegurarnos de que el ambiente esté seleccionado
+        if (this.newProject.environment) {
+          this.newTask.environment = this.newProject.environment;
+          this.onNewTaskEnvironmentChange(); // Cargar proyectos disponibles
+        }
+        this.newTask.project = createdProjectId;
+      } else if (this.showEditTaskModal && this.selectedTask) {
+        // También asegurarnos de que el ambiente esté seleccionado
+        if (this.newProject.environment) {
+          this.selectedTask.environment = this.newProject.environment;
+          this.onEditTaskEnvironmentChange(); // Cargar proyectos disponibles
+        }
+        this.selectedTask.project = createdProjectId;
+      }
+      
       this.closeNewProjectModal();
       this.resetNewProject();
     } catch (error) {
@@ -1591,7 +1724,64 @@ export class TaskTrackerComponent implements OnInit {
     event.preventDefault();
     event.stopPropagation();
     this.selectedTask = task;
-    this.contextMenuPosition = { x: event.clientX, y: event.clientY };
+    
+    // Calcular la altura aproximada del menú contextual
+    // Contamos los elementos que aparecerán en el menú
+    let menuItemsCount = 3; // Editar, Eliminar, Mostrar/Ocultar (siempre presentes)
+    
+    // Contar elementos de estado que aparecerán
+    if (task.status !== 'completed') menuItemsCount++; // Marcar completada
+    if (task.status !== 'in-progress') menuItemsCount++; // Marcar en progreso  
+    if (task.status !== 'pending') menuItemsCount++; // Marcar pendiente
+    
+    // Altura aproximada: 40px por item + padding
+    const menuHeight = menuItemsCount * 40 + 16; // 16px de padding total
+    
+    // Obtener dimensiones del viewport
+    const viewportHeight = window.innerHeight;
+    
+    // Coordenadas del click
+    const clickX = event.clientX;
+    const clickY = event.clientY;
+    
+    // Verificar si el menú cabe hacia abajo desde la posición del click
+    const spaceBelow = viewportHeight - clickY;
+    const spaceAbove = clickY;
+    
+    let finalY = clickY;
+    
+    // Si no cabe hacia abajo pero sí hacia arriba, posicionarlo hacia arriba
+    if (spaceBelow < menuHeight && spaceAbove >= menuHeight) {
+      finalY = clickY - menuHeight;
+    }
+    // Si no cabe hacia abajo pero el espacio arriba es mayor, usarlo
+    else if (spaceBelow < menuHeight && spaceAbove > spaceBelow) {
+      finalY = clickY - menuHeight;
+    }
+    // Si no cabe en ningún lado, ajustar para que esté visible
+    else if (spaceBelow < menuHeight && spaceAbove < menuHeight) {
+      if (spaceAbove > spaceBelow) {
+        finalY = 10; // Pegarlo arriba con margen
+      } else {
+        finalY = viewportHeight - menuHeight - 10; // Pegarlo abajo con margen
+      }
+    }
+    
+    // Asegurar que no se salga por los lados
+    let finalX = clickX;
+    const menuWidth = 200; // Ancho aproximado del menú
+    const spaceRight = window.innerWidth - clickX;
+    
+    if (spaceRight < menuWidth) {
+      finalX = clickX - menuWidth;
+    }
+    
+    // Asegurar que no se salga por la izquierda
+    if (finalX < 0) {
+      finalX = 10;
+    }
+    
+    this.contextMenuPosition = { x: finalX, y: finalY };
     this.showContextMenu = true;
   }
 
@@ -1599,7 +1789,49 @@ export class TaskTrackerComponent implements OnInit {
     event.preventDefault();
     event.stopPropagation();
     this.selectedEnvironment = environment;
-    this.environmentContextMenuPosition = { x: event.clientX, y: event.clientY };
+    
+    // Calcular la altura del menú de ambiente (2 elementos: Crear Proyecto, Eliminar Ambiente)
+    const menuHeight = 2 * 40 + 16; // 2 items * 40px + padding
+    
+    // Obtener dimensiones del viewport
+    const viewportHeight = window.innerHeight;
+    
+    // Coordenadas del click
+    const clickX = event.clientX;
+    const clickY = event.clientY;
+    
+    // Verificar espacio disponible
+    const spaceBelow = viewportHeight - clickY;
+    const spaceAbove = clickY;
+    
+    let finalY = clickY;
+    
+    // Lógica de posicionamiento inteligente
+    if (spaceBelow < menuHeight && spaceAbove >= menuHeight) {
+      finalY = clickY - menuHeight;
+    } else if (spaceBelow < menuHeight && spaceAbove > spaceBelow) {
+      finalY = clickY - menuHeight;
+    } else if (spaceBelow < menuHeight && spaceAbove < menuHeight) {
+      if (spaceAbove > spaceBelow) {
+        finalY = 10;
+      } else {
+        finalY = viewportHeight - menuHeight - 10;
+      }
+    }
+    
+    // Verificar posición horizontal
+    let finalX = clickX;
+    const menuWidth = 200;
+    const spaceRight = window.innerWidth - clickX;
+    
+    if (spaceRight < menuWidth) {
+      finalX = clickX - menuWidth;
+    }
+    if (finalX < 0) {
+      finalX = 10;
+    }
+    
+    this.environmentContextMenuPosition = { x: finalX, y: finalY };
     this.showEnvironmentContextMenu = true;
   }
 
@@ -1607,7 +1839,49 @@ export class TaskTrackerComponent implements OnInit {
     event.preventDefault();
     event.stopPropagation();
     this.selectedProject = project;
-    this.projectContextMenuPosition = { x: event.clientX, y: event.clientY };
+    
+    // Calcular la altura del menú de proyecto (1 elemento: Eliminar Proyecto)
+    const menuHeight = 1 * 40 + 16; // 1 item * 40px + padding
+    
+    // Obtener dimensiones del viewport
+    const viewportHeight = window.innerHeight;
+    
+    // Coordenadas del click
+    const clickX = event.clientX;
+    const clickY = event.clientY;
+    
+    // Verificar espacio disponible
+    const spaceBelow = viewportHeight - clickY;
+    const spaceAbove = clickY;
+    
+    let finalY = clickY;
+    
+    // Lógica de posicionamiento inteligente
+    if (spaceBelow < menuHeight && spaceAbove >= menuHeight) {
+      finalY = clickY - menuHeight;
+    } else if (spaceBelow < menuHeight && spaceAbove > spaceBelow) {
+      finalY = clickY - menuHeight;
+    } else if (spaceBelow < menuHeight && spaceAbove < menuHeight) {
+      if (spaceAbove > spaceBelow) {
+        finalY = 10;
+      } else {
+        finalY = viewportHeight - menuHeight - 10;
+      }
+    }
+    
+    // Verificar posición horizontal
+    let finalX = clickX;
+    const menuWidth = 200;
+    const spaceRight = window.innerWidth - clickX;
+    
+    if (spaceRight < menuWidth) {
+      finalX = clickX - menuWidth;
+    }
+    if (finalX < 0) {
+      finalX = 10;
+    }
+    
+    this.projectContextMenuPosition = { x: finalX, y: finalY };
     this.showProjectContextMenu = true;
   }
 
@@ -1684,6 +1958,9 @@ export class TaskTrackerComponent implements OnInit {
     if (this.selectedTask && originalProject) {
       this.selectedTask.project = originalProject;
     }
+    
+    // Calcular duración inicial automáticamente basada en las fechas/horas de la tarea
+    this.updateEditTaskDuration();
     
     // Abrir el modal después de inicializar todo
     this.showEditTaskModal = true;
@@ -1854,176 +2131,6 @@ export class TaskTrackerComponent implements OnInit {
     return env?.name;
   }
 
-  getTodayTasks(): Task[] {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    return this.tasks.filter(task => {
-      if (!task.start) return false;
-      // Convertir la fecha UTC de la base de datos a hora local
-      const taskDate = new Date(task.start + (task.start.includes('Z') ? '' : 'Z'));
-      return (
-        taskDate.getFullYear() === yyyy &&
-        String(taskDate.getMonth() + 1).padStart(2, '0') === mm &&
-        String(taskDate.getDate()).padStart(2, '0') === dd
-      );
-    });
-  }
-
-  // Métodos para manejar fecha y hora por separado
-  combineDateTime(date: string, time: string): string {
-    if (!date || !time) return '';
-    const [hours, minutes] = time.split(':');
-    
-    // Crear fecha en zona horaria local
-    const year = parseInt(date.substring(0, 4));
-    const month = parseInt(date.substring(5, 7)) - 1; // Los meses en JS son 0-11
-    const day = parseInt(date.substring(8, 10));
-    
-    const dateTime = new Date(year, month, day, parseInt(hours), parseInt(minutes), 0, 0);
-    
-    // Convertir a UTC para guardar en la base de datos (esto es lo correcto)
-    return dateTime.toISOString().slice(0, 16);
-  }
-
-  splitDateTime(dateTimeString: string): { date: string, time: string } {
-    if (!dateTimeString) return { date: '', time: '' };
-    
-    // El string viene de la base de datos en UTC, necesitamos convertir a hora local
-    const dateTime = new Date(dateTimeString + (dateTimeString.includes('Z') ? '' : 'Z')); // Asegurar que se interprete como UTC
-    
-    // Convertir a hora local del usuario
-    const year = dateTime.getFullYear();
-    const month = String(dateTime.getMonth() + 1).padStart(2, '0');
-    const day = String(dateTime.getDate()).padStart(2, '0');
-    const hours = String(dateTime.getHours()).padStart(2, '0');
-    const minutes = String(dateTime.getMinutes()).padStart(2, '0');
-    
-    const date = `${year}-${month}-${day}`;
-    const time = `${hours}:${minutes}`;
-    
-    return { date, time };
-  }
-
-  onNewTaskStartTimeChange(time: string) {
-    this.newTaskStartTime = time;
-    this.updateNewTaskDateTime('start');
-  }
-
-  onNewTaskEndTimeChange(time: string) {
-    this.newTaskEndTime = time;
-    this.updateNewTaskDateTime('end');
-  }
-
-  onNewTaskDeadlineTimeChange(time: string) {
-    this.newTaskDeadlineTime = time;
-    this.updateNewTaskDateTime('deadline');
-  }
-
-  onEditTaskStartTimeChange(time: string) {
-    this.editTaskStartTime = time;
-    this.updateEditTaskDateTime('start');
-  }
-
-  onEditTaskEndTimeChange(time: string) {
-    this.editTaskEndTime = time;
-    this.updateEditTaskDateTime('end');
-  }
-
-  onEditTaskDeadlineTimeChange(time: string) {
-    this.editTaskDeadlineTime = time;
-    this.updateEditTaskDateTime('deadline');
-  }
-
-  private updateNewTaskDateTime(field: 'start' | 'end' | 'deadline') {
-    let dateValue = '';
-    let timeValue = '';
-    
-    switch (field) {
-      case 'start':
-        dateValue = this.newTaskStartDate;
-        timeValue = this.newTaskStartTime;
-        break;
-      case 'end':
-        dateValue = this.newTaskEndDate;
-        timeValue = this.newTaskEndTime;
-        break;
-      case 'deadline':
-        dateValue = this.newTaskDeadlineDate;
-        timeValue = this.newTaskDeadlineTime;
-        break;
-    }
-
-    const combinedDateTime = this.combineDateTime(dateValue, timeValue);
-    
-    if (field === 'deadline') {
-      this.newTask.deadline = combinedDateTime || null;
-    } else {
-      (this.newTask as any)[field] = combinedDateTime;
-    }
-  }
-
-  private updateEditTaskDateTime(field: 'start' | 'end' | 'deadline') {
-    if (!this.selectedTask) return;
-    
-    let dateValue = '';
-    let timeValue = '';
-    
-    switch (field) {
-      case 'start':
-        dateValue = this.editTaskStartDate;
-        timeValue = this.editTaskStartTime;
-        break;
-      case 'end':
-        dateValue = this.editTaskEndDate;
-        timeValue = this.editTaskEndTime;
-        break;
-      case 'deadline':
-        dateValue = this.editTaskDeadlineDate;
-        timeValue = this.editTaskDeadlineTime;
-        break;
-    }
-
-    const combinedDateTime = this.combineDateTime(dateValue, timeValue);
-    
-    if (field === 'deadline') {
-      this.selectedTask.deadline = combinedDateTime || null;
-    } else {
-      (this.selectedTask as any)[field] = combinedDateTime;
-    }
-  }
-
-  onNewTaskDateChange(field: 'start' | 'end' | 'deadline', date: string) {
-    switch (field) {
-      case 'start':
-        this.newTaskStartDate = date;
-        break;
-      case 'end':
-        this.newTaskEndDate = date;
-        break;
-      case 'deadline':
-        this.newTaskDeadlineDate = date;
-        break;
-    }
-    this.updateNewTaskDateTime(field);
-  }
-
-  onEditTaskDateChange(field: 'start' | 'end' | 'deadline', date: string) {
-    switch (field) {
-      case 'start':
-        this.editTaskStartDate = date;
-        break;
-      case 'end':
-        this.editTaskEndDate = date;
-        break;
-      case 'deadline':
-        this.editTaskDeadlineDate = date;
-        break;
-    }
-    this.updateEditTaskDateTime(field);
-  }
-
   getTasksWithoutProjectInEnvironment(environmentId: string): Task[] {
     return this.filteredTasks.filter(task => 
       task.environment === environmentId && (!task.project || task.project === '')
@@ -2141,5 +2248,307 @@ export class TaskTrackerComponent implements OnInit {
     const hours = now.getHours().toString().padStart(2, '0');
     const minutes = now.getMinutes().toString().padStart(2, '0');
     return `${hours}:${minutes}`;
+  }
+
+  calculateDuration(startDate: string, startTime: string, endDate: string, endTime: string): number {
+    if (!startDate || !startTime || !endDate || !endTime) {
+      return 0;
+    }
+
+    try {
+      // Crear objetos Date para inicio y fin
+      const [startHours, startMinutes] = startTime.split(':').map(Number);
+      const [endHours, endMinutes] = endTime.split(':').map(Number);
+      
+      const startDateTime = new Date(startDate);
+      startDateTime.setHours(startHours, startMinutes, 0, 0);
+      
+      const endDateTime = new Date(endDate);
+      endDateTime.setHours(endHours, endMinutes, 0, 0);
+      
+      // Calcular diferencia en milisegundos
+      const diffMs = endDateTime.getTime() - startDateTime.getTime();
+      
+      // Convertir a horas
+      const diffHours = diffMs / (1000 * 60 * 60);
+      
+      // Redondear a 2 decimales y asegurar que no sea negativo
+      return Math.max(0, Math.round(diffHours * 100) / 100);
+    } catch (error) {
+      console.error('Error calculating duration:', error);
+      return 0;
+    }
+  }
+
+  updateNewTaskDuration(): void {
+    const duration = this.calculateDuration(
+      this.newTaskStartDate,
+      this.newTaskStartTime,
+      this.newTaskEndDate,
+      this.newTaskEndTime
+    );
+    this.newTask.duration = duration;
+  }
+
+  updateEditTaskDuration(): void {
+    if (!this.selectedTask) return;
+    
+    const duration = this.calculateDuration(
+      this.editTaskStartDate,
+      this.editTaskStartTime,
+      this.editTaskEndDate,
+      this.editTaskEndTime
+    );
+    this.selectedTask.duration = duration;
+  }
+
+  // Métodos para el color picker personalizado
+  selectSuggestedColor(color: string): void {
+    this.newEnvironment.color = color;
+    // Convertir hex a HSL para sincronizar el color picker
+    const hsl = this.hexToHsl(color);
+    this.colorPickerHue = hsl.h;
+    this.colorPickerSaturation = hsl.s;
+    this.colorPickerLightness = hsl.l;
+  }
+
+  // Convertir HSL a HEX
+  hslToHex(h: number, s: number, l: number): string {
+    l /= 100;
+    const a = s * Math.min(l, 1 - l) / 100;
+    const f = (n: number) => {
+      const k = (n + h / 30) % 12;
+      const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+      return Math.round(255 * color).toString(16).padStart(2, '0');
+    };
+    return `#${f(0)}${f(8)}${f(4)}`;
+  }
+
+  // Convertir HEX a HSL
+  hexToHsl(hex: string): {h: number, s: number, l: number} {
+    const r = parseInt(hex.slice(1, 3), 16) / 255;
+    const g = parseInt(hex.slice(3, 5), 16) / 255;
+    const b = parseInt(hex.slice(5, 7), 16) / 255;
+
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    let h = 0, s = 0, l = (max + min) / 2;
+
+    if (max !== min) {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch (max) {
+        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+        case g: h = (b - r) / d + 2; break;
+        case b: h = (r - g) / d + 4; break;
+      }
+      h /= 6;
+    }
+
+    return {
+      h: Math.round(h * 360),
+      s: Math.round(s * 100),
+      l: Math.round(l * 100)
+    };
+  }
+
+  // Actualizar color basado en HSL
+  updateColorFromHsl(): void {
+    const hexColor = this.hslToHex(this.colorPickerHue, this.colorPickerSaturation, this.colorPickerLightness);
+    this.newEnvironment.color = hexColor;
+  }
+
+  // Manejar click en el área de saturación/luminosidad
+  onColorAreaClick(event: MouseEvent): void {
+    const rect = (event.target as HTMLElement).getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    
+    this.colorPickerSaturation = Math.round((x / rect.width) * 100);
+    this.colorPickerLightness = Math.round(100 - (y / rect.height) * 100);
+    this.updateColorFromHsl();
+  }
+
+  // Manejar click en la barra de matiz
+  onHueBarClick(event: MouseEvent): void {
+    const rect = (event.target as HTMLElement).getBoundingClientRect();
+    const y = event.clientY - rect.top;
+    
+    this.colorPickerHue = Math.round((y / rect.height) * 360);
+    this.updateColorFromHsl();
+  }
+
+  // Inicializar color picker al abrir modal
+  initializeColorPicker(): void {
+    const currentColor = this.newEnvironment.color || '#3B82F6';
+    const hsl = this.hexToHsl(currentColor);
+    this.colorPickerHue = hsl.h;
+    this.colorPickerSaturation = hsl.s;
+    this.colorPickerLightness = hsl.l;
+  }
+
+  // Métodos para manejar fecha y hora por separado
+  combineDateTime(date: string, time: string): string {
+    if (!date || !time) return '';
+    const [hours, minutes] = time.split(':');
+    
+    // Crear fecha en zona horaria local
+    const year = parseInt(date.substring(0, 4));
+    const month = parseInt(date.substring(5, 7)) - 1; // Los meses en JS son 0-11
+    const day = parseInt(date.substring(8, 10));
+    
+    const dateTime = new Date(year, month, day, parseInt(hours), parseInt(minutes), 0, 0);
+    
+    // Convertir a UTC para guardar en la base de datos (esto es lo correcto)
+    return dateTime.toISOString().slice(0, 16);
+  }
+
+  splitDateTime(dateTimeString: string): { date: string, time: string } {
+    if (!dateTimeString) return { date: '', time: '' };
+    
+    // El string viene de la base de datos en UTC, necesitamos convertir a hora local
+    const dateTime = new Date(dateTimeString + (dateTimeString.includes('Z') ? '' : 'Z')); // Asegurar que se interprete como UTC
+    
+    // Convertir a hora local del usuario
+    const year = dateTime.getFullYear();
+    const month = String(dateTime.getMonth() + 1).padStart(2, '0');
+    const day = String(dateTime.getDate()).padStart(2, '0');
+    const hours = String(dateTime.getHours()).padStart(2, '0');
+    const minutes = String(dateTime.getMinutes()).padStart(2, '0');
+    
+    const date = `${year}-${month}-${day}`;
+    const time = `${hours}:${minutes}`;
+    
+    return { date, time };
+  }
+
+  onNewTaskStartTimeChange(time: string) {
+    this.newTaskStartTime = time;
+    this.updateNewTaskDateTime('start');
+    this.updateNewTaskDuration();
+  }
+
+  onNewTaskEndTimeChange(time: string) {
+    this.newTaskEndTime = time;
+    this.updateNewTaskDateTime('end');
+    this.updateNewTaskDuration();
+  }
+
+  onNewTaskDeadlineTimeChange(time: string) {
+    this.newTaskDeadlineTime = time;
+    this.updateNewTaskDateTime('deadline');
+  }
+
+  onEditTaskStartTimeChange(time: string) {
+    this.editTaskStartTime = time;
+    this.updateEditTaskDateTime('start');
+    this.updateEditTaskDuration();
+  }
+
+  onEditTaskEndTimeChange(time: string) {
+    this.editTaskEndTime = time;
+    this.updateEditTaskDateTime('end');
+    this.updateEditTaskDuration();
+  }
+
+  onEditTaskDeadlineTimeChange(time: string) {
+    this.editTaskDeadlineTime = time;
+    this.updateEditTaskDateTime('deadline');
+  }
+
+  private updateNewTaskDateTime(field: 'start' | 'end' | 'deadline') {
+    let dateValue = '';
+    let timeValue = '';
+    
+    switch (field) {
+      case 'start':
+        dateValue = this.newTaskStartDate;
+        timeValue = this.newTaskStartTime;
+        break;
+      case 'end':
+        dateValue = this.newTaskEndDate;
+        timeValue = this.newTaskEndTime;
+        break;
+      case 'deadline':
+        dateValue = this.newTaskDeadlineDate;
+        timeValue = this.newTaskDeadlineTime;
+        break;
+    }
+
+    const combinedDateTime = this.combineDateTime(dateValue, timeValue);
+    
+    if (field === 'deadline') {
+      this.newTask.deadline = combinedDateTime || null;
+    } else {
+      (this.newTask as any)[field] = combinedDateTime;
+    }
+  }
+
+  private updateEditTaskDateTime(field: 'start' | 'end' | 'deadline') {
+    if (!this.selectedTask) return;
+    
+    let dateValue = '';
+    let timeValue = '';
+    
+    switch (field) {
+      case 'start':
+        dateValue = this.editTaskStartDate;
+        timeValue = this.editTaskStartTime;
+        break;
+      case 'end':
+        dateValue = this.editTaskEndDate;
+        timeValue = this.editTaskEndTime;
+        break;
+      case 'deadline':
+        dateValue = this.editTaskDeadlineDate;
+        timeValue = this.editTaskDeadlineTime;
+        break;
+    }
+
+    const combinedDateTime = this.combineDateTime(dateValue, timeValue);
+    
+    if (field === 'deadline') {
+      this.selectedTask.deadline = combinedDateTime || null;
+    } else {
+      (this.selectedTask as any)[field] = combinedDateTime;
+    }
+  }
+
+  onNewTaskDateChange(field: 'start' | 'end' | 'deadline', date: string) {
+    switch (field) {
+      case 'start':
+        this.newTaskStartDate = date;
+        break;
+      case 'end':
+        this.newTaskEndDate = date;
+        break;
+      case 'deadline':
+        this.newTaskDeadlineDate = date;
+        break;
+    }
+    this.updateNewTaskDateTime(field);
+    // Actualizar duración solo si cambió fecha de inicio o fin
+    if (field === 'start' || field === 'end') {
+      this.updateNewTaskDuration();
+    }
+  }
+
+  onEditTaskDateChange(field: 'start' | 'end' | 'deadline', date: string) {
+    switch (field) {
+      case 'start':
+        this.editTaskStartDate = date;
+        break;
+      case 'end':
+        this.editTaskEndDate = date;
+        break;
+      case 'deadline':
+        this.editTaskDeadlineDate = date;
+        break;
+    }
+    this.updateEditTaskDateTime(field);
+    // Actualizar duración solo si cambió fecha de inicio o fin
+    if (field === 'start' || field === 'end') {
+      this.updateEditTaskDuration();
+    }
   }
 } 

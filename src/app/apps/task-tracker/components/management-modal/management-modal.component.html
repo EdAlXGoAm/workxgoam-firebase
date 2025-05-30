@@ -38,49 +38,34 @@
     <div class="p-6" style="max-height: 60vh; overflow-y: auto;">
       <!-- Environments Tab Content -->
       <div *ngIf="activeTab === 'environments'">
-        <h4 class="text-lg font-semibold text-gray-700 mb-4">Entornos</h4>
-        <!-- Form to add/edit environment -->
-        <div class="bg-gray-50 p-4 rounded-lg mb-6">
-          <h5 class="text-md font-semibold text-gray-700 mb-3">{{ isEditingEnvironment ? 'Editar Entorno' : 'Agregar Nuevo Entorno' }}</h5>
-          <form (ngSubmit)="saveEnvironment()" class="space-y-4">
-            <div>
-              <label for="envName" class="block text-sm font-medium text-gray-700">Nombre</label>
-              <input type="text" id="envName" name="envName" [(ngModel)]="currentEnvironment.name" required 
-                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-            </div>
-            <div>
-              <label for="envColor" class="block text-sm font-medium text-gray-700">Color</label>
-              <input type="color" id="envColor" name="envColor" [(ngModel)]="currentEnvironment.color"
-                     class="mt-1 block w-full h-10 px-1 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-            </div>
-            <div class="flex justify-end space-x-3">
-              <button type="button" (click)="resetEnvironmentForm()" *ngIf="isEditingEnvironment || currentEnvironment.name"
-                      class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none">
-                Cancelar
-              </button>
-              <button type="submit"
-                      class="px-4 py-2 bg-indigo-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                {{ isEditingEnvironment ? 'Guardar Cambios' : 'Crear Entorno' }}
-              </button>
-            </div>
-          </form>
+        <div class="flex justify-between items-center mb-4">
+          <h4 class="text-lg font-semibold text-gray-700">Entornos</h4>
+          <button (click)="openAddEnvironmentModal()" 
+                  class="px-4 py-2 bg-indigo-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            <i class="fas fa-plus mr-2"></i>Agregar Entorno
+          </button>
         </div>
 
         <!-- List of environments -->
-        <h5 class="text-md font-semibold text-gray-700 mb-3">Entornos Existentes</h5>
-        <div *ngIf="environments.length === 0" class="text-center text-gray-500 py-4">
-          No hay entornos creados.
+        <div *ngIf="environments.length === 0" class="text-center text-gray-500 py-8">
+          <i class="fas fa-layer-group text-4xl mb-4 text-gray-300"></i>
+          <p class="text-lg">No hay entornos creados</p>
+          <p class="text-sm">Comienza creando tu primer entorno</p>
         </div>
         <ul *ngIf="environments.length > 0" class="space-y-3">
-          <li *ngFor="let env of environments" class="bg-white p-4 rounded-lg shadow flex justify-between items-center">
-            <div>
-              <p class="font-semibold text-gray-800">{{ env.name }}</p>
+          <li *ngFor="let env of environments" class="bg-white p-4 rounded-lg shadow border border-gray-200 flex justify-between items-center hover:shadow-md transition-shadow">
+            <div class="flex items-center">
+              <div class="w-4 h-4 rounded-full mr-3" [style.background-color]="env.color"></div>
+              <div>
+                <p class="font-semibold text-gray-800">{{ env.name }}</p>
+                <p class="text-xs text-gray-500">{{ getProjectCountByEnvironment(env.id) }} proyecto(s)</p>
+              </div>
             </div>
             <div class="space-x-2 flex-shrink-0">
-              <button (click)="editEnvironment(env)" class="p-2 text-indigo-600 hover:text-indigo-800">
+              <button (click)="editEnvironment(env)" class="p-2 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded transition">
                 <i class="fas fa-pencil-alt"></i>
               </button>
-              <button (click)="deleteEnvironment(env.id)" class="p-2 text-red-500 hover:text-red-700">
+              <button (click)="deleteEnvironment(env.id)" class="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition">
                 <i class="fas fa-trash"></i>
               </button>
             </div>
@@ -90,59 +75,35 @@
 
       <!-- Projects Tab Content -->
       <div *ngIf="activeTab === 'projects'">
-        <h4 class="text-lg font-semibold text-gray-700 mb-4">Proyectos</h4>
-        <!-- Form to add/edit project -->
-        <div class="bg-gray-50 p-4 rounded-lg mb-6">
-          <h5 class="text-md font-semibold text-gray-700 mb-3">{{ isEditingProject ? 'Editar Proyecto' : 'Agregar Nuevo Proyecto' }}</h5>
-          <form (ngSubmit)="saveProject()" class="space-y-4">
-            <div>
-              <label for="projectName" class="block text-sm font-medium text-gray-700">Nombre</label>
-              <input type="text" id="projectName" name="projectName" [(ngModel)]="currentProject.name" required
-                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-            </div>
-            <div>
-              <label for="projectDescription" class="block text-sm font-medium text-gray-700">Descripción (Opcional)</label>
-              <textarea id="projectDescription" name="projectDescription" [(ngModel)]="currentProject.description" rows="3"
-                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></textarea>
-            </div>
-            <div>
-              <label for="projectEnvironment" class="block text-sm font-medium text-gray-700">Entorno</label>
-              <select id="projectEnvironment" name="projectEnvironment" [(ngModel)]="currentProject.environment" required
-                      class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white">
-                <option [ngValue]="null" disabled>Selecciona un entorno</option>
-                <option *ngFor="let env of environments" [value]="env.id">{{ env.name }}</option>
-              </select>
-            </div>
-            <div class="flex justify-end space-x-3">
-              <button type="button" (click)="resetProjectForm()" *ngIf="isEditingProject || currentProject.name"
-                      class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none">
-                Cancelar
-              </button>
-              <button type="submit"
-                      class="px-4 py-2 bg-indigo-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                {{ isEditingProject ? 'Guardar Cambios' : 'Crear Proyecto' }}
-              </button>
-            </div>
-          </form>
+        <div class="flex justify-between items-center mb-4">
+          <h4 class="text-lg font-semibold text-gray-700">Proyectos</h4>
+          <button (click)="openAddProjectModal()" 
+                  class="px-4 py-2 bg-indigo-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            <i class="fas fa-plus mr-2"></i>Agregar Proyecto
+          </button>
         </div>
 
         <!-- List of projects -->
-        <h5 class="text-md font-semibold text-gray-700 mb-3">Proyectos Existentes</h5>
-        <div *ngIf="projects.length === 0" class="text-center text-gray-500 py-4">
-          No hay proyectos creados.
+        <div *ngIf="projects.length === 0" class="text-center text-gray-500 py-8">
+          <i class="fas fa-folder text-4xl mb-4 text-gray-300"></i>
+          <p class="text-lg">No hay proyectos creados</p>
+          <p class="text-sm">Comienza creando tu primer proyecto</p>
         </div>
         <ul *ngIf="projects.length > 0" class="space-y-3">
-          <li *ngFor="let proj of projects" class="bg-white p-4 rounded-lg shadow flex justify-between items-center">
+          <li *ngFor="let proj of projects" class="bg-white p-4 rounded-lg shadow border border-gray-200 flex justify-between items-center hover:shadow-md transition-shadow">
             <div>
               <p class="font-semibold text-gray-800">{{ proj.name }}</p>
               <p class="text-sm text-gray-600">{{ proj.description || 'Sin descripción' }}</p>
-              <p class="text-xs text-indigo-600 mt-1">Entorno: {{ getEnvironmentName(proj.environment) || 'N/A' }}</p>
+              <div class="flex items-center mt-1">
+                <div class="w-3 h-3 rounded-full mr-2" [style.background-color]="getEnvironmentColor(proj.environment)"></div>
+                <p class="text-xs text-indigo-600">{{ getEnvironmentName(proj.environment) || 'Entorno no disponible' }}</p>
+              </div>
             </div>
             <div class="space-x-2 flex-shrink-0">
-              <button (click)="editProject(proj)" class="p-2 text-indigo-600 hover:text-indigo-800">
+              <button (click)="editProject(proj)" class="p-2 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded transition">
                 <i class="fas fa-pencil-alt"></i>
               </button>
-              <button (click)="deleteProject(proj.id)" class="p-2 text-red-500 hover:text-red-700">
+              <button (click)="deleteProject(proj.id)" class="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition">
                 <i class="fas fa-trash"></i>
               </button>
             </div>
@@ -150,6 +111,308 @@
         </ul>
       </div>
     </div>
+  </div>
+</div>
 
-  </div> <!-- End of Modal Content -->
-</div> <!-- End of Modal Backdrop --> 
+<!-- Modal para Agregar Entorno -->
+<div *ngIf="showAddEnvironmentModal" class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all">
+    <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200">
+      <h3 class="text-xl font-semibold text-gray-800">Agregar Nuevo Entorno</h3>
+      <button (click)="closeEnvironmentModal()" class="text-gray-400 hover:text-gray-600 transition">
+        <i class="fas fa-times fa-lg"></i>
+      </button>
+    </div>
+    <div class="p-6">
+      <form (ngSubmit)="saveEnvironment()" class="space-y-4">
+        <div>
+          <label for="envName" class="block text-sm font-medium text-gray-700 mb-1">Nombre del Entorno</label>
+          <input type="text" id="envName" name="envName" [(ngModel)]="currentEnvironment.name" required 
+                 class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                 placeholder="Ingresa el nombre del entorno">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-3">Color</label>
+          
+          <!-- Colores sugeridos -->
+          <div class="mb-6">
+            <p class="text-xs text-gray-500 mb-3">Colores sugeridos:</p>
+            <div class="flex flex-wrap gap-2">
+              <button
+                *ngFor="let color of suggestedColors"
+                type="button"
+                (click)="selectSuggestedColor(color)"
+                class="w-8 h-8 rounded-full border-2 hover:scale-110 transition-transform focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                [style.background-color]="color"
+                [class.border-gray-800]="currentEnvironment.color === color"
+                [class.border-gray-300]="currentEnvironment.color !== color"
+                [title]="color">
+              </button>
+            </div>
+          </div>
+
+          <!-- Color Picker Personalizado -->
+          <div class="mb-4">
+            <p class="text-xs text-gray-500 mb-3">O elige un color personalizado:</p>
+            <div class="flex gap-4">
+              <!-- Área principal del color picker -->
+              <div class="relative">
+                <div 
+                  class="w-48 h-32 border border-gray-300 rounded-lg cursor-crosshair relative overflow-hidden"
+                  [style.background]="'linear-gradient(to right, white, hsl(' + colorPickerHue + ', 100%, 50%)), linear-gradient(to top, black, transparent)'"
+                  (click)="onColorAreaClick($event)">
+                  
+                  <!-- Indicador de posición -->
+                  <div 
+                    class="absolute w-3 h-3 border-2 border-white rounded-full transform -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                    [style.left]="colorPickerSaturation + '%'"
+                    [style.top]="(100 - colorPickerLightness) + '%'"
+                    style="box-shadow: 0 0 0 1px rgba(0,0,0,0.3);">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Barra de matiz -->
+              <div class="relative">
+                <div 
+                  class="w-6 h-32 border border-gray-300 rounded cursor-pointer"
+                  style="background: linear-gradient(to bottom, 
+                    hsl(0, 100%, 50%) 0%, 
+                    hsl(60, 100%, 50%) 16.66%, 
+                    hsl(120, 100%, 50%) 33.33%, 
+                    hsl(180, 100%, 50%) 50%, 
+                    hsl(240, 100%, 50%) 66.66%, 
+                    hsl(300, 100%, 50%) 83.33%, 
+                    hsl(360, 100%, 50%) 100%)"
+                  (click)="onHueBarClick($event)">
+                  
+                  <!-- Indicador de matiz -->
+                  <div 
+                    class="absolute w-full h-0.5 bg-white border border-gray-400 transform -translate-y-1/2 pointer-events-none"
+                    [style.top]="(colorPickerHue / 360) * 100 + '%'">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Vista previa -->
+              <div class="flex flex-col items-center gap-2">
+                <p class="text-xs text-gray-500">Vista previa:</p>
+                <div 
+                  class="w-16 h-16 border border-gray-300 rounded-lg"
+                  [style.background-color]="currentEnvironment.color || '#3B82F6'">
+                </div>
+                <p class="text-xs font-mono text-gray-600">{{ currentEnvironment.color || '#3B82F6' }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="flex justify-end space-x-3 pt-4">
+          <button type="button" (click)="closeEnvironmentModal()"
+                  class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none">
+            Cancelar
+          </button>
+          <button type="submit"
+                  class="px-4 py-2 bg-indigo-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            Crear Entorno
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para Editar Entorno -->
+<div *ngIf="showEditEnvironmentModal" class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all">
+    <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200">
+      <h3 class="text-xl font-semibold text-gray-800">Editar Entorno</h3>
+      <button (click)="closeEnvironmentModal()" class="text-gray-400 hover:text-gray-600 transition">
+        <i class="fas fa-times fa-lg"></i>
+      </button>
+    </div>
+    <div class="p-6">
+      <form (ngSubmit)="saveEnvironment()" class="space-y-4">
+        <div>
+          <label for="editEnvName" class="block text-sm font-medium text-gray-700 mb-1">Nombre del Entorno</label>
+          <input type="text" id="editEnvName" name="editEnvName" [(ngModel)]="currentEnvironment.name" required 
+                 class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-3">Color</label>
+          
+          <!-- Colores sugeridos -->
+          <div class="mb-6">
+            <p class="text-xs text-gray-500 mb-3">Colores sugeridos:</p>
+            <div class="flex flex-wrap gap-2">
+              <button
+                *ngFor="let color of suggestedColors"
+                type="button"
+                (click)="selectSuggestedColor(color)"
+                class="w-8 h-8 rounded-full border-2 hover:scale-110 transition-transform focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                [style.background-color]="color"
+                [class.border-gray-800]="currentEnvironment.color === color"
+                [class.border-gray-300]="currentEnvironment.color !== color"
+                [title]="color">
+              </button>
+            </div>
+          </div>
+
+          <!-- Color Picker Personalizado -->
+          <div class="mb-4">
+            <p class="text-xs text-gray-500 mb-3">O elige un color personalizado:</p>
+            <div class="flex gap-4">
+              <!-- Área principal del color picker -->
+              <div class="relative">
+                <div 
+                  class="w-48 h-32 border border-gray-300 rounded-lg cursor-crosshair relative overflow-hidden"
+                  [style.background]="'linear-gradient(to right, white, hsl(' + colorPickerHue + ', 100%, 50%)), linear-gradient(to top, black, transparent)'"
+                  (click)="onColorAreaClick($event)">
+                  
+                  <!-- Indicador de posición -->
+                  <div 
+                    class="absolute w-3 h-3 border-2 border-white rounded-full transform -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                    [style.left]="colorPickerSaturation + '%'"
+                    [style.top]="(100 - colorPickerLightness) + '%'"
+                    style="box-shadow: 0 0 0 1px rgba(0,0,0,0.3);">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Barra de matiz -->
+              <div class="relative">
+                <div 
+                  class="w-6 h-32 border border-gray-300 rounded cursor-pointer"
+                  style="background: linear-gradient(to bottom, 
+                    hsl(0, 100%, 50%) 0%, 
+                    hsl(60, 100%, 50%) 16.66%, 
+                    hsl(120, 100%, 50%) 33.33%, 
+                    hsl(180, 100%, 50%) 50%, 
+                    hsl(240, 100%, 50%) 66.66%, 
+                    hsl(300, 100%, 50%) 83.33%, 
+                    hsl(360, 100%, 50%) 100%)"
+                  (click)="onHueBarClick($event)">
+                  
+                  <!-- Indicador de matiz -->
+                  <div 
+                    class="absolute w-full h-0.5 bg-white border border-gray-400 transform -translate-y-1/2 pointer-events-none"
+                    [style.top]="(colorPickerHue / 360) * 100 + '%'">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Vista previa -->
+              <div class="flex flex-col items-center gap-2">
+                <p class="text-xs text-gray-500">Vista previa:</p>
+                <div 
+                  class="w-16 h-16 border border-gray-300 rounded-lg"
+                  [style.background-color]="currentEnvironment.color || '#3B82F6'">
+                </div>
+                <p class="text-xs font-mono text-gray-600">{{ currentEnvironment.color || '#3B82F6' }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="flex justify-end space-x-3 pt-4">
+          <button type="button" (click)="closeEnvironmentModal()"
+                  class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none">
+            Cancelar
+          </button>
+          <button type="submit"
+                  class="px-4 py-2 bg-indigo-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            Guardar Cambios
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para Agregar Proyecto -->
+<div *ngIf="showAddProjectModal" class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all">
+    <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200">
+      <h3 class="text-xl font-semibold text-gray-800">Agregar Nuevo Proyecto</h3>
+      <button (click)="closeProjectModal()" class="text-gray-400 hover:text-gray-600 transition">
+        <i class="fas fa-times fa-lg"></i>
+      </button>
+    </div>
+    <div class="p-6">
+      <form (ngSubmit)="saveProject()" class="space-y-4">
+        <div>
+          <label for="projectName" class="block text-sm font-medium text-gray-700 mb-1">Nombre del Proyecto</label>
+          <input type="text" id="projectName" name="projectName" [(ngModel)]="currentProject.name" required
+                 class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                 placeholder="Ingresa el nombre del proyecto">
+        </div>
+        <div>
+          <label for="projectDescription" class="block text-sm font-medium text-gray-700 mb-1">Descripción (Opcional)</label>
+          <textarea id="projectDescription" name="projectDescription" [(ngModel)]="currentProject.description" rows="3"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    placeholder="Describe brevemente el proyecto"></textarea>
+        </div>
+        <div>
+          <label for="projectEnvironment" class="block text-sm font-medium text-gray-700 mb-1">Entorno</label>
+          <select id="projectEnvironment" name="projectEnvironment" [(ngModel)]="currentProject.environment" required
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white">
+            <option [ngValue]="null" disabled>Selecciona un entorno</option>
+            <option *ngFor="let env of environments" [value]="env.id">{{ env.name }}</option>
+          </select>
+        </div>
+        <div class="flex justify-end space-x-3 pt-4">
+          <button type="button" (click)="closeProjectModal()"
+                  class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none">
+            Cancelar
+          </button>
+          <button type="submit"
+                  class="px-4 py-2 bg-indigo-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            Crear Proyecto
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para Editar Proyecto -->
+<div *ngIf="showEditProjectModal" class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all">
+    <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200">
+      <h3 class="text-xl font-semibold text-gray-800">Editar Proyecto</h3>
+      <button (click)="closeProjectModal()" class="text-gray-400 hover:text-gray-600 transition">
+        <i class="fas fa-times fa-lg"></i>
+      </button>
+    </div>
+    <div class="p-6">
+      <form (ngSubmit)="saveProject()" class="space-y-4">
+        <div>
+          <label for="editProjectName" class="block text-sm font-medium text-gray-700 mb-1">Nombre del Proyecto</label>
+          <input type="text" id="editProjectName" name="editProjectName" [(ngModel)]="currentProject.name" required
+                 class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+        </div>
+        <div>
+          <label for="editProjectDescription" class="block text-sm font-medium text-gray-700 mb-1">Descripción (Opcional)</label>
+          <textarea id="editProjectDescription" name="editProjectDescription" [(ngModel)]="currentProject.description" rows="3"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></textarea>
+        </div>
+        <div>
+          <label for="editProjectEnvironment" class="block text-sm font-medium text-gray-700 mb-1">Entorno</label>
+          <select id="editProjectEnvironment" name="editProjectEnvironment" [(ngModel)]="currentProject.environment" required
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white">
+            <option [ngValue]="null" disabled>Selecciona un entorno</option>
+            <option *ngFor="let env of environments" [value]="env.id">{{ env.name }}</option>
+          </select>
+        </div>
+        <div class="flex justify-end space-x-3 pt-4">
+          <button type="button" (click)="closeProjectModal()"
+                  class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none">
+            Cancelar
+          </button>
+          <button type="submit"
+                  class="px-4 py-2 bg-indigo-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            Guardar Cambios
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div> 
