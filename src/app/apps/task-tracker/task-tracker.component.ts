@@ -467,8 +467,10 @@ import { CurrentTaskInfoComponent } from './components/current-task-info/current
                           name="newTaskEndTime"
                           label="Hora de fin"
                           placeholder="HH:MM"
-                          [referenceTime]="newTaskStartTime"
-                          referenceLabel="Hora de inicio">
+                          [referenceTimes]="[
+                            { time: newTaskStartTime, label: 'Hora de inicio' },
+                            { time: getCurrentTime(), label: 'Hora actual' }
+                          ]">
                         </app-mui-time-picker>
                         <button type="button" 
                                 (click)="openTimeCalculator('end', 'new')" 
@@ -809,6 +811,27 @@ import { CurrentTaskInfoComponent } from './components/current-task-info/current
           <i class="fas fa-folder-plus"></i>
           <span>Crear Proyecto</span>
         </div>
+        <hr class="my-1 border-gray-200">
+        <!-- Opciones de visibilidad de tareas ocultas -->
+        <div class="context-menu-item" 
+             [class.context-menu-item-active]="getEnvironmentHiddenVisibility(selectedEnvironment!.id) === 'show-all'"
+             (click)="setEnvironmentHiddenVisibility(selectedEnvironment!.id, 'show-all')">
+          <i class="fas fa-eye"></i>
+          <span>Mostrar ocultos</span>
+        </div>
+        <div class="context-menu-item" 
+             [class.context-menu-item-active]="getEnvironmentHiddenVisibility(selectedEnvironment!.id) === 'show-24h'"
+             (click)="setEnvironmentHiddenVisibility(selectedEnvironment!.id, 'show-24h')">
+          <i class="fas fa-clock"></i>
+          <span>Mostrar ocultos 24h</span>
+        </div>
+        <div class="context-menu-item" 
+             [class.context-menu-item-active]="getEnvironmentHiddenVisibility(selectedEnvironment!.id) === 'hidden'"
+             (click)="setEnvironmentHiddenVisibility(selectedEnvironment!.id, 'hidden')">
+          <i class="fas fa-eye-slash"></i>
+          <span>Ocultar ocultos</span>
+        </div>
+        <hr class="my-1 border-gray-200">
         <div class="context-menu-item context-menu-item-danger" (click)="deleteEnvironment(selectedEnvironment!)">
           <i class="fas fa-trash"></i>
           <span>Eliminar Ambiente</span>
@@ -920,8 +943,10 @@ import { CurrentTaskInfoComponent } from './components/current-task-info/current
                           name="editTaskEndTime"
                           label="Hora de fin"
                           placeholder="HH:MM"
-                          [referenceTime]="editTaskStartTime"
-                          referenceLabel="Hora de inicio">
+                          [referenceTimes]="[
+                            { time: editTaskStartTime, label: 'Hora de inicio' },
+                            { time: getCurrentTime(), label: 'Hora actual' }
+                          ]">
                         </app-mui-time-picker>
                         <button type="button" 
                                 (click)="openTimeCalculator('end', 'edit')" 
@@ -1140,6 +1165,52 @@ import { CurrentTaskInfoComponent } from './components/current-task-info/current
           </div>
         </div>
       </div>
+
+      <!-- Status Change Confirmation Modal -->
+      <div *ngIf="showStatusChangeModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+          <div class="p-6">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="text-xl font-bold">{{ getStatusChangeModalTitle() }}</h3>
+              <button (click)="closeStatusChangeModal()" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+            
+            <div class="mb-6">
+              <p class="text-gray-700 mb-4">{{ getStatusChangeModalMessage() }}</p>
+              
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div class="flex items-center">
+                  <i class="fas fa-info-circle text-blue-600 mr-2"></i>
+                  <span class="text-blue-700 text-sm">
+                    <span *ngIf="statusChangeWillHide">Las tareas ocultas no aparecerán en la vista normal, pero puedes verlas activando el filtro de tareas ocultas.</span>
+                    <span *ngIf="!statusChangeWillHide">Si la tarea estaba oculta, volverá a ser visible en la vista normal.</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="flex justify-end space-x-3">
+              <button 
+                type="button" 
+                (click)="confirmStatusChangeWithVisibility(false)"
+                class="px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50">
+                <span *ngIf="statusChangeWillHide">No ocultar</span>
+                <span *ngIf="!statusChangeWillHide">No mostrar</span>
+              </button>
+              <button 
+                type="button" 
+                (click)="confirmStatusChangeWithVisibility(true)"
+                class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700">
+                <i class="fas" [ngClass]="statusChangeWillHide ? 'fa-eye-slash' : 'fa-eye'" class="mr-2"></i>
+                <span *ngIf="statusChangeWillHide">Sí, ocultar</span>
+                <span *ngIf="!statusChangeWillHide">Sí, mostrar</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   `,
   styles: [`
@@ -1247,6 +1318,17 @@ import { CurrentTaskInfoComponent } from './components/current-task-info/current
 
     .context-menu-item:hover {
       background: #f3f4f6;
+    }
+
+    .context-menu-item-active {
+      background: #e0f2fe;
+      color: #0277bd;
+      font-weight: 500;
+    }
+
+    .context-menu-item-active:hover {
+      background: #b3e5fc;
+      color: #01579b;
     }
 
     .context-menu-item-danger {
@@ -1436,6 +1518,9 @@ export class TaskTrackerComponent implements OnInit {
   collapsedEmptyEnvironments = true; // Por defecto contraídos
   collapsedEnvironments: { [envId: string]: boolean } = {}; // Control individual
 
+  // Control de visibilidad de tareas ocultas por environment
+  environmentHiddenVisibility: { [envId: string]: 'hidden' | 'show-all' | 'show-24h' } = {}; // Control de visibilidad individual por environment
+
   newTask: Partial<Task> = {
     name: '',
     emoji: '',
@@ -1535,6 +1620,11 @@ export class TaskTrackerComponent implements OnInit {
   calculatorContext: 'new' | 'edit' = 'new'; // determina si está en modal de nueva tarea o edición
   calculatorError = '';
   calculatorIsValid = false;
+
+  // Variables para el modal de confirmación de cambio de estado
+  showStatusChangeModal = false;
+  pendingStatusChange: { task: Task; status: 'pending' | 'in-progress' | 'completed' } | null = null;
+  statusChangeWillHide = false; // Para mostrar diferente mensaje según si va a ocultar o mostrar
 
   constructor(
     private authService: AuthService,
@@ -1657,10 +1747,6 @@ export class TaskTrackerComponent implements OnInit {
   filterTasks() {
     let tasksToFilter = this.tasks.filter(task => task.environment && task.environment !== '');
     
-    if (!this.showHidden) {
-      tasksToFilter = tasksToFilter.filter(t => !t.hidden);
-    }
-    
     if (this.searchQuery) {
       const q = this.searchQuery.toLowerCase();
       tasksToFilter = tasksToFilter.filter(task =>
@@ -1676,6 +1762,8 @@ export class TaskTrackerComponent implements OnInit {
     this.showHidden = !this.showHidden;
     this.saveShowHiddenState(); // Guardar el nuevo estado
     this.filterTasks();
+    // Actualizar la vista con los nuevos filtros aplicados
+    this.processTasks();
   }
 
   async saveTask() {
@@ -1958,8 +2046,33 @@ export class TaskTrackerComponent implements OnInit {
   }
 
   getTasksByEnvironment(environmentId: string): Task[] {
+    const visibility = this.getEnvironmentHiddenVisibility(environmentId);
+    
     return this.filteredTasks
-      .filter(task => task.environment === environmentId)
+      .filter(task => {
+        // Filtrar por environment
+        if (task.environment !== environmentId) return false;
+        
+        // Aplicar filtro de visibilidad según la configuración del environment
+        if (task.hidden) {
+          switch (visibility) {
+            case 'hidden':
+              return false; // No mostrar tareas ocultas
+            case 'show-all':
+              return true; // Mostrar todas las tareas ocultas
+            case 'show-24h':
+              // Mostrar solo las tareas ocultas de las últimas 24 horas
+              const taskDate = new Date(task.start + (task.start.includes('Z') ? '' : 'Z'));
+              const now = new Date();
+              const hoursDiff = (now.getTime() - taskDate.getTime()) / (1000 * 60 * 60);
+              return hoursDiff <= 24;
+            default:
+              return false;
+          }
+        }
+        
+        return true; // Mostrar tareas no ocultas
+      })
       .sort((a, b) => {
         const dateA = new Date(a.start + (a.start.includes('Z') ? '' : 'Z')).getTime();
         const dateB = new Date(b.start + (b.start.includes('Z') ? '' : 'Z')).getTime();
@@ -1972,8 +2085,36 @@ export class TaskTrackerComponent implements OnInit {
   }
 
   getTasksByProject(projectId: string): Task[] {
+    // Obtener el environment del proyecto para aplicar su configuración de visibilidad
+    const project = this.projects.find(p => p.id === projectId);
+    const environmentId = project?.environment || '';
+    const visibility = this.getEnvironmentHiddenVisibility(environmentId);
+    
     return this.filteredTasks
-      .filter(task => task.project === projectId)
+      .filter(task => {
+        // Filtrar por proyecto
+        if (task.project !== projectId) return false;
+        
+        // Aplicar filtro de visibilidad según la configuración del environment padre
+        if (task.hidden) {
+          switch (visibility) {
+            case 'hidden':
+              return false; // No mostrar tareas ocultas
+            case 'show-all':
+              return true; // Mostrar todas las tareas ocultas
+            case 'show-24h':
+              // Mostrar solo las tareas ocultas de las últimas 24 horas
+              const taskDate = new Date(task.start + (task.start.includes('Z') ? '' : 'Z'));
+              const now = new Date();
+              const hoursDiff = (now.getTime() - taskDate.getTime()) / (1000 * 60 * 60);
+              return hoursDiff <= 24;
+            default:
+              return false;
+          }
+        }
+        
+        return true; // Mostrar tareas no ocultas
+      })
       .sort((a, b) => {
         const dateA = new Date(a.start + (a.start.includes('Z') ? '' : 'Z')).getTime();
         const dateB = new Date(b.start + (b.start.includes('Z') ? '' : 'Z')).getTime();
@@ -2273,21 +2414,56 @@ export class TaskTrackerComponent implements OnInit {
   }
 
   async changeStatus(task: Task, status: 'pending' | 'in-progress' | 'completed') {
+    // Determinar si se debe preguntar sobre ocultar/mostrar
+    const currentStatus = task.status;
+    
+    // Configurar el cambio pendiente
+    this.pendingStatusChange = { task, status };
+    
+    // Determinar el mensaje según el cambio de estado
+    if (status === 'completed') {
+      // Al completar una tarea, preguntar si quiere ocultarla
+      this.statusChangeWillHide = true;
+    } else if (currentStatus === 'completed' && (status === 'pending' || status === 'in-progress')) {
+      // Al sacar de completada, preguntar si quiere mostrarla (en caso de que esté oculta)
+      this.statusChangeWillHide = false;
+    } else {
+      // Para otros cambios, aplicar directamente sin modal
+      await this.applyStatusChange(task, status, false);
+      return;
+    }
+    
+    // Mostrar el modal de confirmación
+    this.showStatusChangeModal = true;
+    this.closeContextMenu();
+  }
+
+  async applyStatusChange(task: Task, status: 'pending' | 'in-progress' | 'completed', changeVisibility: boolean = false) {
     try {
       const updates: Partial<Task> = { status };
+      
+      // Actualizar campos de completado
       if (status === 'completed') {
         updates.completed = true;
         updates.completedAt = new Date().toISOString();
+        // Si se eligió ocultar, agregarlo a las actualizaciones
+        if (changeVisibility) {
+          updates.hidden = true;
+        }
       } else {
         updates.completed = false;
         updates.completedAt = null;
+        // Si se eligió mostrar, agregarlo a las actualizaciones
+        if (changeVisibility) {
+          updates.hidden = false;
+        }
       }
+      
       await this.taskService.updateTask(task.id, updates);
       await this.loadTasks();
     } catch (error) {
       console.error('Error al cambiar estado:', error);
     }
-    this.closeContextMenu();
   }
 
   async saveEditedTask() {
@@ -2420,9 +2596,32 @@ export class TaskTrackerComponent implements OnInit {
   }
 
   getTasksWithoutProjectInEnvironment(environmentId: string): Task[] {
-    return this.filteredTasks.filter(task => 
-      task.environment === environmentId && (!task.project || task.project === '')
-    );
+    const visibility = this.getEnvironmentHiddenVisibility(environmentId);
+    
+    return this.filteredTasks.filter(task => {
+      // Filtrar por environment y sin proyecto
+      if (task.environment !== environmentId || (task.project && task.project !== '')) return false;
+      
+      // Aplicar filtro de visibilidad según la configuración del environment
+      if (task.hidden) {
+        switch (visibility) {
+          case 'hidden':
+            return false; // No mostrar tareas ocultas
+          case 'show-all':
+            return true; // Mostrar todas las tareas ocultas
+          case 'show-24h':
+            // Mostrar solo las tareas ocultas de las últimas 24 horas
+            const taskDate = new Date(task.start + (task.start.includes('Z') ? '' : 'Z'));
+            const now = new Date();
+            const hoursDiff = (now.getTime() - taskDate.getTime()) / (1000 * 60 * 60);
+            return hoursDiff <= 24;
+          default:
+            return false;
+        }
+      }
+      
+      return true; // Mostrar tareas no ocultas
+    });
   }
 
   createProjectForEnvironment(environmentId: string) {
@@ -3095,7 +3294,7 @@ export class TaskTrackerComponent implements OnInit {
     return startDate <= now && now <= endDate;
   }
 
-  // Nuevo: M�todos para manejar environments
+  // Nuevo: Métodos para manejar environments
   get orderedEnvironments(): Environment[] {
     return [...this.environments].sort((a, b) => {
       const aHasTasks = this.environmentHasTasks(a.id);
@@ -3105,7 +3304,7 @@ export class TaskTrackerComponent implements OnInit {
       if (aHasTasks && !bHasTasks) return -1;
       if (!aHasTasks && bHasTasks) return 1;
       
-      // Dentro del mismo grupo, ordenar alfab�ticamente
+      // Dentro del mismo grupo, ordenar alfabéticamente
       return a.name.localeCompare(b.name);
     });
   }
@@ -3123,12 +3322,12 @@ export class TaskTrackerComponent implements OnInit {
   }
 
   isEnvironmentCollapsed(environmentId: string): boolean {
-    // Si el environment tiene tareas, nunca est� colapsado
+    // Si el environment tiene tareas, nunca está colapsado
     if (this.environmentHasTasks(environmentId)) {
       return false;
     }
     
-    // Para environments vac�os, verificar el estado global o individual
+    // Para environments vacíos, verificar el estado global o individual
     if (this.collapsedEnvironments.hasOwnProperty(environmentId)) {
       return this.collapsedEnvironments[environmentId];
     }
@@ -3137,7 +3336,7 @@ export class TaskTrackerComponent implements OnInit {
   }
 
   toggleEnvironmentCollapse(environmentId: string): void {
-    // Solo permitir colapsar environments vac�os
+    // Solo permitir colapsar environments vacíos
     if (!this.environmentHasTasks(environmentId)) {
       this.collapsedEnvironments[environmentId] = !this.isEnvironmentCollapsed(environmentId);
     }
@@ -3151,5 +3350,65 @@ export class TaskTrackerComponent implements OnInit {
 
   get emptyEnvironmentsCount(): number {
     return this.environments.filter(env => !this.environmentHasTasks(env.id)).length;
+  }
+
+  getEnvironmentHiddenVisibility(envId: string): 'show-all' | 'show-24h' | 'hidden' {
+    // Si el filtro global está activado, siempre mostrar todas las tareas ocultas
+    if (this.showHidden) {
+      return 'show-all';
+    }
+    
+    // Si hay una configuración específica para este environment, usarla
+    if (this.environmentHiddenVisibility[envId]) {
+      return this.environmentHiddenVisibility[envId];
+    }
+    // Por defecto, ocultar las tareas ocultas (no mostrarlas)
+    return 'hidden';
+  }
+
+  setEnvironmentHiddenVisibility(envId: string, visibility: 'show-all' | 'show-24h' | 'hidden'): void {
+    this.environmentHiddenVisibility[envId] = visibility;
+    this.closeEnvironmentContextMenu();
+    // Refrescar la vista aplicando los filtros
+    this.processTasks();
+  }
+
+  // Métodos para el modal de confirmación de cambio de estado
+  closeStatusChangeModal() {
+    this.showStatusChangeModal = false;
+    this.pendingStatusChange = null;
+  }
+
+  async confirmStatusChangeWithVisibility(changeVisibility: boolean) {
+    if (this.pendingStatusChange) {
+      await this.applyStatusChange(
+        this.pendingStatusChange.task, 
+        this.pendingStatusChange.status, 
+        changeVisibility
+      );
+      this.closeStatusChangeModal();
+    }
+  }
+
+  getStatusChangeModalTitle(): string {
+    if (!this.pendingStatusChange) return '';
+    
+    const statusNames = {
+      'pending': 'Pendiente',
+      'in-progress': 'En Progreso', 
+      'completed': 'Completada'
+    };
+    
+    return `Cambiar estado a ${statusNames[this.pendingStatusChange.status]}`;
+  }
+
+  getStatusChangeModalMessage(): string {
+    if (!this.pendingStatusChange) return '';
+    
+    if (this.statusChangeWillHide) {
+      return '¿Deseas ocultar la tarea después de marcarla como completada?';
+    } else {
+      return '¿Deseas mostrar la tarea después de cambiar su estado? (en caso de que esté oculta)';
+    }
   }
 } 

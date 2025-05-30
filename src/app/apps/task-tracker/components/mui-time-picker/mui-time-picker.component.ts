@@ -29,10 +29,12 @@ import { CommonModule } from '@angular/common';
         <div class="picker-modal" (click)="onModalClick($event)">
           <!-- Header con tiempo seleccionado -->
           <div class="picker-header">
-            <!-- Tiempo de referencia -->
-            <div *ngIf="referenceTime && referenceLabel" class="reference-time">
-              <span class="reference-label">{{ referenceLabel }}:</span>
-              <span class="reference-value">{{ formatReferenceTime(referenceTime) }}</span>
+            <!-- Tiempos de referencia (nueva versión) -->
+            <div *ngIf="getAllReferences().length > 0" class="reference-times">
+              <div *ngFor="let ref of getAllReferences()" class="reference-time">
+                <span class="reference-label">{{ ref.label }}:</span>
+                <span class="reference-value">{{ formatReferenceTime(ref.time) }}</span>
+              </div>
             </div>
             
             <div class="selected-time-display">
@@ -221,17 +223,19 @@ import { CommonModule } from '@angular/common';
       padding: 16px 24px;
     }
     
-    .reference-time {
+    .reference-times {
       margin-bottom: 12px;
       font-size: 12px;
-      opacity: 0.8;
-      display: flex;
-      align-items: center;
-      gap: 6px;
+      opacity: 0.9;
+    }
+    
+    .reference-time {
+      margin-bottom: 4px;
+      font-weight: 500;
     }
     
     .reference-label {
-      font-weight: 500;
+      opacity: 0.8;
     }
     
     .reference-value {
@@ -240,6 +244,7 @@ import { CommonModule } from '@angular/common';
       border-radius: 12px;
       font-weight: 500;
       font-size: 11px;
+      margin-left: 4px;
     }
     
     .selected-time-display {
@@ -384,8 +389,9 @@ import { CommonModule } from '@angular/common';
 export class MuiTimePickerComponent implements OnInit, ControlValueAccessor {
   @Input() label: string = 'Seleccionar hora';
   @Input() placeholder: string = 'HH:MM AM/PM';
-  @Input() referenceTime: string = ''; // Tiempo de referencia a mostrar
-  @Input() referenceLabel: string = ''; // Etiqueta para el tiempo de referencia
+  @Input() referenceTime: string = ''; // Tiempo de referencia a mostrar (mantenido para compatibilidad)
+  @Input() referenceLabel: string = ''; // Etiqueta para el tiempo de referencia (mantenido para compatibilidad)
+  @Input() referenceTimes: { time: string, label: string }[] = []; // Múltiples referencias de tiempo
   @Output() timeChange = new EventEmitter<string>();
 
   isPickerOpen = false;
@@ -579,5 +585,21 @@ export class MuiTimePickerComponent implements OnInit, ControlValueAccessor {
     const hour12 = hours > 12 ? hours - 12 : (hours === 0 ? 12 : hours);
     const ampm = hours >= 12 ? 'PM' : 'AM';
     return `${hour12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+  }
+
+  getAllReferences(): { time: string, label: string }[] {
+    const references: { time: string, label: string }[] = [];
+    
+    // Agregar referencias múltiples si existen
+    if (this.referenceTimes && this.referenceTimes.length > 0) {
+      references.push(...this.referenceTimes);
+    }
+    
+    // Agregar referencia única si existe (para compatibilidad hacia atrás)
+    if (this.referenceTime && this.referenceLabel && !references.find(ref => ref.time === this.referenceTime)) {
+      references.push({ time: this.referenceTime, label: this.referenceLabel });
+    }
+    
+    return references;
   }
 } 
