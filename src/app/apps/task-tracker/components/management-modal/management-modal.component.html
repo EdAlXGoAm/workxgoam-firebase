@@ -41,9 +41,9 @@
         <div class="flex justify-between items-center mb-4">
           <h4 class="text-lg font-semibold text-gray-700">Entornos</h4>
           <button (click)="openAddEnvironmentModal()" 
-                  class="px-4 py-2 bg-indigo-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                      class="px-4 py-2 bg-indigo-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
             <i class="fas fa-plus mr-2"></i>Agregar Entorno
-          </button>
+              </button>
         </div>
 
         <!-- List of environments -->
@@ -56,8 +56,8 @@
           <li *ngFor="let env of environments" class="bg-white p-4 rounded-lg shadow border border-gray-200 flex justify-between items-center hover:shadow-md transition-shadow">
             <div class="flex items-center">
               <div class="w-4 h-4 rounded-full mr-3" [style.background-color]="env.color"></div>
-              <div>
-                <p class="font-semibold text-gray-800">{{ env.name }}</p>
+            <div>
+              <p class="font-semibold text-gray-800">{{ env.name }}</p>
                 <p class="text-xs text-gray-500">{{ getProjectCountByEnvironment(env.id) }} proyecto(s)</p>
               </div>
             </div>
@@ -78,9 +78,9 @@
         <div class="flex justify-between items-center mb-4">
           <h4 class="text-lg font-semibold text-gray-700">Proyectos</h4>
           <button (click)="openAddProjectModal()" 
-                  class="px-4 py-2 bg-indigo-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                      class="px-4 py-2 bg-indigo-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
             <i class="fas fa-plus mr-2"></i>Agregar Proyecto
-          </button>
+              </button>
         </div>
 
         <!-- List of projects -->

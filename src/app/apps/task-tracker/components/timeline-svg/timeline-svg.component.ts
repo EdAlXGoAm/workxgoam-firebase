@@ -250,6 +250,26 @@ import { Environment } from '../../models/environment.model';
       opacity: 0.9;
       filter: brightness(1.1);
     }
+
+    /* Contenedor centrado para el SVG */
+    .svg-container {
+      /* Permitir scroll horizontal cuando sea necesario pero centrar cuando no */
+      width: 100%;
+    }
+    
+    /* En dispositivos grandes, cuando el SVG es más pequeño que el contenedor */
+    @media (min-width: 1280px) {
+      .svg-container {
+        /* Centrar el contenido */
+        display: flex;
+        justify-content: center;
+      }
+      
+      .timeline-svg {
+        /* Permitir que se centre naturalmente */
+        flex-shrink: 0;
+      }
+    }
   `]
 })
 export class TimelineSvgComponent implements OnInit, AfterViewInit, OnDestroy {

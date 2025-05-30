@@ -1441,10 +1441,10 @@ export class TaskTrackerComponent implements OnInit {
     this.newTask.start = this.formatDateTimeLocalForDefaults(startTime);
     this.newTask.end = this.formatDateTimeLocalForDefaults(endTime);
     
-    // Inicializar fechas y horas separadas directamente desde los Date objects para evitar conversiones
-    this.newTaskStartDate = startTime.toISOString().split('T')[0];
+    // Inicializar fechas y horas separadas usando HORA LOCAL (corregido)
+    this.newTaskStartDate = `${startTime.getFullYear()}-${String(startTime.getMonth() + 1).padStart(2, '0')}-${String(startTime.getDate()).padStart(2, '0')}`;
     this.newTaskStartTime = `${startTime.getHours().toString().padStart(2, '0')}:${startTime.getMinutes().toString().padStart(2, '0')}`;
-    this.newTaskEndDate = endTime.toISOString().split('T')[0];
+    this.newTaskEndDate = `${endTime.getFullYear()}-${String(endTime.getMonth() + 1).padStart(2, '0')}-${String(endTime.getDate()).padStart(2, '0')}`;
     this.newTaskEndTime = `${endTime.getHours().toString().padStart(2, '0')}:${endTime.getMinutes().toString().padStart(2, '0')}`;
     
     // Deadline por defecto vacío
@@ -1458,14 +1458,8 @@ export class TaskTrackerComponent implements OnInit {
   }
 
   private formatDateTimeLocalForDefaults(date: Date): string {
-    // Crear el formato datetime-local directamente en hora local
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
+    // Convertir a UTC para guardar en la base de datos (igual que combineDateTime)
+    return date.toISOString().slice(0, 16);
   }
 
   private formatDateTimeLocal(date: Date): string {
@@ -1587,10 +1581,10 @@ export class TaskTrackerComponent implements OnInit {
     this.newTask.start = this.formatDateTimeLocalForDefaults(startTime);
     this.newTask.end = this.formatDateTimeLocalForDefaults(endTime);
     
-    // Inicializar fechas y horas separadas directamente desde los Date objects para evitar conversiones
-    this.newTaskStartDate = startTime.toISOString().split('T')[0];
+    // Inicializar fechas y horas separadas usando HORA LOCAL (corregido)
+    this.newTaskStartDate = `${startTime.getFullYear()}-${String(startTime.getMonth() + 1).padStart(2, '0')}-${String(startTime.getDate()).padStart(2, '0')}`;
     this.newTaskStartTime = `${startTime.getHours().toString().padStart(2, '0')}:${startTime.getMinutes().toString().padStart(2, '0')}`;
-    this.newTaskEndDate = endTime.toISOString().split('T')[0];
+    this.newTaskEndDate = `${endTime.getFullYear()}-${String(endTime.getMonth() + 1).padStart(2, '0')}-${String(endTime.getDate()).padStart(2, '0')}`;
     this.newTaskEndTime = `${endTime.getHours().toString().padStart(2, '0')}:${endTime.getMinutes().toString().padStart(2, '0')}`;
     
     // Deadline por defecto vacío
