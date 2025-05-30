@@ -122,7 +122,10 @@ import { MuiTimePickerComponent } from './components/mui-time-picker/mui-time-pi
                           <i class="fas fa-ellipsis-v"></i>
                         </button>
                         <div class="flex items-center justify-between mb-2">
-                          <span class="text-lg">{{task.emoji}}</span>
+                          <div class="flex items-center gap-1">
+                            <span class="text-lg">{{task.emoji}}</span>
+                            <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-sm" title="Tarea oculta"></i>
+                          </div>
                           <span class="text-xs px-2 py-1 rounded" [class]="'priority-' + task.priority">
                             {{task.priority}}
                           </span>
@@ -161,7 +164,10 @@ import { MuiTimePickerComponent } from './components/mui-time-picker/mui-time-pi
                           <i class="fas fa-ellipsis-v"></i>
                         </button>
                         <div class="flex items-center justify-between mb-2">
-                          <span class="text-lg">{{task.emoji}}</span>
+                          <div class="flex items-center gap-1">
+                            <span class="text-lg">{{task.emoji}}</span>
+                            <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-sm" title="Tarea oculta"></i>
+                          </div>
                           <span class="text-xs px-2 py-1 rounded" [class]="'priority-' + task.priority">
                             {{task.priority}}
                           </span>
@@ -237,7 +243,10 @@ import { MuiTimePickerComponent } from './components/mui-time-picker/mui-time-pi
                     <input type="checkbox" [(ngModel)]="selectedOrphanedTasks[task.id]" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm font-medium text-gray-900">{{ task.emoji }} {{ task.name }}</div>
+                    <div class="text-sm font-medium text-gray-900">
+                      {{ task.emoji }} {{ task.name }}
+                      <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-sm ml-2" title="Tarea oculta"></i>
+                    </div>
                   </td>
                   <td class="px-6 py-4 text-sm text-gray-500 truncate max-w-xs">{{ task.description || '-' }}</td>
                   <td class="px-6 py-4 whitespace-nowrap">
@@ -365,7 +374,9 @@ import { MuiTimePickerComponent } from './components/mui-time-picker/mui-time-pi
                         (timeChange)="onNewTaskStartTimeChange($event)"
                         name="newTaskStartTime"
                         label="Hora de inicio"
-                        placeholder="HH:MM">
+                        placeholder="HH:MM"
+                        referenceTime="{{ getCurrentTime() }}"
+                        referenceLabel="Hora actual">
                       </app-mui-time-picker>
                     </div>
                   </div>
@@ -391,7 +402,9 @@ import { MuiTimePickerComponent } from './components/mui-time-picker/mui-time-pi
                         (timeChange)="onNewTaskEndTimeChange($event)"
                         name="newTaskEndTime"
                         label="Hora de fin"
-                        placeholder="HH:MM">
+                        placeholder="HH:MM"
+                        [referenceTime]="newTaskStartTime"
+                        referenceLabel="Hora de inicio">
                       </app-mui-time-picker>
                     </div>
                   </div>
@@ -714,7 +727,9 @@ import { MuiTimePickerComponent } from './components/mui-time-picker/mui-time-pi
                         (timeChange)="onEditTaskStartTimeChange($event)"
                         name="editTaskStartTime"
                         label="Hora de inicio"
-                        placeholder="HH:MM">
+                        placeholder="HH:MM"
+                        [referenceTime]="getCurrentTime()"
+                        referenceLabel="Hora actual">
                       </app-mui-time-picker>
                     </div>
                   </div>
@@ -740,7 +755,9 @@ import { MuiTimePickerComponent } from './components/mui-time-picker/mui-time-pi
                         (timeChange)="onEditTaskEndTimeChange($event)"
                         name="editTaskEndTime"
                         label="Hora de fin"
-                        placeholder="HH:MM">
+                        placeholder="HH:MM"
+                        [referenceTime]="editTaskStartTime"
+                        referenceLabel="Hora de inicio">
                       </app-mui-time-picker>
                     </div>
                   </div>
@@ -1086,6 +1103,8 @@ export class TaskTrackerComponent implements OnInit {
   async ngOnInit() {
     await this.loadInitialData();
     this.initializeNewTask();
+    // Cargar el estado del filtro desde localStorage
+    this.loadShowHiddenState();
   }
 
   async loadInitialData(): Promise<void> {
@@ -1211,6 +1230,7 @@ export class TaskTrackerComponent implements OnInit {
 
   toggleShowHidden() {
     this.showHidden = !this.showHidden;
+    this.saveShowHiddenState(); // Guardar el nuevo estado
     this.filterTasks();
   }
 
@@ -1574,9 +1594,9 @@ export class TaskTrackerComponent implements OnInit {
       this.editTaskDeadlineDate = deadlineDateTime.date;
       this.editTaskDeadlineTime = deadlineDateTime.time;
     } else {
-      // Para deadline, permitir valores vacíos, pero proporcionar defecto si es necesario
+      // Para deadline, mantener valores vacíos cuando no hay deadline
       this.editTaskDeadlineDate = '';
-      this.editTaskDeadlineTime = '23:59'; // Valor por defecto para el time picker
+      this.editTaskDeadlineTime = '';
     }
     
     // Cargar proyectos disponibles para el ambiente seleccionado
@@ -2018,5 +2038,25 @@ export class TaskTrackerComponent implements OnInit {
       }
     }
     this.closeProjectContextMenu();
+  }
+
+  private loadShowHiddenState(): void {
+    const savedState = localStorage.getItem('taskTracker_showHidden');
+    if (savedState !== null) {
+      this.showHidden = JSON.parse(savedState);
+      // Aplicar el filtro con el estado recuperado
+      this.filterTasks();
+    }
+  }
+
+  private saveShowHiddenState(): void {
+    localStorage.setItem('taskTracker_showHidden', JSON.stringify(this.showHidden));
+  }
+
+  getCurrentTime(): string {
+    const now = new Date();
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
   }
 } 

@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Task } from '../../models/task.model';
 import { Environment } from '../../models/environment.model';
@@ -72,11 +72,11 @@ import { Environment } from '../../models/environment.model';
     /* Removed fixed height from parent component, adjust as needed */
   `]
 })
-export class TimelineSvgComponent {
+export class TimelineSvgComponent implements OnInit {
   @Input() tasks: Task[] = [];
   @Input() environments: Environment[] = [];
 
-  svgWidth = 450; // Ancho total del SVG
+  svgWidth = 450; // Se establecerá dinámicamente
   sectionHeight = 100; // Altura de cada sección de 8 horas
   svgHeight = this.sectionHeight * 3; // Altura total del SVG
 
@@ -180,5 +180,26 @@ export class TimelineSvgComponent {
     const sectionStartHour = sectionIndex * 8;
     const sectionEndHour = sectionStartHour + 8;
     return currentHour >= sectionStartHour && currentHour < sectionEndHour;
+  }
+
+  ngOnInit() {
+    this.updateSvgWidth();
+  }
+
+  @HostListener('window:resize', ['$event'])
+  onResize(event: any) {
+    this.updateSvgWidth();
+  }
+
+  private updateSvgWidth() {
+    // Verificar que estamos en el navegador
+    if (typeof window !== 'undefined') {
+      // Detectar si es dispositivo móvil basado en el ancho de la ventana
+      const isMobile = window.innerWidth <= 768; // Breakpoint típico para móviles
+      this.svgWidth = isMobile ? 450 : 900;
+    } else {
+      // Fallback para SSR o entornos sin window
+      this.svgWidth = 450;
+    }
   }
 } 

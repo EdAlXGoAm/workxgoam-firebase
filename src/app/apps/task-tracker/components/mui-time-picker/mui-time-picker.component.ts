@@ -29,6 +29,12 @@ import { CommonModule } from '@angular/common';
         <div class="picker-modal" (click)="onModalClick($event)">
           <!-- Header con tiempo seleccionado -->
           <div class="picker-header">
+            <!-- Tiempo de referencia -->
+            <div *ngIf="referenceTime && referenceLabel" class="reference-time">
+              <span class="reference-label">{{ referenceLabel }}:</span>
+              <span class="reference-value">{{ formatReferenceTime(referenceTime) }}</span>
+            </div>
+            
             <div class="selected-time-display">
               <div class="time-digits">
                 <span class="hour-display" [class.selected]="currentView === 'hour'" (click)="setView('hour')">
@@ -215,6 +221,27 @@ import { CommonModule } from '@angular/common';
       padding: 16px 24px;
     }
     
+    .reference-time {
+      margin-bottom: 12px;
+      font-size: 12px;
+      opacity: 0.8;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .reference-label {
+      font-weight: 500;
+    }
+    
+    .reference-value {
+      background: rgba(255, 255, 255, 0.15);
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 500;
+      font-size: 11px;
+    }
+    
     .selected-time-display {
       display: flex;
       align-items: center;
@@ -357,6 +384,8 @@ import { CommonModule } from '@angular/common';
 export class MuiTimePickerComponent implements OnInit, ControlValueAccessor {
   @Input() label: string = 'Seleccionar hora';
   @Input() placeholder: string = 'HH:MM AM/PM';
+  @Input() referenceTime: string = ''; // Tiempo de referencia a mostrar
+  @Input() referenceLabel: string = ''; // Etiqueta para el tiempo de referencia
   @Output() timeChange = new EventEmitter<string>();
 
   isPickerOpen = false;
@@ -543,5 +572,12 @@ export class MuiTimePickerComponent implements OnInit, ControlValueAccessor {
 
   setDisabledState?(isDisabled: boolean): void {
     // Implementar si es necesario
+  }
+
+  formatReferenceTime(time: string): string {
+    const [hours, minutes] = time.split(':').map(Number);
+    const hour12 = hours > 12 ? hours - 12 : (hours === 0 ? 12 : hours);
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    return `${hour12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
   }
 } 
