@@ -52,11 +52,16 @@ import { Environment } from '../../models/environment.model';
            class="tooltip-container absolute top-16 left-1/2 transform -translate-x-1/2 z-50 bg-gray-900 text-white px-4 py-3 rounded-lg shadow-xl max-w-md">
         <div class="flex items-center space-x-2">
           <span class="text-lg">{{ tooltipTask.emoji }}</span>
-          <div>
+          <div class="flex-1">
             <div class="font-semibold text-sm">{{ tooltipTask.name }}</div>
             <div *ngIf="tooltipTask.description" class="text-xs text-gray-300 mt-1">{{ tooltipTask.description }}</div>
             <div class="text-xs text-gray-400 mt-1">
               {{ formatTaskTime(tooltipTask.start) }} - {{ formatTaskTime(tooltipTask.end) }}
+            </div>
+            <!-- Información del tiempo hasta la próxima tarea -->
+            <div class="text-xs text-blue-300 mt-2 flex items-center space-x-1">
+              <i class="fas fa-clock text-xs"></i>
+              <span>{{ getTimeUntilNextTask(tooltipTask) }}</span>
             </div>
           </div>
         </div>
@@ -768,5 +773,84 @@ export class TimelineSvgComponent implements OnInit, AfterViewInit, OnDestroy {
       clearTimeout(this.tooltipTimeout);
       this.tooltipTimeout = null;
     }
+  }
+
+  // 🕒 Métodos para calcular tiempo hasta la próxima tarea
+  getNextTask(currentTask: Task): Task | null {
+    const currentEnd = this.parseUTCToLocal(currentTask.end);
+    const currentDate = currentEnd.toDateString();
+    
+    // Filtrar tareas del mismo día que empiecen después de que termine la tarea actual
+    const tasksOnSameDay = this.tasks.filter(task => {
+      const taskStart = this.parseUTCToLocal(task.start);
+      const taskDate = taskStart.toDateString();
+      return taskDate === currentDate && task.id !== currentTask.id;
+    });
+
+    // Encontrar la próxima tarea (la que empiece más pronto después del final de la tarea actual)
+    let nextTask: Task | null = null;
+    let earliestStart: Date | null = null;
+
+    for (const task of tasksOnSameDay) {
+      const taskStart = this.parseUTCToLocal(task.start);
+      
+      // Solo considerar tareas que empiecen después de que termine la actual
+      if (taskStart >= currentEnd) {
+        if (!earliestStart || taskStart < earliestStart) {
+          earliestStart = taskStart;
+          nextTask = task;
+        }
+      }
+    }
+
+    return nextTask;
+  }
+
+  getTimeUntilNextTask(currentTask: Task): string {
+    const nextTask = this.getNextTask(currentTask);
+    
+    if (!nextTask) {
+      return 'No hay más tareas programadas hoy';
+    }
+
+    const currentEnd = this.parseUTCToLocal(currentTask.end);
+    const nextStart = this.parseUTCToLocal(nextTask.start);
+    
+    const timeDifferenceMs = nextStart.getTime() - currentEnd.getTime();
+    
+    if (timeDifferenceMs <= 0) {
+      return 'La siguiente tarea se superpone';
+    }
+
+    return this.formatTimeBreak(timeDifferenceMs);
+  }
+
+  private formatTimeBreak(milliseconds: number): string {
+    const totalMinutes = Math.floor(milliseconds / (1000 * 60));
+    
+    if (totalMinutes < 1) {
+      return 'Menos de 1 minuto de descanso';
+    }
+    
+    if (totalMinutes < 60) {
+      return `${totalMinutes} min de descanso`;
+    }
+    
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    
+    if (hours === 1 && minutes === 0) {
+      return '1 hora de descanso';
+    }
+    
+    if (minutes === 0) {
+      return `${hours} horas de descanso`;
+    }
+    
+    if (hours === 1) {
+      return `1 hora y ${minutes} min de descanso`;
+    }
+    
+    return `${hours} horas y ${minutes} min de descanso`;
   }
 } 
