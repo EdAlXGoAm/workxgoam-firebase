@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, HostListener, ViewChild, ElementRef, AfterViewInit, OnDestroy } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, HostListener, ViewChild, ElementRef, AfterViewInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Task } from '../../models/task.model';
 import { Environment } from '../../models/environment.model';
@@ -87,14 +87,20 @@ import { Environment } from '../../models/environment.model';
               <rect [attr.x]="getTaskX(task, 0)" y="20" [attr.width]="getTaskWidth(task, 0)" height="40"
                     [attr.fill]="getTaskColor(task)" rx="6" ry="6" fill-opacity="0.8" 
                     stroke="rgba(0,0,0,0.6)" stroke-width="1.5" 
-                    (click)="onTaskClick(task, $event)" class="cursor-pointer" />
+                    (click)="onTaskClick(task, $event)" 
+                    (dblclick)="onTaskDoubleClick(task, $event)"
+                    class="cursor-pointer" />
               <!-- Borde blanco interior -->
               <rect [attr.x]="getTaskX(task, 0)" y="20" [attr.width]="getTaskWidth(task, 0)" height="40"
                     fill="none" rx="6" ry="6" 
                     stroke="rgba(255,255,255,0.8)" stroke-width="1" 
-                    (click)="onTaskClick(task, $event)" class="cursor-pointer" />
+                    (click)="onTaskClick(task, $event)" 
+                    (dblclick)="onTaskDoubleClick(task, $event)"
+                    class="cursor-pointer" />
               <text [attr.x]="getTaskX(task, 0) + 6" y="45" [attr.font-size]="taskFontSize" fill="#111" alignment-baseline="middle"
-                    (click)="onTaskClick(task, $event)" class="cursor-pointer">
+                    (click)="onTaskClick(task, $event)" 
+                    (dblclick)="onTaskDoubleClick(task, $event)"
+                    class="cursor-pointer">
                 {{ getTaskText(task, 0) }}
               </text>
             </g>
@@ -115,14 +121,20 @@ import { Environment } from '../../models/environment.model';
               <rect [attr.x]="getTaskX(task, 8)" y="20" [attr.width]="getTaskWidth(task, 8)" height="40"
                     [attr.fill]="getTaskColor(task)" rx="6" ry="6" fill-opacity="0.8" 
                     stroke="rgba(0,0,0,0.6)" stroke-width="1.5" 
-                    (click)="onTaskClick(task, $event)" class="cursor-pointer" />
+                    (click)="onTaskClick(task, $event)" 
+                    (dblclick)="onTaskDoubleClick(task, $event)"
+                    class="cursor-pointer" />
               <!-- Borde blanco interior -->
               <rect [attr.x]="getTaskX(task, 8)" y="20" [attr.width]="getTaskWidth(task, 8)" height="40"
                     fill="none" rx="6" ry="6" 
                     stroke="rgba(255,255,255,0.8)" stroke-width="1" 
-                    (click)="onTaskClick(task, $event)" class="cursor-pointer" />
+                    (click)="onTaskClick(task, $event)" 
+                    (dblclick)="onTaskDoubleClick(task, $event)"
+                    class="cursor-pointer" />
               <text [attr.x]="getTaskX(task, 8) + 6" y="45" [attr.font-size]="taskFontSize" fill="#111" alignment-baseline="middle"
-                    (click)="onTaskClick(task, $event)" class="cursor-pointer">
+                    (click)="onTaskClick(task, $event)" 
+                    (dblclick)="onTaskDoubleClick(task, $event)"
+                    class="cursor-pointer">
                 {{ getTaskText(task, 8) }}
               </text>
             </g>
@@ -143,14 +155,20 @@ import { Environment } from '../../models/environment.model';
               <rect [attr.x]="getTaskX(task, 16)" y="20" [attr.width]="getTaskWidth(task, 16)" height="40"
                     [attr.fill]="getTaskColor(task)" rx="6" ry="6" fill-opacity="0.8" 
                     stroke="rgba(0,0,0,0.6)" stroke-width="1.5" 
-                    (click)="onTaskClick(task, $event)" class="cursor-pointer" />
+                    (click)="onTaskClick(task, $event)" 
+                    (dblclick)="onTaskDoubleClick(task, $event)"
+                    class="cursor-pointer" />
               <!-- Borde blanco interior -->
               <rect [attr.x]="getTaskX(task, 16)" y="20" [attr.width]="getTaskWidth(task, 16)" height="40"
                     fill="none" rx="6" ry="6" 
                     stroke="rgba(255,255,255,0.8)" stroke-width="1" 
-                    (click)="onTaskClick(task, $event)" class="cursor-pointer" />
+                    (click)="onTaskClick(task, $event)" 
+                    (dblclick)="onTaskDoubleClick(task, $event)"
+                    class="cursor-pointer" />
               <text [attr.x]="getTaskX(task, 16) + 6" y="45" [attr.font-size]="taskFontSize" fill="#111" alignment-baseline="middle"
-                    (click)="onTaskClick(task, $event)" class="cursor-pointer">
+                    (click)="onTaskClick(task, $event)" 
+                    (dblclick)="onTaskDoubleClick(task, $event)"
+                    class="cursor-pointer">
                 {{ getTaskText(task, 16) }}
               </text>
             </g>
@@ -281,6 +299,9 @@ export class TimelineSvgComponent implements OnInit, AfterViewInit, OnDestroy {
   @Input() tasks: Task[] = [];
   @Input() environments: Environment[] = [];
 
+  // 🎯 Output para notificar al componente padre cuando se quiere editar una tarea
+  @Output() editTask = new EventEmitter<Task>();
+
   @ViewChild('containerRef') containerRef!: ElementRef<HTMLDivElement>;
 
   // 📅 NAVEGACIÓN DE FECHAS
@@ -290,6 +311,11 @@ export class TimelineSvgComponent implements OnInit, AfterViewInit, OnDestroy {
   showTooltip: boolean = false;
   tooltipTask: Task | null = null;
   tooltipTimeout: any = null;
+
+  // 🖱️ SISTEMA DE DOBLE CLICK
+  private clickTimeout: any = null;
+  private clickCount = 0;
+  private lastClickedTask: Task | null = null;
 
   // Propiedades de dimensiones responsive
   svgWidth = 600; // Ancho inicial por defecto
@@ -348,6 +374,10 @@ export class TimelineSvgComponent implements OnInit, AfterViewInit, OnDestroy {
     // Limpiar timeout del tooltip
     if (this.tooltipTimeout) {
       clearTimeout(this.tooltipTimeout);
+    }
+    // Limpiar timeout del doble click
+    if (this.clickTimeout) {
+      clearTimeout(this.clickTimeout);
     }
   }
 
@@ -496,10 +526,24 @@ export class TimelineSvgComponent implements OnInit, AfterViewInit, OnDestroy {
 
   getTaskX(task: Task, sectionStartHour: number): number {
     const taskActualStart = this.parseUTCToLocal(task.start);
-    const taskActualStartHour = taskActualStart.getHours() + taskActualStart.getMinutes() / 60;
+    const taskActualEnd = this.parseUTCToLocal(task.end);
+    
+    // Crear fechas del día seleccionado
+    const selectedDayStart = new Date(this.selectedDate);
+    selectedDayStart.setHours(0, 0, 0, 0);
+    
+    // Determinar el inicio efectivo de la tarea en el día seleccionado
+    let effectiveStartHour;
+    
+    // Si la tarea comenzó antes del día seleccionado, usar el inicio del día
+    if (taskActualStart < selectedDayStart) {
+      effectiveStartHour = 0;
+    } else {
+      effectiveStartHour = taskActualStart.getHours() + taskActualStart.getMinutes() / 60;
+    }
 
     // Determinar el inicio de la porción visible de la tarea dentro de esta sección
-    const visiblePortionStartHourInDay = Math.max(taskActualStartHour, sectionStartHour);
+    const visiblePortionStartHourInDay = Math.max(effectiveStartHour, sectionStartHour);
     
     // Convertir este inicio visible a un desplazamiento desde el inicio de la sección
     const offsetFromSectionStart = visiblePortionStartHourInDay - sectionStartHour;
@@ -514,8 +558,29 @@ export class TimelineSvgComponent implements OnInit, AfterViewInit, OnDestroy {
     const start = this.parseUTCToLocal(task.start);
     const end = this.parseUTCToLocal(task.end);
     
-    let taskStartHour = start.getHours() + start.getMinutes() / 60;
-    let taskEndHour = end.getHours() + end.getMinutes() / 60;
+    // Crear fechas del día seleccionado
+    const selectedDayStart = new Date(this.selectedDate);
+    selectedDayStart.setHours(0, 0, 0, 0);
+    
+    const selectedDayEnd = new Date(this.selectedDate);
+    selectedDayEnd.setHours(23, 59, 59, 999);
+    
+    // Determinar las horas efectivas de inicio y fin en el día seleccionado
+    let taskStartHour, taskEndHour;
+    
+    // Si la tarea comenzó antes del día seleccionado, usar el inicio del día
+    if (start < selectedDayStart) {
+      taskStartHour = 0;
+    } else {
+      taskStartHour = start.getHours() + start.getMinutes() / 60;
+    }
+    
+    // Si la tarea termina después del día seleccionado, usar el final del día
+    if (end > selectedDayEnd) {
+      taskEndHour = 24;
+    } else {
+      taskEndHour = end.getHours() + end.getMinutes() / 60;
+    }
 
     // Ajustar las horas de inicio y fin para que estén dentro de los límites de la sección
     taskStartHour = Math.max(taskStartHour, sectionStartHour);
@@ -539,16 +604,40 @@ export class TimelineSvgComponent implements OnInit, AfterViewInit, OnDestroy {
       const taskStart = this.parseUTCToLocal(task.start);
       const taskEnd = this.parseUTCToLocal(task.end);
       
-      // Verificar si la tarea está en la fecha seleccionada
-      const taskDate = taskStart.toDateString();
-      const selectedDateString = this.selectedDate.toDateString();
+      // Crear fechas del día seleccionado (inicio y fin del día)
+      const selectedDayStart = new Date(this.selectedDate);
+      selectedDayStart.setHours(0, 0, 0, 0);
       
-      if (taskDate !== selectedDateString) {
-        return false; // La tarea no está en la fecha seleccionada
+      const selectedDayEnd = new Date(this.selectedDate);
+      selectedDayEnd.setHours(23, 59, 59, 999);
+      
+      // Verificar si la tarea se superpone con el día seleccionado
+      // Una tarea se superpone si:
+      // - Su inicio es antes del final del día seleccionado Y
+      // - Su fin es después del inicio del día seleccionado
+      const taskOverlapsSelectedDay = taskStart <= selectedDayEnd && taskEnd >= selectedDayStart;
+      
+      if (!taskOverlapsSelectedDay) {
+        return false; // La tarea no se superpone con la fecha seleccionada
       }
       
-      const taskStartHour = taskStart.getHours() + taskStart.getMinutes() / 60;
-      const taskEndHour = taskEnd.getHours() + taskEnd.getMinutes() / 60;
+      // Para calcular las horas, necesitamos determinar qué parte de la tarea
+      // está realmente en el día seleccionado
+      let taskStartHour, taskEndHour;
+      
+      // Si la tarea comenzó en un día anterior, usar el inicio del día seleccionado
+      if (taskStart < selectedDayStart) {
+        taskStartHour = 0; // Comenzar desde las 00:00 del día seleccionado
+      } else {
+        taskStartHour = taskStart.getHours() + taskStart.getMinutes() / 60;
+      }
+      
+      // Si la tarea termina después del día seleccionado, usar el final del día
+      if (taskEnd > selectedDayEnd) {
+        taskEndHour = 24; // Terminar a las 24:00 del día seleccionado
+      } else {
+        taskEndHour = taskEnd.getHours() + taskEnd.getMinutes() / 60;
+      }
 
       // La tarea se superpone con la sección si:
       // Su inicio es antes del fin de la sección Y su fin es después del inicio de la sección
@@ -852,5 +941,10 @@ export class TimelineSvgComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     
     return `${hours} horas y ${minutes} min de descanso`;
+  }
+
+  onTaskDoubleClick(task: Task, event: MouseEvent): void {
+    event.stopPropagation();
+    this.editTask.emit(task);
   }
 } 

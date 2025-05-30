@@ -82,141 +82,170 @@ import { CurrentTaskInfoComponent } from './components/current-task-info/current
         <div class="views-container">
           <!-- Board View -->
           <div *ngIf="currentView === 'board'" class="w-full bg-white rounded-lg shadow-md p-4">
-            <h2 class="text-xl font-bold mb-4">Vista de Tablero</h2>
+            <div class="flex justify-between items-center mb-4">
+              <h2 class="text-xl font-bold">Vista de Tablero</h2>
+              <div *ngIf="emptyEnvironmentsCount > 0" class="flex items-center space-x-2">
+                <span class="text-sm text-gray-600">{{emptyEnvironmentsCount}} ambiente(s) vacío(s)</span>
+                <button (click)="toggleAllEmptyEnvironments()" 
+                        class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg border transition-colors">
+                  <i class="fas" [ngClass]="collapsedEmptyEnvironments ? 'fa-chevron-down' : 'fa-chevron-up'" class="mr-1"></i>
+                  {{ collapsedEmptyEnvironments ? 'Expandir' : 'Contraer' }} vacíos
+                </button>
+              </div>
+            </div>
             <!-- Timeline View integrada -->
             <div class="mb-6">
               <h3 class="text-lg font-semibold mb-2">Línea del Tiempo</h3>
-              <app-timeline-svg [tasks]="tasks" [environments]="environments"></app-timeline-svg>
+              <app-timeline-svg [tasks]="tasks" [environments]="environments" (editTask)="editTask($event)"></app-timeline-svg>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div *ngFor="let env of environments" class="board-column p-4">
-                <div class="flex items-center justify-between mb-4">
-                  <h3 class="font-semibold p-2 rounded-md text-black flex-1"
-                      [style.background-color]="env.color + 'aa'" 
-                      [style.color]="'black'">{{env.name}}</h3>
-                  <button (click)="onEnvironmentContextMenu($event, env)" class="p-1 text-gray-500 hover:text-gray-700 ml-2">
-                    <i class="fas fa-ellipsis-v"></i>
-                  </button>
-                </div>
-                
-                <!-- Proyectos dentro del ambiente -->
-                <div class="space-y-4">
-                  <div *ngFor="let project of getProjectsByEnvironment(env.id)" class="project-section">
-                    <!-- Header del proyecto con botón agregar -->
-                    <div class="flex items-center justify-between mb-2 p-2 bg-gray-50 rounded-lg">
-                      <div class="flex items-center gap-2">
-                        <button (click)="onProjectContextMenu($event, project)" class="p-1 text-gray-500 hover:text-gray-700">
-                          <i class="fas fa-ellipsis-v"></i>
-                        </button>
-                        <h4 class="text-sm font-medium text-gray-700">
-                          <i class="fas fa-folder mr-1"></i>{{project.name}}
-                        </h4>
-                      </div>
-                      <button 
-                        (click)="openNewTaskModalForProject(env.id, project.id)"
-                        class="bg-indigo-600 text-white px-2 py-1 rounded text-xs hover:bg-indigo-700 transition-colors"
-                        title="Agregar tarea a {{project.name}}">
-                        <i class="fas fa-plus mr-1"></i>Agregar
+              <div *ngFor="let env of orderedEnvironments" class="board-column">
+                <!-- Header fijo del ambiente -->
+                <div class="environment-header p-4 pb-2">
+                  <div class="flex items-center justify-between">
+                    <h3 class="font-semibold p-2 rounded-md text-black flex-1"
+                        [style.background-color]="env.color + 'aa'" 
+                        [style.color]="'black'">{{env.name}}</h3>
+                    <div class="flex items-center ml-2">
+                      <!-- Botón de colapso solo para environments vacíos -->
+                      <button *ngIf="!environmentHasTasks(env.id)"
+                              (click)="toggleEnvironmentCollapse(env.id)"
+                              class="p-1 text-gray-500 hover:text-gray-700 mr-1"
+                              [title]="isEnvironmentCollapsed(env.id) ? 'Expandir ambiente' : 'Contraer ambiente'">
+                        <i class="fas" [ngClass]="isEnvironmentCollapsed(env.id) ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
+                      </button>
+                      <button (click)="onEnvironmentContextMenu($event, env)" class="p-1 text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-ellipsis-v"></i>
                       </button>
                     </div>
-                    
-                    <!-- Tareas del proyecto -->
-                    <div class="space-y-2 ml-2">
-                      <div *ngFor="let task of getTasksByProject(project.id)"
-                           class="task-card bg-white p-3 rounded-lg shadow-sm border border-gray-200 relative"
-                           [class.status-completed]="task.status === 'completed'"
-                           [class.status-in-progress]="task.status === 'in-progress'"
-                           [class.status-pending]="task.status === 'pending'">
-                        <!-- Barra de progreso superior -->
-                        <div class="progress-bar-container">
-                          <div class="progress-bar" 
-                               [class.progress-pending]="task.status === 'pending'"
-                               [class.progress-in-progress]="task.status === 'in-progress'"
-                               [class.progress-completed]="task.status === 'completed'">
-                          </div>
+                  </div>
+                </div>
+                
+                <!-- Contenido con scroll del ambiente -->
+                <div class="environment-content px-4">
+                  <!-- Proyectos dentro del ambiente -->
+                  <div *ngIf="!isEnvironmentCollapsed(env.id)" class="space-y-4">
+                    <div *ngFor="let project of getProjectsByEnvironment(env.id)" class="project-section">
+                      <!-- Header del proyecto con botón agregar -->
+                      <div class="flex items-center justify-between mb-2 p-2 bg-gray-50 rounded-lg">
+                        <div class="flex items-center gap-2">
+                          <button (click)="onProjectContextMenu($event, project)" class="p-1 text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-ellipsis-v"></i>
+                          </button>
+                          <h4 class="text-sm font-medium text-gray-700">
+                            <i class="fas fa-folder mr-1"></i>{{project.name}}
+                          </h4>
                         </div>
-                        
-                        <button (click)="onTaskContextMenu($event, task)" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
-                          <i class="fas fa-ellipsis-v"></i>
-                        </button>
-                        <div class="flex items-center justify-between mb-2">
-                          <div class="flex items-center gap-1">
-                            <span class="text-lg">{{task.emoji}}</span>
-                            <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-sm" title="Tarea oculta"></i>
-                          </div>
-                          <span class="text-xs px-2 py-1 rounded" [class]="'priority-' + task.priority">
-                            {{task.priority}}
-                          </span>
-                        </div>
-                        <h4 class="font-medium">{{task.name}}</h4>
-                        <p class="text-sm text-gray-600 mt-1">{{task.description}}</p>
-                        <div class="mt-2 text-xs text-gray-500">
-                          <div>Inicio: {{formatDate(task.start)}}</div>
-                          <div>Fin: {{formatDate(task.end)}}</div>
-                        </div>
-                      </div>
-                      
-                      <!-- Mensaje si el proyecto no tiene tareas -->
-                      <div *ngIf="getTasksByProject(project.id).length === 0" class="text-center py-4">
-                        <p class="text-gray-500 text-sm">No hay tareas en este proyecto</p>
                         <button 
                           (click)="openNewTaskModalForProject(env.id, project.id)"
-                          class="mt-2 text-indigo-600 hover:text-indigo-800 text-sm">
-                          <i class="fas fa-plus mr-1"></i>Crear primera tarea
+                          class="bg-indigo-600 text-white px-2 py-1 rounded text-xs hover:bg-indigo-700 transition-colors"
+                          title="Agregar tarea a {{project.name}}">
+                          <i class="fas fa-plus mr-1"></i>Agregar
                         </button>
                       </div>
-                    </div>
-                  </div>
-                  
-                  <!-- Tareas sin proyecto asignado dentro del ambiente -->
-                  <div *ngIf="getTasksWithoutProjectInEnvironment(env.id).length > 0" class="project-section">
-                    <div class="flex items-center justify-between mb-2 p-2 bg-yellow-50 rounded-lg border border-yellow-200">
-                      <h4 class="text-sm font-medium text-yellow-700">
-                        <i class="fas fa-exclamation-triangle mr-1"></i>Sin proyecto asignado
-                      </h4>
-                    </div>
-                    <div class="space-y-2 ml-2">
-                      <div *ngFor="let task of getTasksWithoutProjectInEnvironment(env.id)"
-                           class="task-card bg-white p-3 rounded-lg shadow-sm border border-yellow-200 relative">
-                        <!-- Barra de progreso superior -->
-                        <div class="progress-bar-container">
-                          <div class="progress-bar" 
-                               [class.progress-pending]="task.status === 'pending'"
-                               [class.progress-in-progress]="task.status === 'in-progress'"
-                               [class.progress-completed]="task.status === 'completed'">
+                      
+                      <!-- Tareas del proyecto -->
+                      <div class="space-y-2 ml-2">
+                        <div *ngFor="let task of getTasksByProject(project.id)"
+                             class="task-card bg-white p-3 rounded-lg shadow-sm border border-gray-200 relative"
+                             [class.status-completed]="task.status === 'completed'"
+                             [class.status-in-progress]="task.status === 'in-progress'"
+                             [class.status-pending]="task.status === 'pending'"
+                             [class.task-overdue]="isTaskOverdue(task)"
+                             [class.task-running]="isTaskRunning(task)">
+                          <!-- Barra de progreso superior -->
+                          <div class="progress-bar-container">
+                            <div class="progress-bar" 
+                                 [class.progress-pending]="task.status === 'pending'"
+                                 [class.progress-in-progress]="task.status === 'in-progress'"
+                                 [class.progress-completed]="task.status === 'completed'">
+                            </div>
+                          </div>
+                          
+                          <button (click)="onTaskContextMenu($event, task)" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-ellipsis-v"></i>
+                          </button>
+                          <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-1">
+                              <span class="text-lg">{{task.emoji}}</span>
+                              <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-sm" title="Tarea oculta"></i>
+                            </div>
+                            <span class="text-xs px-2 py-1 rounded" [class]="'priority-' + task.priority">
+                              {{task.priority}}
+                            </span>
+                          </div>
+                          <h4 class="font-medium">{{task.name}}</h4>
+                          <p class="text-sm text-gray-600 mt-1">{{task.description}}</p>
+                          <div class="mt-2 text-xs text-gray-500">
+                            <div>Inicio: {{formatDate(task.start)}}</div>
+                            <div>Fin: {{formatDate(task.end)}}</div>
                           </div>
                         </div>
                         
-                        <button (click)="onTaskContextMenu($event, task)" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
-                          <i class="fas fa-ellipsis-v"></i>
-                        </button>
-                        <div class="flex items-center justify-between mb-2">
-                          <div class="flex items-center gap-1">
-                            <span class="text-lg">{{task.emoji}}</span>
-                            <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-sm" title="Tarea oculta"></i>
-                          </div>
-                          <span class="text-xs px-2 py-1 rounded" [class]="'priority-' + task.priority">
-                            {{task.priority}}
-                          </span>
-                        </div>
-                        <h4 class="font-medium">{{task.name}}</h4>
-                        <p class="text-sm text-gray-600 mt-1">{{task.description}}</p>
-                        <div class="mt-2 text-xs text-gray-500">
-                          <div>Inicio: {{formatDate(task.start)}}</div>
-                          <div>Fin: {{formatDate(task.end)}}</div>
+                        <!-- Mensaje si el proyecto no tiene tareas -->
+                        <div *ngIf="getTasksByProject(project.id).length === 0" class="text-center py-4">
+                          <p class="text-gray-500 text-sm">No hay tareas en este proyecto</p>
+                          <button 
+                            (click)="openNewTaskModalForProject(env.id, project.id)"
+                            class="mt-2 text-indigo-600 hover:text-indigo-800 text-sm">
+                            <i class="fas fa-plus mr-1"></i>Crear primera tarea
+                          </button>
                         </div>
                       </div>
                     </div>
-                  </div>
-                  
-                  <!-- Mensaje si el ambiente no tiene proyectos -->
-                  <div *ngIf="getProjectsByEnvironment(env.id).length === 0" class="text-center py-6">
-                    <p class="text-gray-500 text-sm mb-2">No hay proyectos en este ambiente</p>
-                    <button 
-                      (click)="openNewProjectModal()"
-                      class="bg-gray-200 text-gray-700 px-3 py-2 rounded text-sm hover:bg-gray-300 transition-colors">
-                      <i class="fas fa-plus mr-1"></i>Crear proyecto
-                    </button>
+                    
+                    <!-- Tareas sin proyecto asignado dentro del ambiente -->
+                    <div *ngIf="getTasksWithoutProjectInEnvironment(env.id).length > 0" class="project-section">
+                      <div class="flex items-center justify-between mb-2 p-2 bg-yellow-50 rounded-lg border border-yellow-200">
+                        <h4 class="text-sm font-medium text-yellow-700">
+                          <i class="fas fa-exclamation-triangle mr-1"></i>Sin proyecto asignado
+                        </h4>
+                      </div>
+                      <div class="space-y-2 ml-2">
+                        <div *ngFor="let task of getTasksWithoutProjectInEnvironment(env.id)"
+                             class="task-card bg-white p-3 rounded-lg shadow-sm border border-yellow-200 relative"
+                             [class.task-overdue]="isTaskOverdue(task)"
+                             [class.task-running]="isTaskRunning(task)">
+                          <!-- Barra de progreso superior -->
+                          <div class="progress-bar-container">
+                            <div class="progress-bar" 
+                                 [class.progress-pending]="task.status === 'pending'"
+                                 [class.progress-in-progress]="task.status === 'in-progress'"
+                                 [class.progress-completed]="task.status === 'completed'">
+                            </div>
+                          </div>
+                          
+                          <button (click)="onTaskContextMenu($event, task)" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-ellipsis-v"></i>
+                          </button>
+                          <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-1">
+                              <span class="text-lg">{{task.emoji}}</span>
+                              <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-sm" title="Tarea oculta"></i>
+                            </div>
+                            <span class="text-xs px-2 py-1 rounded" [class]="'priority-' + task.priority">
+                              {{task.priority}}
+                            </span>
+                          </div>
+                          <h4 class="font-medium">{{task.name}}</h4>
+                          <p class="text-sm text-gray-600 mt-1">{{task.description}}</p>
+                          <div class="mt-2 text-xs text-gray-500">
+                            <div>Inicio: {{formatDate(task.start)}}</div>
+                            <div>Fin: {{formatDate(task.end)}}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <!-- Mensaje si el ambiente no tiene proyectos -->
+                    <div *ngIf="getProjectsByEnvironment(env.id).length === 0" class="text-center py-6">
+                      <p class="text-gray-500 text-sm mb-2">No hay proyectos en este ambiente</p>
+                      <button 
+                        (click)="openNewProjectModal()"
+                        class="bg-gray-200 text-gray-700 px-3 py-2 rounded text-sm hover:bg-gray-300 transition-colors">
+                        <i class="fas fa-plus mr-1"></i>Crear proyecto
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -226,7 +255,7 @@ import { CurrentTaskInfoComponent } from './components/current-task-info/current
           <!-- Timeline View -->
           <div *ngIf="currentView === 'timeline'" class="w-full bg-white rounded-lg shadow-md p-4">
             <h2 class="text-xl font-bold mb-4">Línea del Tiempo</h2>
-            <app-timeline-svg [tasks]="tasks" [environments]="environments"></app-timeline-svg>
+            <app-timeline-svg [tasks]="tasks" [environments]="environments" (editTask)="editTask($event)"></app-timeline-svg>
           </div>
         </div>
       </main>
@@ -346,226 +375,244 @@ import { CurrentTaskInfoComponent } from './components/current-task-info/current
       </div>
 
       <!-- New Task Modal -->
-      <div *ngIf="showNewTaskModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-screen overflow-y-auto">
-          <div class="p-6">
-            <div class="flex justify-between items-center mb-4">
+      <div *ngIf="showNewTaskModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] md:max-h-[95vh] overflow-hidden flex flex-col">
+          <div class="p-4 md:p-6 border-b border-gray-200 flex-shrink-0">
+            <div class="flex justify-between items-center">
               <h3 class="text-xl font-bold">Nueva Tarea</h3>
-              <button (click)="closeNewTaskModal()" class="text-gray-400 hover:text-gray-600">
+              <button (click)="closeNewTaskModal()" class="text-gray-500 hover:text-gray-700">
                 <i class="fas fa-times"></i>
               </button>
             </div>
-            
-            <form (ngSubmit)="saveTask()" class="space-y-4">
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Nombre de la tarea</label>
-                  <input type="text" [(ngModel)]="newTask.name" name="name" class="w-full px-3 py-2 border rounded-lg" required>
-                </div>
-                
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Emoji</label>
-                  <div class="relative">
-                    <input type="text" [(ngModel)]="newTask.emoji" name="emoji" class="w-full px-3 py-2 border rounded-lg" readonly>
-                    <button type="button" (click)="toggleEmojiPicker()" class="absolute right-2 top-2 text-xl">{{newTask.emoji || '😊'}}</button>
-                    <div *ngIf="showEmojiPicker" class="emoji-picker">
-                      <span *ngFor="let emoji of emojis" (click)="selectEmoji(emoji)" class="emoji-option">{{emoji}}</span>
+          </div>
+          
+          <div class="flex-1 overflow-y-auto">
+            <div class="p-4 md:p-6">
+              <form id="newTaskForm" (ngSubmit)="saveTask()" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Nombre de la tarea</label>
+                    <input type="text" [(ngModel)]="newTask.name" name="name" class="w-full px-3 py-2 border rounded-lg" required>
+                  </div>
+                  
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Emoji</label>
+                    <div class="relative">
+                      <input type="text" [(ngModel)]="newTask.emoji" name="emoji" class="w-full px-3 py-2 border rounded-lg" readonly>
+                      <button type="button" (click)="toggleEmojiPicker()" class="absolute right-2 top-2 text-xl">{{newTask.emoji || '😊'}}</button>
+                      <div *ngIf="showEmojiPicker" class="emoji-picker">
+                        <span *ngFor="let emoji of emojis" (click)="selectEmoji(emoji)" class="emoji-option">{{emoji}}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-              
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
-                <textarea [(ngModel)]="newTask.description" name="description" rows="3" class="w-full px-3 py-2 border rounded-lg"></textarea>
-              </div>
-              
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Fecha y hora de inicio</label>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                  <textarea [(ngModel)]="newTask.description" name="description" rows="3" class="w-full px-3 py-2 border rounded-lg"></textarea>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Fecha y hora de inicio</label>
+                    <div class="grid grid-cols-2 gap-2">
+                      <div>
+                        <label class="block text-xs text-gray-500 mb-1">Fecha</label>
+                        <input 
+                          type="date" 
+                          [(ngModel)]="newTaskStartDate"
+                          (ngModelChange)="onNewTaskDateChange('start', $event)"
+                          name="newTaskStartDate"
+                          class="w-full px-3 py-2 border rounded-lg text-sm" 
+                          required>
+                      </div>
+                      <div>
+                        <label class="block text-xs text-gray-500 mb-1">Hora</label>
+                        <app-mui-time-picker
+                          [(ngModel)]="newTaskStartTime"
+                          (timeChange)="onNewTaskStartTimeChange($event)"
+                          name="newTaskStartTime"
+                          label="Hora de inicio"
+                          placeholder="HH:MM"
+                          referenceTime="{{ getCurrentTime() }}"
+                          referenceLabel="Hora actual">
+                        </app-mui-time-picker>
+                        <button type="button" 
+                                (click)="openTimeCalculator('start', 'new')" 
+                                class="mt-1 w-full px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 transition-colors">
+                          <i class="fas fa-calculator mr-1"></i>Calcular desde hora de fin
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Fecha y hora de fin</label>
+                    <div class="grid grid-cols-2 gap-2">
+                      <div>
+                        <label class="block text-xs text-gray-500 mb-1">Fecha</label>
+                        <input 
+                          type="date" 
+                          [(ngModel)]="newTaskEndDate"
+                          (ngModelChange)="onNewTaskDateChange('end', $event)"
+                          name="newTaskEndDate"
+                          class="w-full px-3 py-2 border rounded-lg text-sm" 
+                          required>
+                      </div>
+                      <div>
+                        <label class="block text-xs text-gray-500 mb-1">Hora</label>
+                        <app-mui-time-picker
+                          [(ngModel)]="newTaskEndTime"
+                          (timeChange)="onNewTaskEndTimeChange($event)"
+                          name="newTaskEndTime"
+                          label="Hora de fin"
+                          placeholder="HH:MM"
+                          [referenceTime]="newTaskStartTime"
+                          referenceLabel="Hora de inicio">
+                        </app-mui-time-picker>
+                        <button type="button" 
+                                (click)="openTimeCalculator('end', 'new')" 
+                                class="mt-1 w-full px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors">
+                          <i class="fas fa-calculator mr-1"></i>Calcular desde hora de inicio
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Ambiente</label>
+                    <div class="flex">
+                      <select [(ngModel)]="newTask.environment" (ngModelChange)="onNewTaskEnvironmentChange()" name="environment" class="w-full px-3 py-2 border rounded-lg rounded-r-none bg-white">
+                        <option value="">Seleccionar ambiente</option>
+                        <option *ngFor="let env of orderedEnvironments" [value]="env.id">{{env.name}}</option>
+                      </select>
+                      <button type="button" (click)="openNewEnvironmentModal()" class="px-3 py-2 bg-gray-200 border border-l-0 rounded-r-lg">
+                        <i class="fas fa-plus"></i>
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Proyecto</label>
+                    <div class="flex">
+                      <select [(ngModel)]="newTask.project" name="project" class="w-full px-3 py-2 border rounded-lg rounded-r-none bg-white" [disabled]="!newTask.environment || selectableProjectsForNewTask.length === 0">
+                        <option value="">Seleccionar proyecto</option>
+                        <option *ngFor="let proj of selectableProjectsForNewTask" [value]="proj.id">{{proj.name}}</option>
+                      </select>
+                      <button type="button" (click)="openNewProjectModal()" class="px-3 py-2 bg-gray-200 border border-l-0 rounded-r-lg">
+                        <i class="fas fa-plus"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Prioridad</label>
+                    <app-priority-selector
+                      [(ngModel)]="newTask.priority"
+                      name="priority">
+                    </app-priority-selector>
+                  </div>
+                  
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Duración estimada (horas)</label>
+                    <input type="number" [(ngModel)]="newTask.duration" name="duration" min="0" step="0.5" class="w-full px-3 py-2 border rounded-lg">
+                  </div>
+                </div>
+                
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Fecha límite de fin</label>
                   <div class="grid grid-cols-2 gap-2">
                     <div>
                       <label class="block text-xs text-gray-500 mb-1">Fecha</label>
                       <input 
                         type="date" 
-                        [(ngModel)]="newTaskStartDate"
-                        (ngModelChange)="onNewTaskDateChange('start', $event)"
-                        name="newTaskStartDate"
-                        class="w-full px-3 py-2 border rounded-lg text-sm" 
-                        required>
+                        [(ngModel)]="newTaskDeadlineDate"
+                        (ngModelChange)="onNewTaskDateChange('deadline', $event)"
+                        name="newTaskDeadlineDate"
+                        class="w-full px-3 py-2 border rounded-lg text-sm">
                     </div>
                     <div>
                       <label class="block text-xs text-gray-500 mb-1">Hora</label>
                       <app-mui-time-picker
-                        [(ngModel)]="newTaskStartTime"
-                        (timeChange)="onNewTaskStartTimeChange($event)"
-                        name="newTaskStartTime"
-                        label="Hora de inicio"
-                        placeholder="HH:MM"
-                        referenceTime="{{ getCurrentTime() }}"
-                        referenceLabel="Hora actual">
+                        [(ngModel)]="newTaskDeadlineTime"
+                        (timeChange)="onNewTaskDeadlineTimeChange($event)"
+                        name="newTaskDeadlineTime"
+                        label="Hora límite"
+                        placeholder="HH:MM">
                       </app-mui-time-picker>
                     </div>
                   </div>
                 </div>
                 
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Fecha y hora de fin</label>
-                  <div class="grid grid-cols-2 gap-2">
-                    <div>
-                      <label class="block text-xs text-gray-500 mb-1">Fecha</label>
-                      <input 
-                        type="date" 
-                        [(ngModel)]="newTaskEndDate"
-                        (ngModelChange)="onNewTaskDateChange('end', $event)"
-                        name="newTaskEndDate"
-                        class="w-full px-3 py-2 border rounded-lg text-sm" 
-                        required>
-                    </div>
-                    <div>
-                      <label class="block text-xs text-gray-500 mb-1">Hora</label>
-                      <app-mui-time-picker
-                        [(ngModel)]="newTaskEndTime"
-                        (timeChange)="onNewTaskEndTimeChange($event)"
-                        name="newTaskEndTime"
-                        label="Hora de fin"
-                        placeholder="HH:MM"
-                        [referenceTime]="newTaskStartTime"
-                        referenceLabel="Hora de inicio">
-                      </app-mui-time-picker>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Recordatorios</label>
+                  <div #remindersContainer class="space-y-2">
+                    <div *ngFor="let reminder of newTask.reminders; let i = index" class="flex items-center space-x-2">
+                      <input type="datetime-local" [(ngModel)]="newTask.reminders![i]" class="flex-1 px-3 py-2 border rounded-lg">
+                      <button type="button" (click)="removeReminder(i)" class="text-red-500 hover:text-red-700">
+                        <i class="fas fa-trash"></i>
+                      </button>
                     </div>
                   </div>
-                </div>
-              </div>
-              
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Ambiente</label>
-                  <div class="flex">
-                    <select [(ngModel)]="newTask.environment" (ngModelChange)="onNewTaskEnvironmentChange()" name="environment" class="w-full px-3 py-2 border rounded-lg rounded-r-none bg-white">
-                      <option value="">Seleccionar ambiente</option>
-                      <option *ngFor="let env of environments" [value]="env.id">{{env.name}}</option>
-                    </select>
-                    <button type="button" (click)="openNewEnvironmentModal()" class="px-3 py-2 bg-gray-200 border border-l-0 rounded-r-lg">
-                      <i class="fas fa-plus"></i>
-                    </button>
-                  </div>
+                  <button type="button" (click)="addReminder()" class="mt-2 px-3 py-1 bg-gray-200 rounded-lg text-sm">
+                    <i class="fas fa-plus mr-1"></i> Agregar recordatorio
+                  </button>
                 </div>
                 
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Proyecto</label>
-                  <div class="flex">
-                    <select [(ngModel)]="newTask.project" name="project" class="w-full px-3 py-2 border rounded-lg rounded-r-none bg-white" [disabled]="!newTask.environment || selectableProjectsForNewTask.length === 0">
-                      <option value="">Seleccionar proyecto</option>
-                      <option *ngFor="let proj of selectableProjectsForNewTask" [value]="proj.id">{{proj.name}}</option>
-                    </select>
-                    <button type="button" (click)="openNewProjectModal()" class="px-3 py-2 bg-gray-200 border border-l-0 rounded-r-lg">
-                      <i class="fas fa-plus"></i>
-                    </button>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Fragmentos (Pausas)</label>
+                  <div #fragmentsContainer class="space-y-2">
+                    <div *ngFor="let fragment of newTask.fragments; let i = index" class="fragment-item bg-gray-100 p-3 rounded-lg">
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
+                        <div>
+                          <label class="block text-xs font-medium text-gray-500 mb-1">Inicio</label>
+                          <input type="datetime-local" [(ngModel)]="newTask.fragments![i].start" class="w-full px-3 py-2 border rounded-lg text-sm">
+                        </div>
+                        <div>
+                          <label class="block text-xs font-medium text-gray-500 mb-1">Fin</label>
+                          <input type="datetime-local" [(ngModel)]="newTask.fragments![i].end" class="w-full px-3 py-2 border rounded-lg text-sm">
+                        </div>
+                      </div>
+                      <button type="button" (click)="removeFragment(i)" class="text-red-500 hover:text-red-700 text-sm">
+                        <i class="fas fa-trash mr-1"></i>Eliminar fragmento
+                      </button>
+                    </div>
                   </div>
-                </div>
-              </div>
-              
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Prioridad</label>
-                  <app-priority-selector
-                    [(ngModel)]="newTask.priority"
-                    name="priority">
-                  </app-priority-selector>
+                  <button type="button" (click)="addFragment()" class="mt-2 px-3 py-1 bg-gray-200 rounded-lg text-sm">
+                    <i class="fas fa-plus mr-1"></i> Agregar fragmento
+                  </button>
                 </div>
                 
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Duración estimada (horas)</label>
-                  <input type="number" [(ngModel)]="newTask.duration" name="duration" min="0" step="0.5" class="w-full px-3 py-2 border rounded-lg">
-                </div>
-              </div>
-              
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Fecha límite de fin</label>
-                <div class="grid grid-cols-2 gap-2">
-                  <div>
-                    <label class="block text-xs text-gray-500 mb-1">Fecha</label>
-                    <input 
-                      type="date" 
-                      [(ngModel)]="newTaskDeadlineDate"
-                      (ngModelChange)="onNewTaskDateChange('deadline', $event)"
-                      name="newTaskDeadlineDate"
-                      class="w-full px-3 py-2 border rounded-lg text-sm">
-                  </div>
-                  <div>
-                    <label class="block text-xs text-gray-500 mb-1">Hora</label>
-                    <app-mui-time-picker
-                      [(ngModel)]="newTaskDeadlineTime"
-                      (timeChange)="onNewTaskDeadlineTimeChange($event)"
-                      name="newTaskDeadlineTime"
-                      label="Hora límite"
-                      placeholder="HH:MM">
-                    </app-mui-time-picker>
+                <!-- Mensaje de error para validación de fechas -->
+                <div *ngIf="newTaskDateError" class="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                  <div class="flex items-center">
+                    <i class="fas fa-exclamation-triangle text-red-600 mr-2"></i>
+                    <span class="text-red-600 text-sm font-medium">{{ newTaskDateError }}</span>
                   </div>
                 </div>
-              </div>
-              
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Recordatorios</label>
-                <div #remindersContainer class="space-y-2">
-                  <div *ngFor="let reminder of newTask.reminders; let i = index" class="flex items-center space-x-2">
-                    <input type="datetime-local" [(ngModel)]="newTask.reminders![i]" class="flex-1 px-3 py-2 border rounded-lg">
-                    <button type="button" (click)="removeReminder(i)" class="text-red-500 hover:text-red-700">
-                      <i class="fas fa-trash"></i>
-                    </button>
-                  </div>
-                </div>
-                <button type="button" (click)="addReminder()" class="mt-2 px-3 py-1 bg-gray-200 rounded-lg text-sm">
-                  <i class="fas fa-plus mr-1"></i> Agregar recordatorio
-                </button>
-              </div>
-              
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Fragmentos (Pausas)</label>
-                <div #fragmentsContainer class="space-y-2">
-                  <div *ngFor="let fragment of newTask.fragments; let i = index" class="fragment-item bg-gray-100 p-3 rounded-lg">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
-                      <div>
-                        <label class="block text-xs font-medium text-gray-500 mb-1">Inicio</label>
-                        <input type="datetime-local" [(ngModel)]="newTask.fragments![i].start" class="w-full px-3 py-2 border rounded-lg text-sm">
-                      </div>
-                      <div>
-                        <label class="block text-xs font-medium text-gray-500 mb-1">Fin</label>
-                        <input type="datetime-local" [(ngModel)]="newTask.fragments![i].end" class="w-full px-3 py-2 border rounded-lg text-sm">
-                      </div>
-                    </div>
-                    <button type="button" (click)="removeFragment(i)" class="text-red-500 hover:text-red-700 text-sm">
-                      <i class="fas fa-trash mr-1"></i>Eliminar fragmento
-                    </button>
-                  </div>
-                </div>
-                <button type="button" (click)="addFragment()" class="mt-2 px-3 py-1 bg-gray-200 rounded-lg text-sm">
-                  <i class="fas fa-plus mr-1"></i> Agregar fragmento
-                </button>
-              </div>
-              
-              <!-- Mensaje de error para validación de fechas -->
-              <div *ngIf="newTaskDateError" class="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-                <div class="flex items-center">
-                  <i class="fas fa-exclamation-triangle text-red-600 mr-2"></i>
-                  <span class="text-red-600 text-sm font-medium">{{ newTaskDateError }}</span>
-                </div>
-              </div>
-              
-              <div class="flex justify-end space-x-3 pt-4">
-                <button type="button" (click)="closeNewTaskModal()" class="px-4 py-2 border rounded-lg font-medium">
-                  Cancelar
-                </button>
-                <button type="submit" 
-                        [disabled]="!isNewTaskFormValid()" 
-                        [class.opacity-50]="!isNewTaskFormValid()"
-                        [class.cursor-not-allowed]="!isNewTaskFormValid()"
-                        class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:hover:bg-indigo-600">
-                  Guardar Tarea
-                </button>
-              </div>
-            </form>
+              </form>
+            </div>
+          </div>
+          
+          <!-- Botones fijos al final -->
+          <div class="p-4 md:p-6 border-t border-gray-200 bg-gray-50 flex-shrink-0">
+            <div class="flex justify-end space-x-3">
+              <button type="button" (click)="closeNewTaskModal()" class="px-4 py-2 border rounded-lg font-medium">
+                Cancelar
+              </button>
+              <button type="submit" 
+                      form="newTaskForm"
+                      [disabled]="!isNewTaskFormValid()" 
+                      [class.opacity-50]="!isNewTaskFormValid()"
+                      [class.cursor-not-allowed]="!isNewTaskFormValid()"
+                      class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:hover:bg-indigo-600">
+                Guardar Tarea
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -703,7 +750,7 @@ import { CurrentTaskInfoComponent } from './components/current-task-info/current
                 <label class="block text-sm font-medium text-gray-700 mb-1">Ambiente</label>
                 <select [(ngModel)]="newProject.environment" name="projectEnvironment" class="w-full px-3 py-2 border rounded-lg bg-white" required>
                   <option value="" disabled>Seleccionar ambiente</option>
-                  <option *ngFor="let env of environments" [value]="env.id">{{env.name}}</option>
+                  <option *ngFor="let env of orderedEnvironments" [value]="env.id">{{env.name}}</option>
                 </select>
               </div>
               
@@ -781,226 +828,315 @@ import { CurrentTaskInfoComponent } from './components/current-task-info/current
       </div>
 
       <!-- Edit Task Modal -->
-      <div *ngIf="showEditTaskModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-screen overflow-y-auto">
-          <div class="p-6">
-            <div class="flex justify-between items-center mb-4">
+      <div *ngIf="showEditTaskModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] md:max-h-[95vh] overflow-hidden flex flex-col">
+          <div class="p-4 md:p-6 border-b border-gray-200 flex-shrink-0">
+            <div class="flex justify-between items-center">
               <h3 class="text-xl font-bold">Editar Tarea</h3>
               <button (click)="showEditTaskModal = false" class="text-gray-500 hover:text-gray-700">
                 <i class="fas fa-times"></i>
               </button>
             </div>
+          </div>
+          
+          <div class="flex-1 overflow-y-auto">
+            <div class="p-4 md:p-6">
+              <form id="editTaskForm" (ngSubmit)="saveEditedTask()" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Nombre de la tarea</label>
+                    <input type="text" [(ngModel)]="selectedTask!.name" name="name" class="w-full px-3 py-2 border rounded-lg" required>
+                  </div>
+                  
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Emoji</label>
+                    <div class="relative">
+                      <input type="text" [(ngModel)]="selectedTask!.emoji" name="emoji" class="w-full px-3 py-2 border rounded-lg" readonly>
+                      <button type="button" (click)="toggleEmojiPicker()" class="absolute right-2 top-2 text-xl">{{selectedTask!.emoji || '😊'}}</button>
+                      <div *ngIf="showEmojiPicker" class="emoji-picker">
+                        <span *ngFor="let emoji of emojis" (click)="selectEmoji(emoji)" class="emoji-option">{{emoji}}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                  <textarea [(ngModel)]="selectedTask!.description" name="description" rows="3" class="w-full px-3 py-2 border rounded-lg"></textarea>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Fecha y hora de inicio</label>
+                    <div class="grid grid-cols-2 gap-2">
+                      <div>
+                        <label class="block text-xs text-gray-500 mb-1">Fecha</label>
+                        <input 
+                          type="date" 
+                          [(ngModel)]="editTaskStartDate"
+                          (ngModelChange)="onEditTaskDateChange('start', $event)"
+                          name="editTaskStartDate"
+                          class="w-full px-3 py-2 border rounded-lg text-sm" 
+                          required>
+                      </div>
+                      <div>
+                        <label class="block text-xs text-gray-500 mb-1">Hora</label>
+                        <app-mui-time-picker
+                          [(ngModel)]="editTaskStartTime"
+                          (timeChange)="onEditTaskStartTimeChange($event)"
+                          name="editTaskStartTime"
+                          label="Hora de inicio"
+                          placeholder="HH:MM"
+                          [referenceTime]="getCurrentTime()"
+                          referenceLabel="Hora actual">
+                        </app-mui-time-picker>
+                        <button type="button" 
+                                (click)="openTimeCalculator('start', 'edit')" 
+                                class="mt-1 w-full px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 transition-colors">
+                          <i class="fas fa-calculator mr-1"></i>Calcular desde hora de fin
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Fecha y hora de fin</label>
+                    <div class="grid grid-cols-2 gap-2">
+                      <div>
+                        <label class="block text-xs text-gray-500 mb-1">Fecha</label>
+                        <input 
+                          type="date" 
+                          [(ngModel)]="editTaskEndDate"
+                          (ngModelChange)="onEditTaskDateChange('end', $event)"
+                          name="editTaskEndDate"
+                          class="w-full px-3 py-2 border rounded-lg text-sm" 
+                          required>
+                      </div>
+                      <div>
+                        <label class="block text-xs text-gray-500 mb-1">Hora</label>
+                        <app-mui-time-picker
+                          [(ngModel)]="editTaskEndTime"
+                          (timeChange)="onEditTaskEndTimeChange($event)"
+                          name="editTaskEndTime"
+                          label="Hora de fin"
+                          placeholder="HH:MM"
+                          [referenceTime]="editTaskStartTime"
+                          referenceLabel="Hora de inicio">
+                        </app-mui-time-picker>
+                        <button type="button" 
+                                (click)="openTimeCalculator('end', 'edit')" 
+                                class="mt-1 w-full px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors">
+                          <i class="fas fa-calculator mr-1"></i>Calcular desde hora de inicio
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Ambiente</label>
+                    <div class="flex">
+                      <select [(ngModel)]="selectedTask!.environment" (ngModelChange)="onEditTaskEnvironmentChange()" name="environment" class="w-full px-3 py-2 border rounded-lg rounded-r-none bg-white">
+                        <option value="">Seleccionar ambiente</option>
+                        <option *ngFor="let env of orderedEnvironments" [value]="env.id">{{env.name}}</option>
+                      </select>
+                      <button type="button" (click)="openNewEnvironmentModal()" class="px-3 py-2 bg-gray-200 border border-l-0 rounded-r-lg">
+                        <i class="fas fa-plus"></i>
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Proyecto</label>
+                    <div class="flex">
+                      <select [(ngModel)]="selectedTask!.project" name="project" class="w-full px-3 py-2 border rounded-lg rounded-r-none bg-white" [disabled]="!selectedTask!.environment || selectableProjectsForEditTask.length === 0">
+                        <option value="">Seleccionar proyecto</option>
+                        <option *ngFor="let proj of selectableProjectsForEditTask" [value]="proj.id">{{proj.name}}</option>
+                      </select>
+                      <button type="button" (click)="openNewProjectModal()" class="px-3 py-2 bg-gray-200 border border-l-0 rounded-r-lg">
+                        <i class="fas fa-plus"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Prioridad</label>
+                    <app-priority-selector
+                      [(ngModel)]="selectedTask!.priority"
+                      name="priority">
+                    </app-priority-selector>
+                  </div>
+                  
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Duración estimada (horas)</label>
+                    <input type="number" [(ngModel)]="selectedTask!.duration" name="duration" min="0" step="0.5" class="w-full px-3 py-2 border rounded-lg">
+                  </div>
+                </div>
+                
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Fecha límite de fin</label>
+                  <div class="grid grid-cols-2 gap-2">
+                    <div>
+                      <label class="block text-xs text-gray-500 mb-1">Fecha</label>
+                      <input 
+                        type="date" 
+                        [(ngModel)]="editTaskDeadlineDate"
+                        (ngModelChange)="onEditTaskDateChange('deadline', $event)"
+                        name="editTaskDeadlineDate"
+                        class="w-full px-3 py-2 border rounded-lg text-sm">
+                    </div>
+                    <div>
+                      <label class="block text-xs text-gray-500 mb-1">Hora</label>
+                      <app-mui-time-picker
+                        [(ngModel)]="editTaskDeadlineTime"
+                        (timeChange)="onEditTaskDeadlineTimeChange($event)"
+                        name="editTaskDeadlineTime"
+                        label="Hora límite"
+                        placeholder="HH:MM">
+                      </app-mui-time-picker>
+                    </div>
+                  </div>
+                </div>
+                
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Recordatorios</label>
+                  <div #remindersContainer class="space-y-2">
+                    <div *ngFor="let reminder of selectedTask!.reminders; let i = index" class="flex items-center space-x-2">
+                      <input type="datetime-local" [(ngModel)]="selectedTask!.reminders![i]" class="flex-1 px-3 py-2 border rounded-lg">
+                      <button type="button" (click)="removeReminder(i)" class="text-red-500 hover:text-red-700">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </div>
+                  </div>
+                  <button type="button" (click)="addReminder()" class="mt-2 px-3 py-1 bg-gray-200 rounded-lg text-sm">
+                    <i class="fas fa-plus mr-1"></i> Agregar recordatorio
+                  </button>
+                </div>
+                
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Fragmentos (Pausas)</label>
+                  <div #fragmentsContainer class="space-y-2">
+                    <div *ngFor="let fragment of selectedTask!.fragments; let i = index" class="fragment-item bg-gray-100 p-3 rounded-lg">
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
+                        <div>
+                          <label class="block text-xs font-medium text-gray-500 mb-1">Inicio</label>
+                          <input type="datetime-local" [(ngModel)]="selectedTask!.fragments![i].start" class="w-full px-3 py-2 border rounded-lg text-sm">
+                        </div>
+                        <div>
+                          <label class="block text-xs font-medium text-gray-500 mb-1">Fin</label>
+                          <input type="datetime-local" [(ngModel)]="selectedTask!.fragments![i].end" class="w-full px-3 py-2 border rounded-lg text-sm">
+                        </div>
+                      </div>
+                      <button type="button" (click)="removeFragment(i)" class="text-red-500 hover:text-red-700 text-sm">
+                        <i class="fas fa-trash mr-1"></i>Eliminar fragmento
+                      </button>
+                    </div>
+                  </div>
+                  <button type="button" (click)="addFragment()" class="mt-2 px-3 py-1 bg-gray-200 rounded-lg text-sm">
+                    <i class="fas fa-plus mr-1"></i> Agregar fragmento
+                  </button>
+                </div>
+                
+                <!-- Mensaje de error para validación de fechas -->
+                <div *ngIf="editTaskDateError" class="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                  <div class="flex items-center">
+                    <i class="fas fa-exclamation-triangle text-red-600 mr-2"></i>
+                    <span class="text-red-600 text-sm font-medium">{{ editTaskDateError }}</span>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+          
+          <!-- Botones fijos al final -->
+          <div class="p-4 md:p-6 border-t border-gray-200 bg-gray-50 flex-shrink-0">
+            <div class="flex justify-end space-x-3">
+              <button type="button" (click)="showEditTaskModal = false" class="px-4 py-2 border rounded-lg font-medium">
+                Cancelar
+              </button>
+              <button type="submit" 
+                      form="editTaskForm"
+                      [disabled]="!isEditTaskFormValid()" 
+                      [class.opacity-50]="!isEditTaskFormValid()"
+                      [class.cursor-not-allowed]="!isEditTaskFormValid()"
+                      class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:hover:bg-indigo-600">
+                Guardar Cambios
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Time Calculator Modal -->
+      <div *ngIf="showTimeCalculatorModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+          <div class="p-6">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="text-xl font-bold">
+                Calcular {{ calculatorType === 'start' ? 'Hora de Inicio' : 'Hora de Fin' }}
+              </h3>
+              <button (click)="closeTimeCalculator()" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
             
-            <form (ngSubmit)="saveEditedTask()" class="space-y-4">
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Nombre de la tarea</label>
-                  <input type="text" [(ngModel)]="selectedTask!.name" name="name" class="w-full px-3 py-2 border rounded-lg" required>
-                </div>
-                
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Emoji</label>
-                  <div class="relative">
-                    <input type="text" [(ngModel)]="selectedTask!.emoji" name="emoji" class="w-full px-3 py-2 border rounded-lg" readonly>
-                    <button type="button" (click)="toggleEmojiPicker()" class="absolute right-2 top-2 text-xl">{{selectedTask!.emoji || '😊'}}</button>
-                    <div *ngIf="showEmojiPicker" class="emoji-picker">
-                      <span *ngFor="let emoji of emojis" (click)="selectEmoji(emoji)" class="emoji-option">{{emoji}}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
+            <div class="space-y-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
-                <textarea [(ngModel)]="selectedTask!.description" name="description" rows="3" class="w-full px-3 py-2 border rounded-lg"></textarea>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  {{ calculatorType === 'start' ? 'Restar de la hora de fin:' : 'Sumar a la hora de inicio:' }}
+                </label>
+                <input 
+                  type="text" 
+                  [(ngModel)]="calculatorInput"
+                  (input)="validateCalculatorInput()"
+                  placeholder="ej: 1.5, 2h, 30, 1.5+0.5"
+                  class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  [class.border-red-500]="calculatorError && calculatorInput"
+                  [class.border-green-500]="calculatorIsValid && calculatorInput">
               </div>
               
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Fecha y hora de inicio</label>
-                  <div class="grid grid-cols-2 gap-2">
-                    <div>
-                      <label class="block text-xs text-gray-500 mb-1">Fecha</label>
-                      <input 
-                        type="date" 
-                        [(ngModel)]="editTaskStartDate"
-                        (ngModelChange)="onEditTaskDateChange('start', $event)"
-                        name="editTaskStartDate"
-                        class="w-full px-3 py-2 border rounded-lg text-sm" 
-                        required>
-                    </div>
-                    <div>
-                      <label class="block text-xs text-gray-500 mb-1">Hora</label>
-                      <app-mui-time-picker
-                        [(ngModel)]="editTaskStartTime"
-                        (timeChange)="onEditTaskStartTimeChange($event)"
-                        name="editTaskStartTime"
-                        label="Hora de inicio"
-                        placeholder="HH:MM"
-                        [referenceTime]="getCurrentTime()"
-                        referenceLabel="Hora actual">
-                      </app-mui-time-picker>
-                    </div>
-                  </div>
-                </div>
-                
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Fecha y hora de fin</label>
-                  <div class="grid grid-cols-2 gap-2">
-                    <div>
-                      <label class="block text-xs text-gray-500 mb-1">Fecha</label>
-                      <input 
-                        type="date" 
-                        [(ngModel)]="editTaskEndDate"
-                        (ngModelChange)="onEditTaskDateChange('end', $event)"
-                        name="editTaskEndDate"
-                        class="w-full px-3 py-2 border rounded-lg text-sm" 
-                        required>
-                    </div>
-                    <div>
-                      <label class="block text-xs text-gray-500 mb-1">Hora</label>
-                      <app-mui-time-picker
-                        [(ngModel)]="editTaskEndTime"
-                        (timeChange)="onEditTaskEndTimeChange($event)"
-                        name="editTaskEndTime"
-                        label="Hora de fin"
-                        placeholder="HH:MM"
-                        [referenceTime]="editTaskStartTime"
-                        referenceLabel="Hora de inicio">
-                      </app-mui-time-picker>
-                    </div>
-                  </div>
-                </div>
+              <div class="text-sm text-gray-600">
+                <p class="mb-1"><strong>Formatos válidos:</strong></p>
+                <ul class="list-disc pl-5 space-y-1">
+                  <li><strong>Minutos:</strong> 30, 45, 90</li>
+                  <li><strong>Horas:</strong> 1h, 2.5h, 1.25 h</li>
+                  <li><strong>Operaciones:</strong> 1+0.5, 2*1.5, 3-0.25h</li>
+                  <li><strong>Con paréntesis:</strong> (45) h, (1.5+0.5) h, (2*1.5) h</li>
+                </ul>
               </div>
               
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Ambiente</label>
-                  <div class="flex">
-                    <select [(ngModel)]="selectedTask!.environment" (ngModelChange)="onEditTaskEnvironmentChange()" name="environment" class="w-full px-3 py-2 border rounded-lg rounded-r-none bg-white">
-                      <option value="">Seleccionar ambiente</option>
-                      <option *ngFor="let env of environments" [value]="env.id">{{env.name}}</option>
-                    </select>
-                    <button type="button" (click)="openNewEnvironmentModal()" class="px-3 py-2 bg-gray-200 border border-l-0 rounded-r-lg">
-                      <i class="fas fa-plus"></i>
-                    </button>
-                  </div>
-                </div>
-                
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Proyecto</label>
-                  <div class="flex">
-                    <select [(ngModel)]="selectedTask!.project" name="project" class="w-full px-3 py-2 border rounded-lg rounded-r-none bg-white" [disabled]="!selectedTask!.environment || selectableProjectsForEditTask.length === 0">
-                      <option value="">Seleccionar proyecto</option>
-                      <option *ngFor="let proj of selectableProjectsForEditTask" [value]="proj.id">{{proj.name}}</option>
-                    </select>
-                    <button type="button" (click)="openNewProjectModal()" class="px-3 py-2 bg-gray-200 border border-l-0 rounded-r-lg">
-                      <i class="fas fa-plus"></i>
-                    </button>
-                  </div>
-                </div>
-              </div>
-              
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Prioridad</label>
-                  <app-priority-selector
-                    [(ngModel)]="selectedTask!.priority"
-                    name="priority">
-                  </app-priority-selector>
-                </div>
-                
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Duración estimada (horas)</label>
-                  <input type="number" [(ngModel)]="selectedTask!.duration" name="duration" min="0" step="0.5" class="w-full px-3 py-2 border rounded-lg">
-                </div>
-              </div>
-              
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Fecha límite de fin</label>
-                <div class="grid grid-cols-2 gap-2">
-                  <div>
-                    <label class="block text-xs text-gray-500 mb-1">Fecha</label>
-                    <input 
-                      type="date" 
-                      [(ngModel)]="editTaskDeadlineDate"
-                      (ngModelChange)="onEditTaskDateChange('deadline', $event)"
-                      name="editTaskDeadlineDate"
-                      class="w-full px-3 py-2 border rounded-lg text-sm">
-                  </div>
-                  <div>
-                    <label class="block text-xs text-gray-500 mb-1">Hora</label>
-                    <app-mui-time-picker
-                      [(ngModel)]="editTaskDeadlineTime"
-                      (timeChange)="onEditTaskDeadlineTimeChange($event)"
-                      name="editTaskDeadlineTime"
-                      label="Hora límite"
-                      placeholder="HH:MM">
-                    </app-mui-time-picker>
-                  </div>
-                </div>
-              </div>
-              
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Recordatorios</label>
-                <div #remindersContainer class="space-y-2">
-                  <div *ngFor="let reminder of selectedTask!.reminders; let i = index" class="flex items-center space-x-2">
-                    <input type="datetime-local" [(ngModel)]="selectedTask!.reminders![i]" class="flex-1 px-3 py-2 border rounded-lg">
-                    <button type="button" (click)="removeReminder(i)" class="text-red-500 hover:text-red-700">
-                      <i class="fas fa-trash"></i>
-                    </button>
-                  </div>
-                </div>
-                <button type="button" (click)="addReminder()" class="mt-2 px-3 py-1 bg-gray-200 rounded-lg text-sm">
-                  <i class="fas fa-plus mr-1"></i> Agregar recordatorio
-                </button>
-              </div>
-              
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Fragmentos (Pausas)</label>
-                <div #fragmentsContainer class="space-y-2">
-                  <div *ngFor="let fragment of selectedTask!.fragments; let i = index" class="fragment-item bg-gray-100 p-3 rounded-lg">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
-                      <div>
-                        <label class="block text-xs font-medium text-gray-500 mb-1">Inicio</label>
-                        <input type="datetime-local" [(ngModel)]="selectedTask!.fragments![i].start" class="w-full px-3 py-2 border rounded-lg text-sm">
-                      </div>
-                      <div>
-                        <label class="block text-xs font-medium text-gray-500 mb-1">Fin</label>
-                        <input type="datetime-local" [(ngModel)]="selectedTask!.fragments![i].end" class="w-full px-3 py-2 border rounded-lg text-sm">
-                      </div>
-                    </div>
-                    <button type="button" (click)="removeFragment(i)" class="text-red-500 hover:text-red-700 text-sm">
-                      <i class="fas fa-trash mr-1"></i>Eliminar fragmento
-                    </button>
-                  </div>
-                </div>
-                <button type="button" (click)="addFragment()" class="mt-2 px-3 py-1 bg-gray-200 rounded-lg text-sm">
-                  <i class="fas fa-plus mr-1"></i> Agregar fragmento
-                </button>
-              </div>
-              
-              <!-- Mensaje de error para validación de fechas -->
-              <div *ngIf="editTaskDateError" class="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+              <div *ngIf="calculatorError && calculatorInput" class="bg-red-50 border border-red-200 rounded-lg p-3">
                 <div class="flex items-center">
                   <i class="fas fa-exclamation-triangle text-red-600 mr-2"></i>
-                  <span class="text-red-600 text-sm font-medium">{{ editTaskDateError }}</span>
+                  <span class="text-red-600 text-sm">{{ calculatorError }}</span>
                 </div>
               </div>
               
-              <div class="flex justify-end space-x-3 pt-4">
-                <button type="button" (click)="showEditTaskModal = false" class="px-4 py-2 border rounded-lg font-medium">
-                  Cancelar
-                </button>
-                <button type="submit" 
-                        [disabled]="!isEditTaskFormValid()" 
-                        [class.opacity-50]="!isEditTaskFormValid()"
-                        [class.cursor-not-allowed]="!isEditTaskFormValid()"
-                        class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:hover:bg-indigo-600">
-                  Guardar Cambios
-                </button>
+              <div *ngIf="calculatorIsValid && calculatorInput" class="bg-green-50 border border-green-200 rounded-lg p-3">
+                <div class="flex items-center">
+                  <i class="fas fa-check-circle text-green-600 mr-2"></i>
+                  <span class="text-green-600 text-sm">{{ getCalculatorPreview() }}</span>
+                </div>
               </div>
-            </form>
+            </div>
+            
+            <div class="flex justify-end space-x-3 pt-6">
+              <button type="button" (click)="closeTimeCalculator()" class="px-4 py-2 border rounded-lg font-medium">
+                Cancelar
+              </button>
+              <button 
+                type="button" 
+                (click)="applyTimeCalculation()"
+                [disabled]="!calculatorIsValid || !calculatorInput"
+                [class.opacity-50]="!calculatorIsValid || !calculatorInput"
+                [class.cursor-not-allowed]="!calculatorIsValid || !calculatorInput"
+                class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:hover:bg-indigo-600">
+                <i class="fas fa-calculator mr-2"></i>Calcular
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1013,9 +1149,46 @@ import { CurrentTaskInfoComponent } from './components/current-task-info/current
     .priority-critical { background-color: #9c27b0; }
     
     .board-column {
-      min-height: 500px;
+      min-height: 200px;
+      max-height: 50vh;
       background-color: #f3f4f6;
       border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    
+    .environment-header {
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      background-color: #f3f4f6;
+      z-index: 10;
+      border-radius: 8px 8px 0 0;
+    }
+    
+    .environment-content {
+      flex: 1;
+      overflow-y: auto;
+      padding-bottom: 1rem;
+    }
+    
+    .environment-content::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    .environment-content::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 3px;
+    }
+    
+    .environment-content::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 3px;
+    }
+    
+    .environment-content::-webkit-scrollbar-thumb:hover {
+      background: #a8a8a8;
     }
     
     .task-card {
@@ -1187,6 +1360,62 @@ import { CurrentTaskInfoComponent } from './components/current-task-info/current
       width: 100%;
       background-color: #10b981;
     }
+
+    /* Tareas vencidas - efecto parpadeante */
+    .task-overdue {
+      border: 3px solid transparent;
+      animation: overdue-pulse 1.5s infinite;
+      position: relative;
+    }
+
+    @keyframes overdue-pulse {
+      0%, 100% {
+        border-color: #ef4444;
+        box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.4), 
+                    0 0 20px rgba(239, 68, 68, 0.3),
+                    0 0 40px rgba(239, 68, 68, 0.2);
+      }
+      50% {
+        border-color: #ffffff;
+        box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.8), 
+                    0 0 25px rgba(255, 255, 255, 0.6),
+                    0 0 45px rgba(255, 255, 255, 0.4);
+      }
+    }
+
+    /* Asegurar que el efecto se vea incluso en tareas hover */
+    .task-overdue:hover {
+      animation: overdue-pulse 1.5s infinite;
+      transform: translateY(-2px);
+    }
+
+    /* Tareas en progreso - efecto parpadeante verde-blanco */
+    .task-running {
+      border: 3px solid transparent;
+      animation: running-pulse 1.5s infinite;
+      position: relative;
+    }
+
+    @keyframes running-pulse {
+      0%, 100% {
+        border-color: #10b981;
+        box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.4), 
+                    0 0 20px rgba(16, 185, 129, 0.3),
+                    0 0 40px rgba(16, 185, 129, 0.2);
+      }
+      50% {
+        border-color: #ffffff;
+        box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.8), 
+                    0 0 25px rgba(255, 255, 255, 0.6),
+                    0 0 45px rgba(255, 255, 255, 0.4);
+      }
+    }
+
+    /* Asegurar que el efecto se vea incluso en tareas hover */
+    .task-running:hover {
+      animation: running-pulse 1.5s infinite;
+      transform: translateY(-2px);
+    }
   `]
 })
 export class TaskTrackerComponent implements OnInit {
@@ -1202,6 +1431,11 @@ export class TaskTrackerComponent implements OnInit {
   showNewEnvironmentModal = false;
   showNewProjectModal = false;
   showManagementModal = false;
+
+  // Nuevo: Estado para contraer environments vacíos
+  collapsedEmptyEnvironments = true; // Por defecto contraídos
+  collapsedEnvironments: { [envId: string]: boolean } = {}; // Control individual
+
   newTask: Partial<Task> = {
     name: '',
     emoji: '',
@@ -1219,7 +1453,7 @@ export class TaskTrackerComponent implements OnInit {
   showEmojiPicker = false;
   emojis = ['😀', '😊', '😎', '🤩', '😍', '🤔', '😴', '🥳', '😇', '🤯', 
             '📝', '📅', '📌', '✅', '🔑', '⏰', '📚', '💻', '📱', '🔋',
-            '🏋️', '🚴', '🍎', '🍕', '☕', '🍷', '🎵', '🎮', '🎨', '✈️'];
+            '🏋️', '🚴', '🚗', '🍎', '🍕', '🍔', '🛒', '☕', '🍷', '🎵', '🎮', '🎨', '🛏️', '✈️'];
   filteredProjects: Project[] = [];
   newEnvironment: Partial<Environment> = {
     name: '',
@@ -1293,6 +1527,14 @@ export class TaskTrackerComponent implements OnInit {
   // Propiedades para validación de fechas
   newTaskDateError: string = '';
   editTaskDateError: string = '';
+
+  // Variables para el modal de cálculo de tiempo
+  showTimeCalculatorModal = false;
+  calculatorInput = '';
+  calculatorType: 'start' | 'end' = 'start'; // determina si calcula hora de inicio o fin
+  calculatorContext: 'new' | 'edit' = 'new'; // determina si está en modal de nueva tarea o edición
+  calculatorError = '';
+  calculatorIsValid = false;
 
   constructor(
     private authService: AuthService,
@@ -2647,5 +2889,267 @@ export class TaskTrackerComponent implements OnInit {
 
   isEditTaskFormValid(): boolean {
     return this.validateEditTaskDates();
+  }
+
+  // Métodos para el cálculo de tiempo
+  openTimeCalculator(type: 'start' | 'end', context: 'new' | 'edit') {
+    this.calculatorType = type;
+    this.calculatorContext = context;
+    this.calculatorInput = '';
+    this.calculatorError = '';
+    this.calculatorIsValid = false;
+    this.showTimeCalculatorModal = true;
+  }
+
+  closeTimeCalculator() {
+    this.showTimeCalculatorModal = false;
+    this.calculatorInput = '';
+    this.calculatorError = '';
+    this.calculatorIsValid = false;
+  }
+
+  validateCalculatorInput() {
+    if (!this.calculatorInput.trim()) {
+      this.calculatorError = '';
+      this.calculatorIsValid = false;
+      return;
+    }
+
+    try {
+      const result = this.parseCalculatorInput(this.calculatorInput);
+      if (result > 0) {
+        this.calculatorError = '';
+        this.calculatorIsValid = true;
+      } else {
+        this.calculatorError = 'El resultado debe ser mayor que 0';
+        this.calculatorIsValid = false;
+      }
+    } catch (error: any) {
+      this.calculatorError = error.message || 'Formato inválido';
+      this.calculatorIsValid = false;
+    }
+  }
+
+  parseCalculatorInput(input: string): number {
+    // Limpiar espacios y normalizar
+    let cleanInput = input.trim().toLowerCase();
+    
+    // Verificar si termina en 'h' (horas) - puede tener espacios antes
+    const isHours = /\s*h\s*$/.test(cleanInput);
+    let expression = isHours ? cleanInput.replace(/\s*h\s*$/, '').trim() : cleanInput;
+    
+    // Validar caracteres permitidos (números, operadores, puntos decimales, espacios, paréntesis)
+    if (!/^[\d+\-*\/\.\s\(\)]+$/.test(expression)) {
+      throw new Error('Solo se permiten números y operadores matemáticos (+, -, *, /, paréntesis)');
+    }
+    
+    // Evaluar la expresión matemática de forma segura
+    let result: number;
+    try {
+      // Reemplazar espacios múltiples y normalizar espacios alrededor de operadores
+      expression = expression.replace(/\s+/g, '');
+      
+      // Validar que no hay operadores consecutivos o mal formados
+      if (/[\+\-\*\/]{2,}/.test(expression) || /^[\+\*\/]/.test(expression) || /[\+\-\*\/]$/.test(expression)) {
+        throw new Error('Operadores mal formados');
+      }
+      
+      // Usar Function constructor para evaluar de forma más segura que eval()
+      result = new Function('return ' + expression)();
+      
+      if (isNaN(result) || !isFinite(result)) {
+        throw new Error('Resultado inválido');
+      }
+    } catch (error) {
+      throw new Error('Expresión matemática inválida');
+    }
+    
+    // Redondear a 2 decimales
+    result = Math.round(result * 100) / 100;
+    
+    // Si es en horas, convertir a minutos
+    if (isHours) {
+      result = result * 60; // Convertir horas a minutos
+    }
+    
+    return result;
+  }
+
+  getCalculatorPreview(): string {
+    if (!this.calculatorIsValid || !this.calculatorInput) return '';
+    
+    try {
+      const minutes = this.parseCalculatorInput(this.calculatorInput);
+      const hours = Math.floor(minutes / 60);
+      const mins = Math.round(minutes % 60);
+      
+      let timeStr = '';
+      if (hours > 0) {
+        timeStr = `${hours}h ${mins}m`;
+      } else {
+        timeStr = `${mins}m`;
+      }
+      
+      const action = this.calculatorType === 'start' ? 'Restar' : 'Sumar';
+      return `${action} ${timeStr} (${minutes} minutos)`;
+    } catch (error) {
+      return '';
+    }
+  }
+
+  applyTimeCalculation() {
+    if (!this.calculatorIsValid || !this.calculatorInput) return;
+    
+    try {
+      const minutes = this.parseCalculatorInput(this.calculatorInput);
+      
+      if (this.calculatorContext === 'new') {
+        this.applyNewTaskTimeCalculation(minutes);
+      } else {
+        this.applyEditTaskTimeCalculation(minutes);
+      }
+      
+      this.closeTimeCalculator();
+    } catch (error) {
+      console.error('Error aplicando cálculo:', error);
+    }
+  }
+
+  applyNewTaskTimeCalculation(minutes: number) {
+    if (this.calculatorType === 'start') {
+      // Calcular hora de inicio restando minutos de la hora de fin
+      if (this.newTaskEndDate && this.newTaskEndTime) {
+        const endDateTime = new Date(`${this.newTaskEndDate}T${this.newTaskEndTime}`);
+        const startDateTime = new Date(endDateTime.getTime() - (minutes * 60 * 1000));
+        
+        this.newTaskStartDate = startDateTime.toISOString().split('T')[0];
+        this.newTaskStartTime = startDateTime.toTimeString().slice(0, 5);
+        
+        this.onNewTaskDateChange('start', this.newTaskStartDate);
+        this.onNewTaskStartTimeChange(this.newTaskStartTime);
+      }
+    } else {
+      // Calcular hora de fin sumando minutos a la hora de inicio
+      if (this.newTaskStartDate && this.newTaskStartTime) {
+        const startDateTime = new Date(`${this.newTaskStartDate}T${this.newTaskStartTime}`);
+        const endDateTime = new Date(startDateTime.getTime() + (minutes * 60 * 1000));
+        
+        this.newTaskEndDate = endDateTime.toISOString().split('T')[0];
+        this.newTaskEndTime = endDateTime.toTimeString().slice(0, 5);
+        
+        this.onNewTaskDateChange('end', this.newTaskEndDate);
+        this.onNewTaskEndTimeChange(this.newTaskEndTime);
+      }
+    }
+  }
+
+  applyEditTaskTimeCalculation(minutes: number) {
+    if (this.calculatorType === 'start') {
+      // Calcular hora de inicio restando minutos de la hora de fin
+      if (this.editTaskEndDate && this.editTaskEndTime) {
+        const endDateTime = new Date(`${this.editTaskEndDate}T${this.editTaskEndTime}`);
+        const startDateTime = new Date(endDateTime.getTime() - (minutes * 60 * 1000));
+        
+        this.editTaskStartDate = startDateTime.toISOString().split('T')[0];
+        this.editTaskStartTime = startDateTime.toTimeString().slice(0, 5);
+        
+        this.onEditTaskDateChange('start', this.editTaskStartDate);
+        this.onEditTaskStartTimeChange(this.editTaskStartTime);
+      }
+    } else {
+      // Calcular hora de fin sumando minutos a la hora de inicio
+      if (this.editTaskStartDate && this.editTaskStartTime) {
+        const startDateTime = new Date(`${this.editTaskStartDate}T${this.editTaskStartTime}`);
+        const endDateTime = new Date(startDateTime.getTime() + (minutes * 60 * 1000));
+        
+        this.editTaskEndDate = endDateTime.toISOString().split('T')[0];
+        this.editTaskEndTime = endDateTime.toTimeString().slice(0, 5);
+        
+        this.onEditTaskDateChange('end', this.editTaskEndDate);
+        this.onEditTaskEndTimeChange(this.editTaskEndTime);
+      }
+    }
+  }
+
+  isTaskOverdue(task: Task): boolean {
+    // Solo marcar como vencida si no está completada
+    if (task.status === 'completed' || task.completed) {
+      return false;
+    }
+    
+    const endDate = new Date(task.end + (task.end.includes('Z') ? '' : 'Z'));
+    const now = new Date();
+    return endDate < now;
+  }
+
+  isTaskRunning(task: Task): boolean {
+    // Verificar si la tarea está en progreso (no completada y en horario actual)
+    if (task.status === 'completed' || task.completed) {
+      return false;
+    }
+    
+    const startDate = new Date(task.start + (task.start.includes('Z') ? '' : 'Z'));
+    const endDate = new Date(task.end + (task.end.includes('Z') ? '' : 'Z'));
+    const now = new Date();
+    
+    return startDate <= now && now <= endDate;
+  }
+
+  // Nuevo: M�todos para manejar environments
+  get orderedEnvironments(): Environment[] {
+    return [...this.environments].sort((a, b) => {
+      const aHasTasks = this.environmentHasTasks(a.id);
+      const bHasTasks = this.environmentHasTasks(b.id);
+      
+      // Environments con tareas van primero
+      if (aHasTasks && !bHasTasks) return -1;
+      if (!aHasTasks && bHasTasks) return 1;
+      
+      // Dentro del mismo grupo, ordenar alfab�ticamente
+      return a.name.localeCompare(b.name);
+    });
+  }
+
+  environmentHasTasks(environmentId: string): boolean {
+    return this.getTasksByEnvironment(environmentId).length > 0 ||
+           this.getProjectsWithTasksInEnvironment(environmentId).length > 0;
+  }
+
+  getProjectsWithTasksInEnvironment(environmentId: string): Project[] {
+    return this.projects.filter(project =>
+      project.environment === environmentId &&
+      this.getTasksByProject(project.id).length > 0
+    );
+  }
+
+  isEnvironmentCollapsed(environmentId: string): boolean {
+    // Si el environment tiene tareas, nunca est� colapsado
+    if (this.environmentHasTasks(environmentId)) {
+      return false;
+    }
+    
+    // Para environments vac�os, verificar el estado global o individual
+    if (this.collapsedEnvironments.hasOwnProperty(environmentId)) {
+      return this.collapsedEnvironments[environmentId];
+    }
+    
+    return this.collapsedEmptyEnvironments;
+  }
+
+  toggleEnvironmentCollapse(environmentId: string): void {
+    // Solo permitir colapsar environments vac�os
+    if (!this.environmentHasTasks(environmentId)) {
+      this.collapsedEnvironments[environmentId] = !this.isEnvironmentCollapsed(environmentId);
+    }
+  }
+
+  toggleAllEmptyEnvironments(): void {
+    this.collapsedEmptyEnvironments = !this.collapsedEmptyEnvironments;
+    // Limpiar estados individuales para que se use el estado global
+    this.collapsedEnvironments = {};
+  }
+
+  get emptyEnvironmentsCount(): number {
+    return this.environments.filter(env => !this.environmentHasTasks(env.id)).length;
   }
 } 
