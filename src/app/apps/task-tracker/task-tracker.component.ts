@@ -14,11 +14,12 @@ import { ManagementModalComponent } from './components/management-modal/manageme
 import { TimelineSvgComponent } from './components/timeline-svg/timeline-svg.component';
 import { MuiTimePickerComponent } from './components/mui-time-picker/mui-time-picker.component';
 import { PrioritySelectorComponent } from './components/priority-selector/priority-selector.component';
+import { CurrentTaskInfoComponent } from './components/current-task-info/current-task-info.component';
 
 @Component({
   selector: 'app-task-tracker',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, TimelineSvgComponent, MuiTimePickerComponent, PrioritySelectorComponent],
+  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, TimelineSvgComponent, MuiTimePickerComponent, PrioritySelectorComponent, CurrentTaskInfoComponent],
   template: `
     <div class="min-h-screen bg-gray-50">
       <!-- Header -->
@@ -44,6 +45,13 @@ import { PrioritySelectorComponent } from './components/priority-selector/priori
 
       <!-- Main Content -->
       <main class="max-w-7xl mx-auto px-4 py-6">
+        <!-- Current Task Info Card -->
+        <app-current-task-info 
+          [tasks]="tasks" 
+          [projects]="projects" 
+          [environments]="environments">
+        </app-current-task-info>
+
         <!-- View Selector -->
         <div class="bg-white rounded-lg shadow-md p-4 mb-6">
           <div class="flex flex-wrap justify-between items-center">
