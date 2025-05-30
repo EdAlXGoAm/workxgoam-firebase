@@ -13,11 +13,12 @@ import { Environment } from './models/environment.model';
 import { ManagementModalComponent } from './components/management-modal/management-modal.component';
 import { TimelineSvgComponent } from './components/timeline-svg/timeline-svg.component';
 import { MuiTimePickerComponent } from './components/mui-time-picker/mui-time-picker.component';
+import { PrioritySelectorComponent } from './components/priority-selector/priority-selector.component';
 
 @Component({
   selector: 'app-task-tracker',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, TimelineSvgComponent, MuiTimePickerComponent],
+  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, TimelineSvgComponent, MuiTimePickerComponent, PrioritySelectorComponent],
   template: `
     <div class="min-h-screen bg-gray-50">
       <!-- Header -->
@@ -118,6 +119,15 @@ import { MuiTimePickerComponent } from './components/mui-time-picker/mui-time-pi
                            [class.status-completed]="task.status === 'completed'"
                            [class.status-in-progress]="task.status === 'in-progress'"
                            [class.status-pending]="task.status === 'pending'">
+                        <!-- Barra de progreso superior -->
+                        <div class="progress-bar-container">
+                          <div class="progress-bar" 
+                               [class.progress-pending]="task.status === 'pending'"
+                               [class.progress-in-progress]="task.status === 'in-progress'"
+                               [class.progress-completed]="task.status === 'completed'">
+                          </div>
+                        </div>
+                        
                         <button (click)="onTaskContextMenu($event, task)" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
                           <i class="fas fa-ellipsis-v"></i>
                         </button>
@@ -160,6 +170,15 @@ import { MuiTimePickerComponent } from './components/mui-time-picker/mui-time-pi
                     <div class="space-y-2 ml-2">
                       <div *ngFor="let task of getTasksWithoutProjectInEnvironment(env.id)"
                            class="task-card bg-white p-3 rounded-lg shadow-sm border border-yellow-200 relative">
+                        <!-- Barra de progreso superior -->
+                        <div class="progress-bar-container">
+                          <div class="progress-bar" 
+                               [class.progress-pending]="task.status === 'pending'"
+                               [class.progress-in-progress]="task.status === 'in-progress'"
+                               [class.progress-completed]="task.status === 'completed'">
+                          </div>
+                        </div>
+                        
                         <button (click)="onTaskContextMenu($event, task)" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
                           <i class="fas fa-ellipsis-v"></i>
                         </button>
@@ -442,12 +461,10 @@ import { MuiTimePickerComponent } from './components/mui-time-picker/mui-time-pi
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Prioridad</label>
-                  <select [(ngModel)]="newTask.priority" name="priority" class="w-full px-3 py-2 border rounded-lg">
-                    <option value="low">Baja</option>
-                    <option value="medium">Media</option>
-                    <option value="high">Alta</option>
-                    <option value="critical">Crítica</option>
-                  </select>
+                  <app-priority-selector
+                    [(ngModel)]="newTask.priority"
+                    name="priority">
+                  </app-priority-selector>
                 </div>
                 
                 <div>
@@ -629,15 +646,15 @@ import { MuiTimePickerComponent } from './components/mui-time-picker/mui-time-pi
           <i class="fas" [ngClass]="selectedTask!.hidden ? 'fa-eye' : 'fa-eye-slash'"></i>
           <span>{{ selectedTask!.hidden ? 'Mostrar' : 'Ocultar' }}</span>
         </div>
-        <div class="context-menu-item" (click)="changeStatus(selectedTask!, 'completed')" *ngIf="selectedTask?.status !== 'completed'">
+        <div class="context-menu-item context-menu-item-completed" (click)="changeStatus(selectedTask!, 'completed')" *ngIf="selectedTask?.status !== 'completed'">
           <i class="fas fa-check"></i>
           <span>Marcar completada</span>
         </div>
-        <div class="context-menu-item" (click)="changeStatus(selectedTask!, 'in-progress')" *ngIf="selectedTask?.status !== 'in-progress'">
+        <div class="context-menu-item context-menu-item-progress" (click)="changeStatus(selectedTask!, 'in-progress')" *ngIf="selectedTask?.status !== 'in-progress'">
           <i class="fas fa-spinner"></i>
           <span>Marcar en progreso</span>
         </div>
-        <div class="context-menu-item" (click)="changeStatus(selectedTask!, 'pending')" *ngIf="selectedTask?.status !== 'pending'">
+        <div class="context-menu-item context-menu-item-pending" (click)="changeStatus(selectedTask!, 'pending')" *ngIf="selectedTask?.status !== 'pending'">
           <i class="fas fa-play"></i>
           <span>Marcar pendiente</span>
         </div>
@@ -795,12 +812,10 @@ import { MuiTimePickerComponent } from './components/mui-time-picker/mui-time-pi
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Prioridad</label>
-                  <select [(ngModel)]="selectedTask!.priority" name="priority" class="w-full px-3 py-2 border rounded-lg">
-                    <option value="low">Baja</option>
-                    <option value="medium">Media</option>
-                    <option value="high">Alta</option>
-                    <option value="critical">Crítica</option>
-                  </select>
+                  <app-priority-selector
+                    [(ngModel)]="selectedTask!.priority"
+                    name="priority">
+                  </app-priority-selector>
                 </div>
                 
                 <div>
@@ -888,10 +903,10 @@ import { MuiTimePickerComponent } from './components/mui-time-picker/mui-time-pi
     </div>
   `,
   styles: [`
-    .priority-low { background-color: #4ade80; }
-    .priority-medium { background-color: #60a5fa; }
-    .priority-high { background-color: #f87171; }
-    .priority-critical { background-color: #f472b6; }
+    .priority-low { background-color: #4caf50; }
+    .priority-medium { background-color: #ff9800; }
+    .priority-high { background-color: #f44336; }
+    .priority-critical { background-color: #9c27b0; }
     
     .board-column {
       min-height: 500px;
@@ -966,6 +981,33 @@ import { MuiTimePickerComponent } from './components/mui-time-picker/mui-time-pi
       color: #b91c1c;
     }
 
+    .context-menu-item-completed {
+      color: #10b981;
+    }
+
+    .context-menu-item-completed:hover {
+      background: #ecfdf5;
+      color: #059669;
+    }
+
+    .context-menu-item-progress {
+      color: #f59e0b;
+    }
+
+    .context-menu-item-progress:hover {
+      background: #fffbeb;
+      color: #d97706;
+    }
+
+    .context-menu-item-pending {
+      color: #3b82f6;
+    }
+
+    .context-menu-item-pending:hover {
+      background: #eff6ff;
+      color: #2563eb;
+    }
+
     .task-options {
       position: absolute;
       top: 8px;
@@ -1007,6 +1049,39 @@ import { MuiTimePickerComponent } from './components/mui-time-picker/mui-time-pi
 
     .project-section:hover {
       border-left-color: #6366f1;
+    }
+
+    .progress-bar-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      width: 100%;
+      height: 6px;
+      background-color: #e5e7eb;
+      border-radius: 8px 8px 0 0;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      transition: width 0.3s ease;
+      border-radius: 8px 8px 0 0;
+    }
+
+    .progress-pending {
+      width: 20%;
+      background-color: #3b82f6;
+    }
+
+    .progress-in-progress {
+      width: 60%;
+      background-color: #f59e0b;
+    }
+
+    .progress-completed {
+      width: 100%;
+      background-color: #10b981;
     }
   `]
 })
@@ -1565,6 +1640,9 @@ export class TaskTrackerComponent implements OnInit {
   async editTask(task: Task) {
     this.selectedTask = JSON.parse(JSON.stringify(task));
     
+    // Guardar el proyecto original antes de cargar proyectos disponibles
+    const originalProject = this.selectedTask?.project;
+    
     // Inicializar fechas y horas separadas para edición ANTES de cargar proyectos
     if (this.selectedTask && this.selectedTask.start) {
       const startDateTime = this.splitDateTime(this.selectedTask.start);
@@ -1601,6 +1679,11 @@ export class TaskTrackerComponent implements OnInit {
     
     // Cargar proyectos disponibles para el ambiente seleccionado
     this.onEditTaskEnvironmentChange();
+    
+    // Restaurar el proyecto original después de cargar los proyectos disponibles
+    if (this.selectedTask && originalProject) {
+      this.selectedTask.project = originalProject;
+    }
     
     // Abrir el modal después de inicializar todo
     this.showEditTaskModal = true;
