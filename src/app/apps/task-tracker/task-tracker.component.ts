@@ -537,11 +537,23 @@ import { PrioritySelectorComponent } from './components/priority-selector/priori
                 </button>
               </div>
               
+              <!-- Mensaje de error para validación de fechas -->
+              <div *ngIf="newTaskDateError" class="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                <div class="flex items-center">
+                  <i class="fas fa-exclamation-triangle text-red-600 mr-2"></i>
+                  <span class="text-red-600 text-sm font-medium">{{ newTaskDateError }}</span>
+                </div>
+              </div>
+              
               <div class="flex justify-end space-x-3 pt-4">
                 <button type="button" (click)="closeNewTaskModal()" class="px-4 py-2 border rounded-lg font-medium">
                   Cancelar
                 </button>
-                <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700">
+                <button type="submit" 
+                        [disabled]="!isNewTaskFormValid()" 
+                        [class.opacity-50]="!isNewTaskFormValid()"
+                        [class.cursor-not-allowed]="!isNewTaskFormValid()"
+                        class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:hover:bg-indigo-600">
                   Guardar Tarea
                 </button>
               </div>
@@ -960,11 +972,23 @@ import { PrioritySelectorComponent } from './components/priority-selector/priori
                 </button>
               </div>
               
+              <!-- Mensaje de error para validación de fechas -->
+              <div *ngIf="editTaskDateError" class="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                <div class="flex items-center">
+                  <i class="fas fa-exclamation-triangle text-red-600 mr-2"></i>
+                  <span class="text-red-600 text-sm font-medium">{{ editTaskDateError }}</span>
+                </div>
+              </div>
+              
               <div class="flex justify-end space-x-3 pt-4">
                 <button type="button" (click)="showEditTaskModal = false" class="px-4 py-2 border rounded-lg font-medium">
                   Cancelar
                 </button>
-                <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700">
+                <button type="submit" 
+                        [disabled]="!isEditTaskFormValid()" 
+                        [class.opacity-50]="!isEditTaskFormValid()"
+                        [class.cursor-not-allowed]="!isEditTaskFormValid()"
+                        class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:hover:bg-indigo-600">
                   Guardar Cambios
                 </button>
               </div>
@@ -1258,6 +1282,10 @@ export class TaskTrackerComponent implements OnInit {
   editTaskDeadlineDate: string = '';
   editTaskDeadlineTime: string = '';
 
+  // Propiedades para validación de fechas
+  newTaskDateError: string = '';
+  editTaskDateError: string = '';
+
   constructor(
     private authService: AuthService,
     private firestore: Firestore,
@@ -1401,6 +1429,11 @@ export class TaskTrackerComponent implements OnInit {
   }
 
   async saveTask() {
+    // Validar fechas antes de guardar
+    if (!this.validateNewTaskDates()) {
+      return; // No guardar si hay errores de validación
+    }
+
     try {
       await this.taskService.createTask(this.newTask as Omit<Task, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'completed' | 'completedAt'>);
       await this.loadTasks();
@@ -1426,6 +1459,9 @@ export class TaskTrackerComponent implements OnInit {
       reminders: [],
       fragments: []
     };
+    
+    // Limpiar errores de validación
+    this.newTaskDateError = '';
     
     // Establecer tiempos por defecto directamente
     const now = new Date();
@@ -1908,6 +1944,9 @@ export class TaskTrackerComponent implements OnInit {
   async editTask(task: Task) {
     this.selectedTask = JSON.parse(JSON.stringify(task));
     
+    // Limpiar errores de validación
+    this.editTaskDateError = '';
+    
     // Guardar el proyecto original antes de cargar proyectos disponibles
     const originalProject = this.selectedTask?.project;
     
@@ -2003,6 +2042,11 @@ export class TaskTrackerComponent implements OnInit {
 
   async saveEditedTask() {
     if (!this.selectedTask) return;
+    
+    // Validar fechas antes de guardar
+    if (!this.validateEditTaskDates()) {
+      return; // No guardar si hay errores de validación
+    }
     
     try {
       // Excluir campos del sistema que no deben actualizarse
@@ -2282,6 +2326,9 @@ export class TaskTrackerComponent implements OnInit {
       this.newTaskEndTime
     );
     this.newTask.duration = duration;
+    
+    // Validar fechas automáticamente
+    this.validateNewTaskDates();
   }
 
   updateEditTaskDuration(): void {
@@ -2294,6 +2341,9 @@ export class TaskTrackerComponent implements OnInit {
       this.editTaskEndTime
     );
     this.selectedTask.duration = duration;
+    
+    // Validar fechas automáticamente
+    this.validateEditTaskDates();
   }
 
   // Métodos para el color picker personalizado
@@ -2544,5 +2594,50 @@ export class TaskTrackerComponent implements OnInit {
     if (field === 'start' || field === 'end') {
       this.updateEditTaskDuration();
     }
+  }
+
+  // Métodos para validación de fechas
+  validateNewTaskDates(): boolean {
+    this.newTaskDateError = '';
+    
+    if (!this.newTaskStartDate || !this.newTaskStartTime || !this.newTaskEndDate || !this.newTaskEndTime) {
+      return true; // No validar si no están completas las fechas
+    }
+
+    const startDateTime = new Date(`${this.newTaskStartDate}T${this.newTaskStartTime}`);
+    const endDateTime = new Date(`${this.newTaskEndDate}T${this.newTaskEndTime}`);
+
+    if (endDateTime <= startDateTime) {
+      this.newTaskDateError = 'La fecha de fin debe ser posterior a la fecha de inicio';
+      return false;
+    }
+
+    return true;
+  }
+
+  validateEditTaskDates(): boolean {
+    this.editTaskDateError = '';
+    
+    if (!this.editTaskStartDate || !this.editTaskStartTime || !this.editTaskEndDate || !this.editTaskEndTime) {
+      return true; // No validar si no están completas las fechas
+    }
+
+    const startDateTime = new Date(`${this.editTaskStartDate}T${this.editTaskStartTime}`);
+    const endDateTime = new Date(`${this.editTaskEndDate}T${this.editTaskEndTime}`);
+
+    if (endDateTime <= startDateTime) {
+      this.editTaskDateError = 'La fecha de fin debe ser posterior a la fecha de inicio';
+      return false;
+    }
+
+    return true;
+  }
+
+  isNewTaskFormValid(): boolean {
+    return this.validateNewTaskDates();
+  }
+
+  isEditTaskFormValid(): boolean {
+    return this.validateEditTaskDates();
   }
 } 
