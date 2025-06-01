@@ -552,48 +552,95 @@ import { CurrentTaskInfoComponent } from './components/current-task-info/current
                 
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Recordatorios</label>
-                  <div #remindersContainer class="space-y-3">
-                    <div *ngFor="let reminder of newTask.reminders; let i = index" class="reminder-item bg-gray-50 p-3 rounded-lg">
-                      <div class="grid grid-cols-2 gap-2 mb-2">
-                        <div>
-                          <label class="block text-xs text-gray-500 mb-1">Fecha</label>
-                          <input 
-                            type="date" 
-                            [(ngModel)]="newTaskReminderDates[i]"
-                            (ngModelChange)="onNewTaskReminderDateChange(i, $event)"
-                            [name]="'newTaskReminderDate' + i"
-                            class="w-full px-3 py-2 border rounded-lg text-sm" 
-                            required>
+                  
+                  <!-- Vista no editable de recordatorios -->
+                  <div class="bg-gray-50 rounded-lg p-4 mb-3">
+                    <div *ngIf="!newTask.reminders || newTask.reminders.length === 0" class="text-center text-gray-500 py-4">
+                      <i class="fas fa-bell-slash text-2xl mb-2"></i>
+                      <p>No hay recordatorios configurados</p>
+                    </div>
+                    
+                    <div *ngIf="newTask.reminders && newTask.reminders.length > 0" class="space-y-4">
+                      <!-- Tabla de recordatorios categorizados -->
+                      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        
+                        <!-- Antes del inicio -->
+                        <div class="bg-white rounded-lg p-3 border">
+                          <h4 class="font-medium text-indigo-600 mb-2 text-center">
+                            <i class="fas fa-clock mr-1"></i>
+                            Antes del Inicio
+                          </h4>
+                          <div class="space-y-1">
+                            <div *ngFor="let item of currentCategorizedReminders.beforeStart" 
+                                 class="text-xs p-2 bg-indigo-50 rounded border-l-2 border-indigo-300">
+                              <div class="font-medium">{{ item.description }}</div>
+                              <div class="text-gray-600">{{ formatReminderDateTime(item.reminder) }}</div>
+                            </div>
+                            <div *ngIf="currentCategorizedReminders.beforeStart.length === 0" 
+                                 class="text-center text-gray-400 py-2">
+                              No hay recordatorios antes del inicio
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <label class="block text-xs text-gray-500 mb-1">Hora</label>
-                          <app-mui-time-picker
-                            [(ngModel)]="newTaskReminderTimes[i]"
-                            (timeChange)="onNewTaskReminderTimeChange(i, $event)"
-                            [name]="'newTaskReminderTime' + i"
-                            label="Hora del recordatorio"
-                            placeholder="HH:MM"
-                            referenceTime="{{ getCurrentTime() }}"
-                            referenceLabel="Hora actual">
-                          </app-mui-time-picker>
+                        
+                        <!-- Durante el evento -->
+                        <div class="bg-white rounded-lg p-3 border">
+                          <h4 class="font-medium text-green-600 mb-2 text-center">
+                            <i class="fas fa-play-circle mr-1"></i>
+                            Durante el Evento
+                          </h4>
+                          <div class="space-y-1">
+                            <div *ngFor="let item of currentCategorizedReminders.duringEvent" 
+                                 class="text-xs p-2 bg-green-50 rounded border-l-2 border-green-300">
+                              <div class="font-medium">{{ item.description }}</div>
+                              <div class="text-gray-600">{{ formatReminderDateTime(item.reminder) }}</div>
+                            </div>
+                            <div *ngIf="currentCategorizedReminders.duringEvent.length === 0" 
+                                 class="text-center text-gray-400 py-2">
+                              No hay recordatorios durante el evento
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <!-- Antes/Después del límite -->
+                        <div class="bg-white rounded-lg p-3 border" *ngIf="getTaskReferenceDates().deadline">
+                          <h4 class="font-medium text-amber-600 mb-2 text-center">
+                            <i class="fas fa-flag-checkered mr-1"></i>
+                            Antes/Después del Límite
+                          </h4>
+                          <div class="space-y-1">
+                            <!-- Recordatorios antes del límite -->
+                            <div *ngFor="let item of currentCategorizedReminders.beforeDeadline" 
+                                 class="text-xs p-2 bg-amber-50 rounded border-l-2 border-amber-300">
+                              <div class="font-medium">{{ item.description }}</div>
+                              <div class="text-gray-600">{{ formatReminderDateTime(item.reminder) }}</div>
+                            </div>
+                            <!-- Recordatorios después del límite -->
+                            <div *ngFor="let item of currentCategorizedReminders.afterDeadline" 
+                                 class="text-xs p-2 bg-red-50 rounded border-l-2 border-red-300">
+                              <div class="font-medium">{{ item.description }}</div>
+                              <div class="text-gray-600">{{ formatReminderDateTime(item.reminder) }}</div>
+                            </div>
+                            <div *ngIf="currentCategorizedReminders.beforeDeadline.length === 0 && currentCategorizedReminders.afterDeadline.length === 0" 
+                                 class="text-center text-gray-400 py-2">
+                              No hay recordatorios relacionados con la fecha límite
+                            </div>
+                          </div>
                         </div>
                       </div>
                       
-                      <!-- Mensaje de error individual para este recordatorio -->
-                      <div *ngIf="newTaskReminderErrors[i]" class="bg-red-50 border border-red-200 rounded-lg p-2 mb-2">
-                        <div class="flex items-center">
-                          <i class="fas fa-exclamation-triangle text-red-600 mr-2 text-sm"></i>
-                          <span class="text-red-600 text-xs">{{ newTaskReminderErrors[i] }}</span>
-                        </div>
+                      <!-- Resumen -->
+                      <div class="text-center text-gray-600 text-sm">
+                        Total: {{ newTask.reminders.length }} recordatorio{{ newTask.reminders.length !== 1 ? 's' : '' }}
                       </div>
-                      
-                      <button type="button" (click)="removeReminder(i)" class="text-red-500 hover:text-red-700 text-sm">
-                        <i class="fas fa-trash mr-1"></i>Eliminar recordatorio
-                      </button>
                     </div>
                   </div>
-                  <button type="button" (click)="addReminder()" class="mt-2 px-3 py-1 bg-gray-200 rounded-lg text-sm hover:bg-gray-300 transition-colors">
-                    <i class="fas fa-plus mr-1"></i> Agregar recordatorio
+                  
+                  <!-- Botón para editar recordatorios -->
+                  <button type="button" 
+                          (click)="openRemindersModal('new')" 
+                          class="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors">
+                    <i class="fas fa-edit mr-2"></i>Gestionar Recordatorios
                   </button>
                 </div>
                 
@@ -1060,48 +1107,95 @@ import { CurrentTaskInfoComponent } from './components/current-task-info/current
                 
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Recordatorios</label>
-                  <div #remindersContainer class="space-y-3">
-                    <div *ngFor="let reminder of selectedTask!.reminders; let i = index" class="reminder-item bg-gray-50 p-3 rounded-lg">
-                      <div class="grid grid-cols-2 gap-2 mb-2">
-                        <div>
-                          <label class="block text-xs text-gray-500 mb-1">Fecha</label>
-                          <input 
-                            type="date" 
-                            [(ngModel)]="editTaskReminderDates[i]"
-                            (ngModelChange)="onEditTaskReminderDateChange(i, $event)"
-                            [name]="'editTaskReminderDate' + i"
-                            class="w-full px-3 py-2 border rounded-lg text-sm" 
-                            required>
+                  
+                  <!-- Vista no editable de recordatorios -->
+                  <div class="bg-gray-50 rounded-lg p-4 mb-3">
+                    <div *ngIf="!selectedTask?.reminders || (selectedTask?.reminders?.length ?? 0) === 0" class="text-center text-gray-500 py-4">
+                      <i class="fas fa-bell-slash text-2xl mb-2"></i>
+                      <p>No hay recordatorios configurados</p>
+                    </div>
+                    
+                    <div *ngIf="selectedTask?.reminders && (selectedTask?.reminders?.length ?? 0) > 0" class="space-y-4">
+                      <!-- Tabla de recordatorios categorizados -->
+                      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        
+                        <!-- Antes del inicio -->
+                        <div class="bg-white rounded-lg p-3 border">
+                          <h4 class="font-medium text-indigo-600 mb-2 text-center">
+                            <i class="fas fa-clock mr-1"></i>
+                            Antes del Inicio
+                          </h4>
+                          <div class="space-y-1">
+                            <div *ngFor="let item of currentCategorizedReminders.beforeStart" 
+                                 class="text-xs p-2 bg-indigo-50 rounded border-l-2 border-indigo-300">
+                              <div class="font-medium">{{ item.description }}</div>
+                              <div class="text-gray-600">{{ formatReminderDateTime(item.reminder) }}</div>
+                            </div>
+                            <div *ngIf="currentCategorizedReminders.beforeStart.length === 0" 
+                                 class="text-center text-gray-400 py-2">
+                              No hay recordatorios antes del inicio
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <label class="block text-xs text-gray-500 mb-1">Hora</label>
-                          <app-mui-time-picker
-                            [(ngModel)]="editTaskReminderTimes[i]"
-                            (timeChange)="onEditTaskReminderTimeChange(i, $event)"
-                            [name]="'editTaskReminderTime' + i"
-                            label="Hora del recordatorio"
-                            placeholder="HH:MM"
-                            referenceTime="{{ getCurrentTime() }}"
-                            referenceLabel="Hora actual">
-                          </app-mui-time-picker>
+                        
+                        <!-- Durante el evento -->
+                        <div class="bg-white rounded-lg p-3 border">
+                          <h4 class="font-medium text-green-600 mb-2 text-center">
+                            <i class="fas fa-play-circle mr-1"></i>
+                            Durante el Evento
+                          </h4>
+                          <div class="space-y-1">
+                            <div *ngFor="let item of currentCategorizedReminders.duringEvent" 
+                                 class="text-xs p-2 bg-green-50 rounded border-l-2 border-green-300">
+                              <div class="font-medium">{{ item.description }}</div>
+                              <div class="text-gray-600">{{ formatReminderDateTime(item.reminder) }}</div>
+                            </div>
+                            <div *ngIf="currentCategorizedReminders.duringEvent.length === 0" 
+                                 class="text-center text-gray-400 py-2">
+                              No hay recordatorios durante el evento
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <!-- Antes/Después del límite -->
+                        <div class="bg-white rounded-lg p-3 border" *ngIf="getTaskReferenceDates().deadline">
+                          <h4 class="font-medium text-amber-600 mb-2 text-center">
+                            <i class="fas fa-flag-checkered mr-1"></i>
+                            Antes/Después del Límite
+                          </h4>
+                          <div class="space-y-1">
+                            <!-- Recordatorios antes del límite -->
+                            <div *ngFor="let item of currentCategorizedReminders.beforeDeadline" 
+                                 class="text-xs p-2 bg-amber-50 rounded border-l-2 border-amber-300">
+                              <div class="font-medium">{{ item.description }}</div>
+                              <div class="text-gray-600">{{ formatReminderDateTime(item.reminder) }}</div>
+                            </div>
+                            <!-- Recordatorios después del límite -->
+                            <div *ngFor="let item of currentCategorizedReminders.afterDeadline" 
+                                 class="text-xs p-2 bg-red-50 rounded border-l-2 border-red-300">
+                              <div class="font-medium">{{ item.description }}</div>
+                              <div class="text-gray-600">{{ formatReminderDateTime(item.reminder) }}</div>
+                            </div>
+                            <div *ngIf="currentCategorizedReminders.beforeDeadline.length === 0 && currentCategorizedReminders.afterDeadline.length === 0" 
+                                 class="text-center text-gray-400 py-2">
+                              No hay recordatorios relacionados con la fecha límite
+                            </div>
+                          </div>
                         </div>
                       </div>
                       
-                      <!-- Mensaje de error individual para este recordatorio -->
-                      <div *ngIf="editTaskReminderErrors[i]" class="bg-red-50 border border-red-200 rounded-lg p-2 mb-2">
-                        <div class="flex items-center">
-                          <i class="fas fa-exclamation-triangle text-red-600 mr-2 text-sm"></i>
-                          <span class="text-red-600 text-xs">{{ editTaskReminderErrors[i] }}</span>
-                        </div>
+                      <!-- Resumen -->
+                      <div class="text-center text-gray-600 text-sm">
+                        Total: {{ selectedTask?.reminders?.length || 0 }} recordatorio{{ (selectedTask?.reminders?.length || 0) !== 1 ? 's' : '' }}
                       </div>
-                      
-                      <button type="button" (click)="removeReminder(i)" class="text-red-500 hover:text-red-700 text-sm">
-                        <i class="fas fa-trash mr-1"></i>Eliminar recordatorio
-                      </button>
                     </div>
                   </div>
-                  <button type="button" (click)="addReminder()" class="mt-2 px-3 py-1 bg-gray-200 rounded-lg text-sm hover:bg-gray-300 transition-colors">
-                    <i class="fas fa-plus mr-1"></i> Agregar recordatorio
+                  
+                  <!-- Botón para editar recordatorios -->
+                  <button type="button" 
+                          (click)="openRemindersModal('edit')" 
+                          class="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors">
+                    <i class="fas fa-edit mr-2"></i>Gestionar Recordatorios
                   </button>
                 </div>
                 
@@ -1275,7 +1369,409 @@ import { CurrentTaskInfoComponent } from './components/current-task-info/current
           </div>
         </div>
       </div>
-    </div>
+
+      <!-- Modal de Gestión de Recordatorios -->
+      <div *ngIf="showRemindersModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[95vh] overflow-hidden flex flex-col">
+          <!-- Modal Header -->
+          <div class="bg-indigo-600 text-white p-6 flex-shrink-0">
+            <div class="flex justify-between items-center">
+              <div>
+                <h2 class="text-2xl font-bold">Gestión de Recordatorios</h2>
+                <p class="mt-2 text-indigo-100">Aquí puedes agregar, editar y organizar tus recordatorios</p>
+              </div>
+              <button (click)="closeRemindersModal()" class="text-white hover:text-indigo-200 transition">
+                <i class="fas fa-times text-xl"></i>
+              </button>
+            </div>
+          </div>
+          
+          <!-- Modal Body -->
+          <div class="flex-1 overflow-y-auto p-6">
+            <!-- Fechas recibidas -->
+            <div class="mb-6 bg-gray-50 p-4 rounded-lg">
+              <h3 class="font-medium text-gray-700 mb-2">Fechas del evento:</h3>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <div class="bg-white p-3 rounded border">
+                  <p class="text-sm text-gray-500">Inicio</p>
+                  <p class="font-medium">{{ getTaskReferenceDates().start ? formatReminderDateTime(getTaskReferenceDates().start!) : 'No establecido' }}</p>
+                </div>
+                <div class="bg-white p-3 rounded border">
+                  <p class="text-sm text-gray-500">Final</p>
+                  <p class="font-medium">{{ getTaskReferenceDates().end ? formatReminderDateTime(getTaskReferenceDates().end!) : 'No establecido' }}</p>
+                </div>
+                <div class="bg-white p-3 rounded border">
+                  <p class="text-sm text-gray-500">Límite</p>
+                  <p class="font-medium">{{ getTaskReferenceDates().deadline ? formatReminderDateTime(getTaskReferenceDates().deadline!) : 'Sin límite' }}</p>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Opciones para agregar recordatorios -->
+            <div class="mb-6">
+              <h3 class="font-medium text-gray-700 mb-3">Agregar nuevo recordatorio:</h3>
+              
+              <!-- Tabs para seleccionar método -->
+              <div class="flex border-b border-gray-200 mb-4 overflow-x-auto">
+                <button 
+                  (click)="setRemindersTab('relative')"
+                  [class.bg-indigo-600]="remindersActiveTab === 'relative'"
+                  [class.text-white]="remindersActiveTab === 'relative'"
+                  [class.border-indigo-600]="remindersActiveTab === 'relative'"
+                  [class.text-gray-500]="remindersActiveTab !== 'relative'"
+                  [class.hover:text-gray-700]="remindersActiveTab !== 'relative'"
+                  class="px-4 py-2 font-medium border-b-2 whitespace-nowrap transition-colors">
+                  Relativo a fechas
+                </button>
+                <button 
+                  (click)="setRemindersTab('now')"
+                  [class.bg-indigo-600]="remindersActiveTab === 'now'"
+                  [class.text-white]="remindersActiveTab === 'now'"
+                  [class.border-indigo-600]="remindersActiveTab === 'now'"
+                  [class.text-gray-500]="remindersActiveTab !== 'now'"
+                  [class.hover:text-gray-700]="remindersActiveTab !== 'now'"
+                  class="px-4 py-2 font-medium border-b-2 whitespace-nowrap transition-colors">
+                  Desde ahora
+                </button>
+                <button 
+                  (click)="setRemindersTab('ai')"
+                  [class.bg-indigo-600]="remindersActiveTab === 'ai'"
+                  [class.text-white]="remindersActiveTab === 'ai'"
+                  [class.border-indigo-600]="remindersActiveTab === 'ai'"
+                  [class.text-gray-500]="remindersActiveTab !== 'ai'"
+                  [class.hover:text-gray-700]="remindersActiveTab !== 'ai'"
+                  class="px-4 py-2 font-medium border-b-2 whitespace-nowrap transition-colors">
+                  Con IA
+                </button>
+                <button 
+                  (click)="setRemindersTab('manual')"
+                  [class.bg-indigo-600]="remindersActiveTab === 'manual'"
+                  [class.text-white]="remindersActiveTab === 'manual'"
+                  [class.border-indigo-600]="remindersActiveTab === 'manual'"
+                  [class.text-gray-500]="remindersActiveTab !== 'manual'"
+                  [class.hover:text-gray-700]="remindersActiveTab !== 'manual'"
+                  class="px-4 py-2 font-medium border-b-2 whitespace-nowrap transition-colors">
+                  Manual
+                </button>
+              </div>
+              
+              <!-- Contenido de los tabs -->
+              <div *ngIf="remindersActiveTab === 'relative'" class="space-y-4">
+                <div class="bg-blue-50 p-3 rounded-lg">
+                  <p class="text-sm text-blue-700">
+                    <i class="fas fa-info-circle mr-1"></i> 
+                    Puedes crear recordatorios relativos a las fechas del evento. Ejemplos: "15" (minutos), "2h" (horas), "5*5" (25 minutos), "(2*3)h" (6 horas).
+                  </p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Selecciona fecha de referencia:</label>
+                    <select [(ngModel)]="reminderRelativeReference" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                      <option value="start">Hora de inicio</option>
+                      <option value="end">Hora de finalización</option>
+                      <option value="deadline" *ngIf="getTaskReferenceDates().deadline">Hora límite</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Tiempo relativo:</label>
+                    <div class="flex">
+                      <select [(ngModel)]="reminderRelativeDirection" class="rounded-l-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 w-24">
+                        <option value="before">Antes</option>
+                        <option value="after">Después</option>
+                      </select>
+                      <input 
+                        type="text" 
+                        [(ngModel)]="reminderRelativeTime"
+                        class="flex-1 rounded-r-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" 
+                        placeholder="Ej: 15, 2h, 5*5">
+                    </div>
+                  </div>
+                </div>
+                <div *ngIf="reminderRelativeError" class="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <div class="flex items-center">
+                    <i class="fas fa-exclamation-triangle text-red-600 mr-2"></i>
+                    <span class="text-red-600 text-sm">{{ reminderRelativeError }}</span>
+                  </div>
+                </div>
+                <button (click)="addRelativeReminder()" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition">
+                  Agregar Recordatorio
+                </button>
+              </div>
+              
+              <div *ngIf="remindersActiveTab === 'now'" class="space-y-4">
+                <div class="bg-blue-50 p-3 rounded-lg">
+                  <p class="text-sm text-blue-700">
+                    <i class="fas fa-info-circle mr-1"></i> 
+                    Crea recordatorios basados en el tiempo actual. Ejemplo: "30" para 30 minutos desde ahora.
+                  </p>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <select [(ngModel)]="reminderFromNowDirection" class="rounded-l-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 w-24">
+                    <option value="in">En</option>
+                    <option value="before">Antes</option>
+                    <option value="after">Después</option>
+                  </select>
+                  <input 
+                    type="text" 
+                    [(ngModel)]="reminderFromNowTime"
+                    class="flex-1 border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 rounded-md" 
+                    placeholder="Ej: 30, 1h, (2*30)">
+                  <button (click)="addFromNowReminder()" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition">
+                    Agregar
+                  </button>
+                </div>
+                <div *ngIf="reminderFromNowError" class="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <div class="flex items-center">
+                    <i class="fas fa-exclamation-triangle text-red-600 mr-2"></i>
+                    <span class="text-red-600 text-sm">{{ reminderFromNowError }}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div *ngIf="remindersActiveTab === 'ai'" class="space-y-4">
+                <div class="bg-blue-50 p-3 rounded-lg">
+                  <p class="text-sm text-blue-700">
+                    <i class="fas fa-info-circle mr-1"></i> 
+                    Describe tu recordatorio en lenguaje natural y nuestra IA lo interpretará. Ejemplo: "15 minutos antes del inicio y 1 hora después del final".
+                  </p>
+                </div>
+                <textarea 
+                  [(ngModel)]="reminderAiInput"
+                  class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" 
+                  rows="3" 
+                  placeholder="Escribe tu recordatorio..."></textarea>
+                <div *ngIf="reminderAiError" class="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <div class="flex items-center">
+                    <i class="fas fa-exclamation-triangle text-red-600 mr-2"></i>
+                    <span class="text-red-600 text-sm">{{ reminderAiError }}</span>
+                  </div>
+                </div>
+                <button (click)="processAiReminder()" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition flex items-center">
+                  <i class="fas fa-magic mr-2"></i> Interpretar con IA
+                </button>
+              </div>
+              
+              <div *ngIf="remindersActiveTab === 'manual'" class="space-y-4">
+                <div class="bg-blue-50 p-3 rounded-lg">
+                  <p class="text-sm text-blue-700">
+                    <i class="fas fa-info-circle mr-1"></i> 
+                    Selecciona manualmente la fecha y hora exacta para tu recordatorio.
+                  </p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Fecha:</label>
+                    <input 
+                      type="date" 
+                      [(ngModel)]="reminderManualDate"
+                      class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Hora:</label>
+                    <input 
+                      type="time" 
+                      [(ngModel)]="reminderManualTime"
+                      class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                  </div>
+                </div>
+                <div *ngIf="reminderManualError" class="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <div class="flex items-center">
+                    <i class="fas fa-exclamation-triangle text-red-600 mr-2"></i>
+                    <span class="text-red-600 text-sm">{{ reminderManualError }}</span>
+                  </div>
+                </div>
+                <button (click)="addManualReminder()" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition">
+                  Agregar Recordatorio
+                </button>
+              </div>
+            </div>
+            
+            <!-- Lista de recordatorios -->
+            <div>
+              <h3 class="font-medium text-gray-700 mb-3">Tus recordatorios:</h3>
+              
+              <!-- Mensaje cuando no hay recordatorios -->
+              <div *ngIf="(remindersModalContext === 'new' ? (newTask.reminders?.length || 0) : (selectedTask?.reminders?.length || 0)) === 0" 
+                   class="bg-gray-50 rounded-lg p-8 text-center">
+                <i class="fas fa-bell-slash text-4xl text-gray-300 mb-3"></i>
+                <p class="text-gray-500 mb-2">No tienes recordatorios configurados</p>
+                <p class="text-sm text-gray-400">Usa las opciones de arriba para agregar tu primer recordatorio</p>
+              </div>
+              
+              <!-- Recordatorios antes del inicio -->
+              <ng-container *ngIf="getCategorizedReminders().beforeStart.length > 0">
+                <div class="section-divider mb-4">
+                  <div class="relative">
+                    <div class="absolute inset-0 flex items-center" aria-hidden="true">
+                      <div class="w-full border-t border-gray-300"></div>
+                    </div>
+                    <div class="relative flex justify-center">
+                      <span class="bg-white px-3 text-sm font-medium text-gray-500">ANTES DEL INICIO</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="space-y-2 mb-6">
+                  <div *ngFor="let item of getCategorizedReminders().beforeStart; let i = index" 
+                       class="reminder-item bg-white border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start">
+                      <div>
+                        <p class="font-medium">{{ item.description }}</p>
+                        <p class="text-sm text-gray-500">{{ formatReminderDateTime(item.reminder) }}</p>
+                      </div>
+                      <div class="flex space-x-2">
+                        <button 
+                          (click)="editReminder(item.index)" 
+                          class="text-gray-400 hover:text-indigo-600 transition" 
+                          title="Editar">
+                          <i class="fas fa-edit"></i>
+                        </button>
+                        <button 
+                          (click)="cloneReminder(item.index)" 
+                          class="text-gray-400 hover:text-indigo-600 transition" 
+                          title="Clonar">
+                          <i class="fas fa-copy"></i>
+                        </button>
+                        <button 
+                          (click)="deleteReminder(item.index)" 
+                          class="text-gray-400 hover:text-red-600 transition" 
+                          title="Eliminar">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </ng-container>
+              
+              <!-- Recordatorios durante el evento -->
+              <ng-container *ngIf="getCategorizedReminders().duringEvent.length > 0">
+                <div class="section-divider mb-4">
+                  <div class="relative">
+                    <div class="absolute inset-0 flex items-center" aria-hidden="true">
+                      <div class="w-full border-t border-gray-300"></div>
+                    </div>
+                    <div class="relative flex justify-center">
+                      <span class="bg-white px-3 text-sm font-medium text-gray-500">
+                        DURANTE EL EVENTO
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="space-y-2 mb-6">
+                  <div *ngFor="let item of getCategorizedReminders().duringEvent; let i = index" 
+                       class="reminder-item bg-white border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start">
+                      <div>
+                        <p class="font-medium">{{ item.description }}</p>
+                        <p class="text-sm text-gray-500">{{ formatReminderDateTime(item.reminder) }}</p>
+                      </div>
+                      <div class="flex space-x-2">
+                        <button 
+                          (click)="editReminder(item.index)" 
+                          class="text-gray-400 hover:text-indigo-600 transition" 
+                          title="Editar">
+                          <i class="fas fa-edit"></i>
+                        </button>
+                        <button 
+                          (click)="cloneReminder(item.index)" 
+                          class="text-gray-400 hover:text-indigo-600 transition" 
+                          title="Clonar">
+                          <i class="fas fa-copy"></i>
+                        </button>
+                        <button 
+                          (click)="deleteReminder(item.index)" 
+                          class="text-gray-400 hover:text-red-600 transition" 
+                          title="Eliminar">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </ng-container>
+              
+              <!-- Recordatorios relacionados con la fecha límite -->
+              <ng-container *ngIf="getTaskReferenceDates().deadline && (getCategorizedReminders().beforeDeadline.length > 0 || getCategorizedReminders().afterDeadline.length > 0)">
+                <div class="section-divider mb-4">
+                  <div class="relative">
+                    <div class="absolute inset-0 flex items-center" aria-hidden="true">
+                      <div class="w-full border-t border-gray-300"></div>
+                    </div>
+                    <div class="relative flex justify-center">
+                      <span class="bg-white px-3 text-sm font-medium text-gray-500">ANTES DEL LÍMITE / DESPUÉS DEL LÍMITE</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="space-y-2">
+                  <!-- Recordatorios antes del límite -->
+                  <div *ngFor="let item of getCategorizedReminders().beforeDeadline; let i = index" 
+                       class="reminder-item bg-white border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start">
+                      <div>
+                        <p class="font-medium">{{ item.description }}</p>
+                        <p class="text-sm text-gray-500">{{ formatReminderDateTime(item.reminder) }}</p>
+                      </div>
+                      <div class="flex space-x-2">
+                        <button 
+                          (click)="editReminder(item.index)" 
+                          class="text-gray-400 hover:text-indigo-600 transition" 
+                          title="Editar">
+                          <i class="fas fa-edit"></i>
+                        </button>
+                        <button 
+                          (click)="cloneReminder(item.index)" 
+                          class="text-gray-400 hover:text-indigo-600 transition" 
+                          title="Clonar">
+                          <i class="fas fa-copy"></i>
+                        </button>
+                        <button 
+                          (click)="deleteReminder(item.index)" 
+                          class="text-gray-400 hover:text-red-600 transition" 
+                          title="Eliminar">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Recordatorios después del límite -->
+                  <div *ngFor="let item of getCategorizedReminders().afterDeadline; let i = index" 
+                       class="reminder-item bg-white border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start">
+                      <div>
+                        <p class="font-medium">{{ item.description }}</p>
+                        <p class="text-sm text-gray-500">{{ formatReminderDateTime(item.reminder) }}</p>
+                      </div>
+                      <div class="flex space-x-2">
+                        <button 
+                          (click)="editReminder(item.index)" 
+                          class="text-gray-400 hover:text-indigo-600 transition" 
+                          title="Editar">
+                          <i class="fas fa-edit"></i>
+                        </button>
+                        <button 
+                          (click)="cloneReminder(item.index)" 
+                          class="text-gray-400 hover:text-indigo-600 transition" 
+                          title="Clonar">
+                          <i class="fas fa-copy"></i>
+                        </button>
+                        <button 
+                          (click)="deleteReminder(item.index)" 
+                          class="text-gray-400 hover:text-red-600 transition" 
+                          title="Eliminar">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </ng-container>
+            </div>
+          </div>
+        </div>
+      </div>
   `,
   styles: [`
     .priority-low { background-color: #4caf50; }
@@ -1721,6 +2217,27 @@ export class TaskTrackerComponent implements OnInit {
   editTaskReminderTimes: string[] = [];
   newTaskReminderErrors: string[] = [];
   editTaskReminderErrors: string[] = [];
+
+  // Modal de gestión de recordatorios
+  showRemindersModal = false;
+  remindersModalContext: 'new' | 'edit' = 'new';
+  remindersActiveTab: 'relative' | 'now' | 'ai' | 'manual' = 'relative';
+  
+  // Campos para agregar recordatorios
+  reminderRelativeReference: 'start' | 'end' | 'deadline' = 'start';
+  reminderRelativeDirection: 'before' | 'after' = 'before';
+  reminderRelativeTime = '';
+  reminderFromNowDirection: 'in' | 'before' | 'after' = 'in';
+  reminderFromNowTime = '';
+  reminderAiInput = '';
+  reminderManualDate = '';
+  reminderManualTime = '';
+  
+  // Errores y estados
+  reminderRelativeError = '';
+  reminderFromNowError = '';
+  reminderAiError = '';
+  reminderManualError = '';
 
   constructor(
     private authService: AuthService,
@@ -3684,5 +4201,486 @@ export class TaskTrackerComponent implements OnInit {
 
     this.editTaskReminderErrors[index] = '';
     return true;
+  }
+
+  // Métodos para modal de recordatorios
+  openRemindersModal(context: 'new' | 'edit') {
+    this.remindersModalContext = context;
+    this.showRemindersModal = true;
+    this.resetReminderInputs();
+  }
+
+  closeRemindersModal() {
+    this.showRemindersModal = false;
+    this.resetReminderInputs();
+  }
+
+  setRemindersTab(tab: 'relative' | 'now' | 'ai' | 'manual') {
+    this.remindersActiveTab = tab;
+    this.resetReminderInputs();
+  }
+
+  private resetReminderInputs() {
+    this.reminderRelativeTime = '';
+    this.reminderFromNowTime = '';
+    this.reminderAiInput = '';
+    this.reminderManualDate = '';
+    this.reminderManualTime = '';
+    this.reminderRelativeError = '';
+    this.reminderFromNowError = '';
+    this.reminderAiError = '';
+    this.reminderManualError = '';
+  }
+
+  // Obtener fechas de referencia para el modal
+  getTaskReferenceDates() {
+    if (this.remindersModalContext === 'new') {
+      return {
+        start: this.newTask.start,
+        end: this.newTask.end,
+        deadline: this.newTask.deadline
+      };
+    } else {
+      return {
+        start: this.selectedTask?.start,
+        end: this.selectedTask?.end,
+        deadline: this.selectedTask?.deadline
+      };
+    }
+  }
+
+  // Categorizar recordatorios
+  getCategorizedReminders() {
+    const reminders = this.remindersModalContext === 'new' 
+      ? this.newTask.reminders || []
+      : this.selectedTask?.reminders || [];
+    
+    const dates = this.getTaskReferenceDates();
+    // Asegurar que todas las fechas se interpreten como UTC
+    const startDate = dates.start ? new Date(dates.start + (dates.start.includes('Z') ? '' : 'Z')) : null;
+    const endDate = dates.end ? new Date(dates.end + (dates.end.includes('Z') ? '' : 'Z')) : null;
+    const deadlineDate = dates.deadline ? new Date(dates.deadline + (dates.deadline.includes('Z') ? '' : 'Z')) : null;
+
+    const categorized = {
+      beforeStart: [] as Array<{reminder: string, index: number, description: string}>,
+      duringEvent: [] as Array<{reminder: string, index: number, description: string}>,
+      beforeDeadline: [] as Array<{reminder: string, index: number, description: string}>,
+      afterDeadline: [] as Array<{reminder: string, index: number, description: string}>
+    };
+
+    reminders.forEach((reminder, index) => {
+      // Asegurar que el recordatorio se interprete como UTC
+      const reminderDate = new Date(reminder + (reminder.includes('Z') ? '' : 'Z'));
+      const description = this.generateReminderDescription(reminderDate, dates);
+      
+      if (startDate && reminderDate < startDate) {
+        // Antes del inicio del evento
+        categorized.beforeStart.push({reminder, index, description});
+      } else if (endDate && reminderDate <= endDate) {
+        // Durante el evento (entre inicio y fin)
+        categorized.duringEvent.push({reminder, index, description});
+      } else if (deadlineDate && endDate && reminderDate > endDate && reminderDate <= deadlineDate) {
+        // Entre el fin del evento y la fecha límite
+        categorized.beforeDeadline.push({reminder, index, description});
+      } else if (deadlineDate && reminderDate > deadlineDate) {
+        // Después de la fecha límite
+        categorized.afterDeadline.push({reminder, index, description});
+      } else {
+        // Si no hay fecha límite pero está después del fin, va a "durante el evento"
+        categorized.duringEvent.push({reminder, index, description});
+      }
+    });
+
+    return categorized;
+  }
+
+  // Getter para vista de recordatorios - maneja contexto actual automáticamente
+  get currentCategorizedReminders() {
+    if (this.showRemindersModal) {
+      return this.getCategorizedReminders();
+    }
+    
+    // Para las vistas principales, determinar contexto según modal activo
+    if (this.showEditTaskModal && this.selectedTask?.reminders) {
+      this.remindersModalContext = 'edit';
+      return this.getCategorizedReminders();
+    } else if (this.showNewTaskModal && this.newTask.reminders) {
+      this.remindersModalContext = 'new';
+      return this.getCategorizedReminders();
+    }
+    
+    // Valor por defecto si no hay contexto válido
+    return {
+      beforeStart: [],
+      duringEvent: [],
+      beforeDeadline: [],
+      afterDeadline: []
+    };
+  }
+
+  private generateReminderDescription(reminderDate: Date, dates: any): string {
+    // Asegurar que todas las fechas se interpreten como UTC
+    const startDate = dates.start ? new Date(dates.start + (dates.start.includes('Z') ? '' : 'Z')) : null;
+    const endDate = dates.end ? new Date(dates.end + (dates.end.includes('Z') ? '' : 'Z')) : null;
+    const deadlineDate = dates.deadline ? new Date(dates.deadline + (dates.deadline.includes('Z') ? '' : 'Z')) : null;
+
+    // Si hay fecha límite y el recordatorio está después del fin del evento, 
+    // calcular en relación a la fecha límite
+    if (deadlineDate && endDate && reminderDate > endDate) {
+      if (reminderDate <= deadlineDate) {
+        const diffMinutes = Math.floor((deadlineDate.getTime() - reminderDate.getTime()) / (1000 * 60));
+        return this.formatTimeDifference(diffMinutes, 'antes del límite');
+      } else {
+        const diffMinutes = Math.floor((reminderDate.getTime() - deadlineDate.getTime()) / (1000 * 60));
+        return this.formatTimeDifference(diffMinutes, 'después del límite');
+      }
+    }
+    
+    // Lógica original para otros casos
+    if (startDate && reminderDate < startDate) {
+      const diffMinutes = Math.floor((startDate.getTime() - reminderDate.getTime()) / (1000 * 60));
+      return this.formatTimeDifference(diffMinutes, 'antes del inicio');
+    } else if (endDate && reminderDate > endDate && !deadlineDate) {
+      // Solo usar "después del final" si NO hay fecha límite
+      const diffMinutes = Math.floor((reminderDate.getTime() - endDate.getTime()) / (1000 * 60));
+      return this.formatTimeDifference(diffMinutes, 'después del final');
+    } else if (startDate) {
+      const diffMinutes = Math.floor((reminderDate.getTime() - startDate.getTime()) / (1000 * 60));
+      return this.formatTimeDifference(Math.abs(diffMinutes), diffMinutes >= 0 ? 'después del inicio' : 'antes del inicio');
+    }
+    
+    return 'Recordatorio personalizado';
+  }
+
+  private formatTimeDifference(minutes: number, context: string): string {
+    if (minutes < 60) {
+      return `${minutes} minutos ${context}`;
+    } else if (minutes < 1440) {
+      const hours = Math.floor(minutes / 60);
+      const remainingMinutes = minutes % 60;
+      if (remainingMinutes === 0) {
+        return `${hours} hora${hours > 1 ? 's' : ''} ${context}`;
+      } else {
+        return `${hours}h ${remainingMinutes}m ${context}`;
+      }
+    } else {
+      const days = Math.floor(minutes / 1440);
+      const remainingHours = Math.floor((minutes % 1440) / 60);
+      if (remainingHours === 0) {
+        return `${days} día${days > 1 ? 's' : ''} ${context}`;
+      } else {
+        return `${days}d ${remainingHours}h ${context}`;
+      }
+    }
+  }
+
+  // Métodos para agregar recordatorios desde el modal especializado
+  addRelativeReminder() {
+    try {
+      const dates = this.getTaskReferenceDates();
+      const referenceDate = dates[this.reminderRelativeReference];
+      
+      if (!referenceDate) {
+        this.reminderRelativeError = 'Fecha de referencia no disponible';
+        return;
+      }
+
+      const minutes = this.parseTimeExpression(this.reminderRelativeTime);
+      if (minutes === null) {
+        this.reminderRelativeError = 'Formato de tiempo inválido';
+        return;
+      }
+
+      // Asegurar que la fecha de referencia se interprete como UTC
+      const baseDate = new Date(referenceDate + (referenceDate.includes('Z') ? '' : 'Z'));
+      const reminderDate = new Date(baseDate.getTime() + 
+        (this.reminderRelativeDirection === 'before' ? -minutes : minutes) * 60 * 1000);
+
+      // Validar que el recordatorio no sea en el pasado
+      const now = new Date();
+      if (reminderDate < now) {
+        this.reminderRelativeError = 'El recordatorio calculado está en el pasado. Por favor, ajusta el tiempo para que sea en el futuro.';
+        return;
+      }
+
+      this.addReminderToCurrentContext(reminderDate);
+      this.reminderRelativeTime = '';
+      this.reminderRelativeError = '';
+    } catch (error) {
+      this.reminderRelativeError = 'Error al calcular el recordatorio';
+    }
+  }
+
+  addFromNowReminder() {
+    try {
+      const minutes = this.parseTimeExpression(this.reminderFromNowTime);
+      if (minutes === null) {
+        this.reminderFromNowError = 'Formato de tiempo inválido';
+        return;
+      }
+
+      const now = new Date();
+      let reminderDate: Date;
+
+      switch (this.reminderFromNowDirection) {
+        case 'in':
+          reminderDate = new Date(now.getTime() + minutes * 60 * 1000);
+          break;
+        case 'before':
+          reminderDate = new Date(now.getTime() - minutes * 60 * 1000);
+          break;
+        case 'after':
+          reminderDate = new Date(now.getTime() + minutes * 60 * 1000);
+          break;
+        default:
+          reminderDate = new Date(now.getTime() + minutes * 60 * 1000);
+      }
+
+      // Validar que el recordatorio no sea en el pasado
+      if (reminderDate < now) {
+        this.reminderFromNowError = 'El recordatorio no puede ser en el pasado. Por favor, usa "En" con un tiempo positivo.';
+        return;
+      }
+
+      this.addReminderToCurrentContext(reminderDate);
+      this.reminderFromNowTime = '';
+      this.reminderFromNowError = '';
+    } catch (error) {
+      this.reminderFromNowError = 'Error al calcular el recordatorio';
+    }
+  }
+
+  addManualReminder() {
+    try {
+      if (!this.reminderManualDate || !this.reminderManualTime) {
+        this.reminderManualError = 'Fecha y hora son requeridos';
+        return;
+      }
+
+      // Crear fecha directamente en zona horaria local sin conversión
+      const [hours, minutes] = this.reminderManualTime.split(':');
+      const year = parseInt(this.reminderManualDate.substring(0, 4));
+      const month = parseInt(this.reminderManualDate.substring(5, 7)) - 1; // Meses en JS son 0-11
+      const day = parseInt(this.reminderManualDate.substring(8, 10));
+      
+      const reminderDate = new Date(year, month, day, parseInt(hours), parseInt(minutes), 0, 0);
+      
+      // Validar que el recordatorio no sea en el pasado
+      const now = new Date();
+      if (reminderDate < now) {
+        this.reminderManualError = 'El recordatorio no puede ser en el pasado. Por favor, selecciona una fecha y hora futura.';
+        return;
+      }
+      
+      this.addReminderToCurrentContext(reminderDate);
+      this.reminderManualDate = '';
+      this.reminderManualTime = '';
+      this.reminderManualError = '';
+    } catch (error) {
+      this.reminderManualError = 'Fecha u hora inválidas';
+    }
+  }
+
+  processAiReminder() {
+    // Por ahora, implementaremos un parsing básico de lenguaje natural
+    try {
+      const input = this.reminderAiInput.toLowerCase().trim();
+      const dates = this.getTaskReferenceDates();
+      
+      // Patrones básicos de reconocimiento
+      const patterns = [
+        {
+          regex: /(\d+)\s*(minuto|minutos|min|m)\s*(antes|después)\s*del?\s*(inicio|final|límite)/,
+          handler: (matches: RegExpMatchArray) => {
+            const minutes = parseInt(matches[1]);
+            const direction = matches[3] === 'antes' ? 'before' : 'after';
+            const reference = matches[4] === 'inicio' ? 'start' : 
+                            matches[4] === 'final' ? 'end' : 'deadline';
+            
+            const refDate = dates[reference as keyof typeof dates];
+            if (!refDate) throw new Error('Fecha de referencia no encontrada');
+            
+            // Asegurar que la fecha se interprete como UTC
+            const baseDate = new Date(refDate + (refDate.includes('Z') ? '' : 'Z'));
+            return new Date(baseDate.getTime() + 
+              (direction === 'before' ? -minutes : minutes) * 60 * 1000);
+          }
+        },
+        {
+          regex: /(\d+)\s*(hora|horas|h)\s*(antes|después)\s*del?\s*(inicio|final|límite)/,
+          handler: (matches: RegExpMatchArray) => {
+            const hours = parseInt(matches[1]);
+            const direction = matches[3] === 'antes' ? 'before' : 'after';
+            const reference = matches[4] === 'inicio' ? 'start' : 
+                            matches[4] === 'final' ? 'end' : 'deadline';
+            
+            const refDate = dates[reference as keyof typeof dates];
+            if (!refDate) throw new Error('Fecha de referencia no encontrada');
+            
+            // Asegurar que la fecha se interprete como UTC
+            const baseDate = new Date(refDate + (refDate.includes('Z') ? '' : 'Z'));
+            return new Date(baseDate.getTime() + 
+              (direction === 'before' ? -hours : hours) * 60 * 60 * 1000);
+          }
+        }
+      ];
+
+      let reminderDate: Date | null = null;
+      
+      for (const pattern of patterns) {
+        const matches = input.match(pattern.regex);
+        if (matches) {
+          reminderDate = pattern.handler(matches);
+          break;
+        }
+      }
+
+      if (!reminderDate) {
+        this.reminderAiError = 'No se pudo interpretar el recordatorio. Intenta con: "15 minutos antes del inicio"';
+        return;
+      }
+
+      // Validar que el recordatorio no sea en el pasado
+      const now = new Date();
+      if (reminderDate < now) {
+        this.reminderAiError = 'El recordatorio interpretado está en el pasado. Por favor, especifica un recordatorio futuro.';
+        return;
+      }
+
+      this.addReminderToCurrentContext(reminderDate);
+      this.reminderAiInput = '';
+      this.reminderAiError = '';
+    } catch (error) {
+      this.reminderAiError = 'Error al interpretar el recordatorio';
+    }
+  }
+
+  private addReminderToCurrentContext(reminderDate: Date) {
+    const reminderString = reminderDate.toISOString();
+    
+    if (this.remindersModalContext === 'new') {
+      if (!this.newTask.reminders) this.newTask.reminders = [];
+      this.newTask.reminders.push(reminderString);
+      this.newTask.reminders.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+    } else {
+      if (!this.selectedTask!.reminders) this.selectedTask!.reminders = [];
+      this.selectedTask!.reminders.push(reminderString);
+      this.selectedTask!.reminders.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+    }
+  }
+
+  // Parser de expresiones de tiempo con soporte para matemáticas
+  private parseTimeExpression(input: string): number | null {
+    try {
+      let expression = input.trim().toLowerCase();
+      
+      // Reemplazar unidades de tiempo
+      expression = expression.replace(/\s*h\s*/g, '*60');
+      expression = expression.replace(/\s*m\s*/g, '');
+      expression = expression.replace(/\s*min\s*/g, '');
+      expression = expression.replace(/\s*minuto[s]?\s*/g, '');
+      expression = expression.replace(/\s*hora[s]?\s*/g, '*60');
+      
+      // Limpiar espacios
+      expression = expression.replace(/\s+/g, '');
+      
+      // Validar que solo contenga números, operadores y paréntesis
+      if (!/^[\d+\-*/().]+$/.test(expression)) {
+        return null;
+      }
+      
+      // Evaluar la expresión matemática de forma segura
+      const result = this.safeEval(expression);
+      return typeof result === 'number' && !isNaN(result) ? Math.round(result) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private safeEval(expression: string): number {
+    // Implementación segura de evaluación matemática
+    const allowedChars = /^[\d+\-*/().]+$/;
+    if (!allowedChars.test(expression)) {
+      throw new Error('Invalid expression');
+    }
+    
+    try {
+      return Function(`"use strict"; return (${expression})`)();
+    } catch {
+      throw new Error('Evaluation failed');
+    }
+  }
+
+  // Métodos para gestionar recordatorios individuales
+  editReminder(index: number) {
+    const reminders = this.remindersModalContext === 'new' 
+      ? this.newTask.reminders || []
+      : this.selectedTask?.reminders || [];
+    
+    const reminder = reminders[index];
+    if (reminder) {
+      const reminderDate = new Date(reminder);
+      const { date, time } = this.splitDateTime(reminder);
+      
+      this.reminderManualDate = date;
+      this.reminderManualTime = time;
+      this.setRemindersTab('manual');
+      
+      // Eliminar el recordatorio actual para reemplazarlo
+      this.deleteReminder(index);
+    }
+  }
+
+  cloneReminder(index: number) {
+    const reminders = this.remindersModalContext === 'new' 
+      ? this.newTask.reminders || []
+      : this.selectedTask?.reminders || [];
+    
+    const reminder = reminders[index];
+    if (reminder) {
+      // Clonar el recordatorio agregando 5 minutos
+      // Asegurar que la fecha se interprete como UTC
+      const originalDate = new Date(reminder + (reminder.includes('Z') ? '' : 'Z'));
+      const clonedDate = new Date(originalDate.getTime() + 5 * 60 * 1000);
+      this.addReminderToCurrentContext(clonedDate);
+    }
+  }
+
+  deleteReminder(index: number) {
+    if (this.remindersModalContext === 'new') {
+      if (this.newTask.reminders) {
+        this.newTask.reminders.splice(index, 1);
+      }
+    } else {
+      if (this.selectedTask?.reminders) {
+        this.selectedTask.reminders.splice(index, 1);
+      }
+    }
+  }
+
+  formatReminderDateTime(dateTimeString: string): string {
+    // Asegurar que el string se interprete como UTC si no tiene indicador de zona horaria
+    const utcString = dateTimeString.includes('Z') || dateTimeString.includes('+') 
+      ? dateTimeString 
+      : dateTimeString + 'Z';
+    
+    // Crear fecha desde el string UTC
+    const date = new Date(utcString);
+    
+    // Verificar si la fecha es válida
+    if (isNaN(date.getTime())) {
+      return 'Fecha inválida';
+    }
+    
+    // Formatear usando la zona horaria de México con formato de 12 horas
+    return date.toLocaleString('es-MX', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: 'numeric',  // Cambiado de '2-digit' a 'numeric' para formato 12h
+      minute: '2-digit',
+      hour12: true,     // Especificar formato de 12 horas
+      timeZone: 'America/Mexico_City'
+    });
   }
 } 
