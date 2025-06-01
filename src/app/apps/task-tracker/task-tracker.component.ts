@@ -552,15 +552,47 @@ import { CurrentTaskInfoComponent } from './components/current-task-info/current
                 
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Recordatorios</label>
-                  <div #remindersContainer class="space-y-2">
-                    <div *ngFor="let reminder of newTask.reminders; let i = index" class="flex items-center space-x-2">
-                      <input type="datetime-local" [(ngModel)]="newTask.reminders![i]" class="flex-1 px-3 py-2 border rounded-lg">
-                      <button type="button" (click)="removeReminder(i)" class="text-red-500 hover:text-red-700">
-                        <i class="fas fa-trash"></i>
+                  <div #remindersContainer class="space-y-3">
+                    <div *ngFor="let reminder of newTask.reminders; let i = index" class="reminder-item bg-gray-50 p-3 rounded-lg">
+                      <div class="grid grid-cols-2 gap-2 mb-2">
+                        <div>
+                          <label class="block text-xs text-gray-500 mb-1">Fecha</label>
+                          <input 
+                            type="date" 
+                            [(ngModel)]="newTaskReminderDates[i]"
+                            (ngModelChange)="onNewTaskReminderDateChange(i, $event)"
+                            [name]="'newTaskReminderDate' + i"
+                            class="w-full px-3 py-2 border rounded-lg text-sm" 
+                            required>
+                        </div>
+                        <div>
+                          <label class="block text-xs text-gray-500 mb-1">Hora</label>
+                          <app-mui-time-picker
+                            [(ngModel)]="newTaskReminderTimes[i]"
+                            (timeChange)="onNewTaskReminderTimeChange(i, $event)"
+                            [name]="'newTaskReminderTime' + i"
+                            label="Hora del recordatorio"
+                            placeholder="HH:MM"
+                            referenceTime="{{ getCurrentTime() }}"
+                            referenceLabel="Hora actual">
+                          </app-mui-time-picker>
+                        </div>
+                      </div>
+                      
+                      <!-- Mensaje de error individual para este recordatorio -->
+                      <div *ngIf="newTaskReminderErrors[i]" class="bg-red-50 border border-red-200 rounded-lg p-2 mb-2">
+                        <div class="flex items-center">
+                          <i class="fas fa-exclamation-triangle text-red-600 mr-2 text-sm"></i>
+                          <span class="text-red-600 text-xs">{{ newTaskReminderErrors[i] }}</span>
+                        </div>
+                      </div>
+                      
+                      <button type="button" (click)="removeReminder(i)" class="text-red-500 hover:text-red-700 text-sm">
+                        <i class="fas fa-trash mr-1"></i>Eliminar recordatorio
                       </button>
                     </div>
                   </div>
-                  <button type="button" (click)="addReminder()" class="mt-2 px-3 py-1 bg-gray-200 rounded-lg text-sm">
+                  <button type="button" (click)="addReminder()" class="mt-2 px-3 py-1 bg-gray-200 rounded-lg text-sm hover:bg-gray-300 transition-colors">
                     <i class="fas fa-plus mr-1"></i> Agregar recordatorio
                   </button>
                 </div>
@@ -1028,15 +1060,47 @@ import { CurrentTaskInfoComponent } from './components/current-task-info/current
                 
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Recordatorios</label>
-                  <div #remindersContainer class="space-y-2">
-                    <div *ngFor="let reminder of selectedTask!.reminders; let i = index" class="flex items-center space-x-2">
-                      <input type="datetime-local" [(ngModel)]="selectedTask!.reminders![i]" class="flex-1 px-3 py-2 border rounded-lg">
-                      <button type="button" (click)="removeReminder(i)" class="text-red-500 hover:text-red-700">
-                        <i class="fas fa-trash"></i>
+                  <div #remindersContainer class="space-y-3">
+                    <div *ngFor="let reminder of selectedTask!.reminders; let i = index" class="reminder-item bg-gray-50 p-3 rounded-lg">
+                      <div class="grid grid-cols-2 gap-2 mb-2">
+                        <div>
+                          <label class="block text-xs text-gray-500 mb-1">Fecha</label>
+                          <input 
+                            type="date" 
+                            [(ngModel)]="editTaskReminderDates[i]"
+                            (ngModelChange)="onEditTaskReminderDateChange(i, $event)"
+                            [name]="'editTaskReminderDate' + i"
+                            class="w-full px-3 py-2 border rounded-lg text-sm" 
+                            required>
+                        </div>
+                        <div>
+                          <label class="block text-xs text-gray-500 mb-1">Hora</label>
+                          <app-mui-time-picker
+                            [(ngModel)]="editTaskReminderTimes[i]"
+                            (timeChange)="onEditTaskReminderTimeChange(i, $event)"
+                            [name]="'editTaskReminderTime' + i"
+                            label="Hora del recordatorio"
+                            placeholder="HH:MM"
+                            referenceTime="{{ getCurrentTime() }}"
+                            referenceLabel="Hora actual">
+                          </app-mui-time-picker>
+                        </div>
+                      </div>
+                      
+                      <!-- Mensaje de error individual para este recordatorio -->
+                      <div *ngIf="editTaskReminderErrors[i]" class="bg-red-50 border border-red-200 rounded-lg p-2 mb-2">
+                        <div class="flex items-center">
+                          <i class="fas fa-exclamation-triangle text-red-600 mr-2 text-sm"></i>
+                          <span class="text-red-600 text-xs">{{ editTaskReminderErrors[i] }}</span>
+                        </div>
+                      </div>
+                      
+                      <button type="button" (click)="removeReminder(i)" class="text-red-500 hover:text-red-700 text-sm">
+                        <i class="fas fa-trash mr-1"></i>Eliminar recordatorio
                       </button>
                     </div>
                   </div>
-                  <button type="button" (click)="addReminder()" class="mt-2 px-3 py-1 bg-gray-200 rounded-lg text-sm">
+                  <button type="button" (click)="addReminder()" class="mt-2 px-3 py-1 bg-gray-200 rounded-lg text-sm hover:bg-gray-300 transition-colors">
                     <i class="fas fa-plus mr-1"></i> Agregar recordatorio
                   </button>
                 </div>
@@ -1498,6 +1562,30 @@ import { CurrentTaskInfoComponent } from './components/current-task-info/current
       animation: running-pulse 1.5s infinite;
       transform: translateY(-2px);
     }
+
+    .task-running::before {
+      animation: pulse 2s infinite;
+    }
+    
+    .reminder-item {
+      transition: all 0.2s ease;
+    }
+    
+    .reminder-item:hover {
+      background-color: #f3f4f6;
+      border: 1px solid #e5e7eb;
+    }
+    
+    @keyframes pulse {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
+      }
+      50% {
+        transform: scale(1.05);
+        box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.5);
+      }
+    }
   `]
 })
 export class TaskTrackerComponent implements OnInit {
@@ -1625,6 +1713,14 @@ export class TaskTrackerComponent implements OnInit {
   showStatusChangeModal = false;
   pendingStatusChange: { task: Task; status: 'pending' | 'in-progress' | 'completed' } | null = null;
   statusChangeWillHide = false; // Para mostrar diferente mensaje según si va a ocultar o mostrar
+
+  // Propiedades para recordatorios con fecha/hora separadas
+  newTaskReminderDates: string[] = [];
+  newTaskReminderTimes: string[] = [];
+  editTaskReminderDates: string[] = [];
+  editTaskReminderTimes: string[] = [];
+  newTaskReminderErrors: string[] = [];
+  editTaskReminderErrors: string[] = [];
 
   constructor(
     private authService: AuthService,
@@ -1825,6 +1921,11 @@ export class TaskTrackerComponent implements OnInit {
     this.newTaskDeadlineDate = '';
     this.newTaskDeadlineTime = '';
     
+    // Limpiar arrays de recordatorios
+    this.newTaskReminderDates = [];
+    this.newTaskReminderTimes = [];
+    this.newTaskReminderErrors = [];
+    
     this.onNewTaskEnvironmentChange();
     
     // Calcular duración inicial automáticamente
@@ -1860,15 +1961,57 @@ export class TaskTrackerComponent implements OnInit {
   }
 
   addReminder() {
-    if (!this.newTask.reminders) {
-      this.newTask.reminders = [];
+    // Determinar si estamos en nueva tarea o editando
+    const isEditing = this.showEditTaskModal && this.selectedTask;
+    const remindersList = isEditing ? this.selectedTask!.reminders : this.newTask.reminders;
+    
+    // Agregar nuevo recordatorio con fecha/hora por defecto (en 1 hora)
+    const defaultReminderTime = new Date(Date.now() + 60 * 60 * 1000); // 1 hora desde ahora
+    
+    const dateStr = `${defaultReminderTime.getFullYear()}-${String(defaultReminderTime.getMonth() + 1).padStart(2, '0')}-${String(defaultReminderTime.getDate()).padStart(2, '0')}`;
+    const timeStr = `${defaultReminderTime.getHours().toString().padStart(2, '0')}:${defaultReminderTime.getMinutes().toString().padStart(2, '0')}`;
+    
+    if (isEditing) {
+      // Modo edición
+      if (!this.selectedTask!.reminders) {
+        this.selectedTask!.reminders = [];
+      }
+      this.editTaskReminderDates.push(dateStr);
+      this.editTaskReminderTimes.push(timeStr);
+      this.editTaskReminderErrors.push('');
+      this.selectedTask!.reminders.push(this.combineDateTime(dateStr, timeStr));
+    } else {
+      // Modo nueva tarea
+      if (!this.newTask.reminders) {
+        this.newTask.reminders = [];
+      }
+      this.newTaskReminderDates.push(dateStr);
+      this.newTaskReminderTimes.push(timeStr);
+      this.newTaskReminderErrors.push('');
+      this.newTask.reminders.push(this.combineDateTime(dateStr, timeStr));
     }
-    this.newTask.reminders.push(this.formatDateTimeLocal(new Date()));
   }
 
   removeReminder(index: number) {
-    if (this.newTask.reminders) {
-      this.newTask.reminders.splice(index, 1);
+    // Determinar si estamos en nueva tarea o editando
+    const isEditing = this.showEditTaskModal && this.selectedTask;
+    
+    if (isEditing) {
+      // Modo edición
+      if (this.selectedTask!.reminders) {
+        this.selectedTask!.reminders.splice(index, 1);
+        this.editTaskReminderDates.splice(index, 1);
+        this.editTaskReminderTimes.splice(index, 1);
+        this.editTaskReminderErrors.splice(index, 1);
+      }
+    } else {
+      // Modo nueva tarea
+      if (this.newTask.reminders) {
+        this.newTask.reminders.splice(index, 1);
+        this.newTaskReminderDates.splice(index, 1);
+        this.newTaskReminderTimes.splice(index, 1);
+        this.newTaskReminderErrors.splice(index, 1);
+      }
     }
   }
 
@@ -1964,6 +2107,11 @@ export class TaskTrackerComponent implements OnInit {
     // Deadline por defecto vacío
     this.newTaskDeadlineDate = '';
     this.newTaskDeadlineTime = '';
+    
+    // Limpiar arrays de recordatorios
+    this.newTaskReminderDates = [];
+    this.newTaskReminderTimes = [];
+    this.newTaskReminderErrors = [];
     
     this.onNewTaskEnvironmentChange();
     
@@ -2373,6 +2521,20 @@ export class TaskTrackerComponent implements OnInit {
       // Para deadline, mantener valores vacíos cuando no hay deadline
       this.editTaskDeadlineDate = '';
       this.editTaskDeadlineTime = '';
+    }
+    
+    // Inicializar recordatorios para edición
+    this.editTaskReminderDates = [];
+    this.editTaskReminderTimes = [];
+    this.editTaskReminderErrors = [];
+    
+    if (this.selectedTask?.reminders) {
+      this.selectedTask.reminders.forEach((reminder, index) => {
+        const reminderDateTime = this.splitDateTime(reminder);
+        this.editTaskReminderDates[index] = reminderDateTime.date;
+        this.editTaskReminderTimes[index] = reminderDateTime.time;
+        this.editTaskReminderErrors[index] = '';
+      });
     }
     
     // Cargar proyectos disponibles para el ambiente seleccionado
@@ -3083,11 +3245,37 @@ export class TaskTrackerComponent implements OnInit {
   }
 
   isNewTaskFormValid(): boolean {
-    return this.validateNewTaskDates();
+    return this.validateNewTaskDates() && this.validateNewTaskReminders();
   }
 
   isEditTaskFormValid(): boolean {
-    return this.validateEditTaskDates();
+    return this.validateEditTaskDates() && this.validateEditTaskReminders();
+  }
+
+  private validateNewTaskReminders(): boolean {
+    if (!this.newTask.reminders || this.newTask.reminders.length === 0) {
+      return true; // Los recordatorios son opcionales
+    }
+
+    for (let i = 0; i < this.newTask.reminders.length; i++) {
+      if (!this.validateNewTaskReminder(i)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private validateEditTaskReminders(): boolean {
+    if (!this.selectedTask?.reminders || this.selectedTask.reminders.length === 0) {
+      return true; // Los recordatorios son opcionales
+    }
+
+    for (let i = 0; i < this.selectedTask.reminders.length; i++) {
+      if (!this.validateEditTaskReminder(i)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   // Métodos para el cálculo de tiempo
@@ -3410,5 +3598,91 @@ export class TaskTrackerComponent implements OnInit {
     } else {
       return '¿Deseas mostrar la tarea después de cambiar su estado? (en caso de que esté oculta)';
     }
+  }
+
+  // Métodos para manejar recordatorios en nueva tarea
+  onNewTaskReminderDateChange(index: number, date: string) {
+    this.newTaskReminderDates[index] = date;
+    this.updateNewTaskReminderDateTime(index);
+  }
+
+  onNewTaskReminderTimeChange(index: number, time: string) {
+    this.newTaskReminderTimes[index] = time;
+    this.updateNewTaskReminderDateTime(index);
+  }
+
+  // Métodos para manejar recordatorios en edición de tarea
+  onEditTaskReminderDateChange(index: number, date: string) {
+    this.editTaskReminderDates[index] = date;
+    this.updateEditTaskReminderDateTime(index);
+  }
+
+  onEditTaskReminderTimeChange(index: number, time: string) {
+    this.editTaskReminderTimes[index] = time;
+    this.updateEditTaskReminderDateTime(index);
+  }
+
+  private updateNewTaskReminderDateTime(index: number) {
+    const date = this.newTaskReminderDates[index];
+    const time = this.newTaskReminderTimes[index];
+    
+    if (date && time) {
+      const combinedDateTime = this.combineDateTime(date, time);
+      if (this.newTask.reminders) {
+        this.newTask.reminders[index] = combinedDateTime;
+      }
+      this.validateNewTaskReminder(index);
+    }
+  }
+
+  private updateEditTaskReminderDateTime(index: number) {
+    const date = this.editTaskReminderDates[index];
+    const time = this.editTaskReminderTimes[index];
+    
+    if (date && time && this.selectedTask?.reminders) {
+      const combinedDateTime = this.combineDateTime(date, time);
+      this.selectedTask.reminders[index] = combinedDateTime;
+      this.validateEditTaskReminder(index);
+    }
+  }
+
+  private validateNewTaskReminder(index: number): boolean {
+    const reminderDateTime = this.newTask.reminders?.[index];
+    if (!reminderDateTime) {
+      this.newTaskReminderErrors[index] = '';
+      return true;
+    }
+
+    const reminderDate = new Date(reminderDateTime);
+    const now = new Date();
+
+    // Opcional: validar que el recordatorio no sea en el pasado
+    if (reminderDate < now) {
+      this.newTaskReminderErrors[index] = 'El recordatorio no puede ser en el pasado';
+      return false;
+    }
+
+    this.newTaskReminderErrors[index] = '';
+    return true;
+  }
+
+  private validateEditTaskReminder(index: number): boolean {
+    const reminderDateTime = this.selectedTask?.reminders?.[index];
+    if (!reminderDateTime) {
+      this.editTaskReminderErrors[index] = '';
+      return true;
+    }
+
+    const reminderDate = new Date(reminderDateTime);
+    const now = new Date();
+
+    // Opcional: validar que el recordatorio no sea en el pasado
+    if (reminderDate < now) {
+      this.editTaskReminderErrors[index] = 'El recordatorio no puede ser en el pasado';
+      return false;
+    }
+
+    this.editTaskReminderErrors[index] = '';
+    return true;
   }
 } 
