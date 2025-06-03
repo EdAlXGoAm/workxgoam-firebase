@@ -1,4 +1,4 @@
-import { Component, OnInit, HostListener } from '@angular/core';
+import { Component, OnInit, HostListener, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
@@ -638,8 +638,13 @@ import { RemindersModalComponent } from './components/reminders-modal/reminders-
       </app-task-modal>
 
       <!-- Time Calculator Modal -->
-      <div *ngIf="showTimeCalculatorModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+      <div *ngIf="showTimeCalculatorModal" 
+           class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+           (mousedown)="onCalculatorBackdropMouseDown($event)"
+           (mouseup)="onCalculatorBackdropMouseUp($event)">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md"
+             (mousedown)="$event.stopPropagation()"
+             (mouseup)="$event.stopPropagation()">
           <div class="p-6">
             <div class="flex justify-between items-center mb-4">
               <h3 class="text-xl font-bold">
@@ -1234,12 +1239,16 @@ export class TaskTrackerComponent implements OnInit {
   reminderAiError = '';
   reminderManualError = '';
 
+  // Propiedades para manejo de modales inteligentes
+  private calculatorBackdropMouseDownPos: { x: number, y: number } | null = null;
+
   constructor(
     private authService: AuthService,
     private firestore: Firestore,
     private taskService: TaskService,
     private projectService: ProjectService,
-    private environmentService: EnvironmentService
+    private environmentService: EnvironmentService,
+    private elementRef: ElementRef
   ) {}
 
   async ngOnInit() {
@@ -1968,14 +1977,19 @@ export class TaskTrackerComponent implements OnInit {
 
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent) {
-    // Solo cerrar los context menus, no otros modales
-    if (this.showContextMenu) {
+    // Si el time calculator está abierto y el click está fuera del componente
+    if (this.showTimeCalculatorModal && event.target && !this.elementRef.nativeElement.contains(event.target)) {
+      this.closeTimeCalculator();
+    }
+    
+    // Funcionalidad existente para otros context menus
+    if (this.showContextMenu && event.target && !(event.target as Element).closest('.context-menu')) {
       this.closeContextMenu();
     }
-    if (this.showEnvironmentContextMenu) {
+    if (this.showEnvironmentContextMenu && event.target && !(event.target as Element).closest('.environment-context-menu')) {
       this.closeEnvironmentContextMenu();
     }
-    if (this.showProjectContextMenu) {
+    if (this.showProjectContextMenu && event.target && !(event.target as Element).closest('.project-context-menu')) {
       this.closeProjectContextMenu();
     }
   }
@@ -2798,6 +2812,9 @@ export class TaskTrackerComponent implements OnInit {
     this.calculatorError = '';
     this.calculatorIsValid = false;
     this.showTimeCalculatorModal = true;
+    
+    // Bloquear scroll del body
+    document.body.style.overflow = 'hidden';
   }
 
   closeTimeCalculator() {
@@ -2805,6 +2822,38 @@ export class TaskTrackerComponent implements OnInit {
     this.calculatorInput = '';
     this.calculatorError = '';
     this.calculatorIsValid = false;
+    this.calculatorBackdropMouseDownPos = null;
+    
+    // Restaurar scroll del body
+    document.body.style.overflow = '';
+  }
+
+  // Detectar Escape key para cerrar modales
+  @HostListener('document:keydown.escape')
+  onEscapeKey() {
+    if (this.showTimeCalculatorModal) {
+      this.closeTimeCalculator();
+    }
+  }
+
+  onCalculatorBackdropMouseDown(event: MouseEvent) {
+    // Guardar la posición del mousedown para comparar con mouseup
+    this.calculatorBackdropMouseDownPos = { x: event.clientX, y: event.clientY };
+  }
+
+  onCalculatorBackdropMouseUp(event: MouseEvent) {
+    // Solo cerrar si el mouseup está cerca del mousedown (es un click, no un drag)
+    if (this.calculatorBackdropMouseDownPos) {
+      const deltaX = Math.abs(event.clientX - this.calculatorBackdropMouseDownPos.x);
+      const deltaY = Math.abs(event.clientY - this.calculatorBackdropMouseDownPos.y);
+      const threshold = 5; // Píxeles de tolerancia para considerar que es un click
+      
+      if (deltaX <= threshold && deltaY <= threshold) {
+        this.closeTimeCalculator();
+      }
+    }
+    
+    this.calculatorBackdropMouseDownPos = null;
   }
 
   validateCalculatorInput() {

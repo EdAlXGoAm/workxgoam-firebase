@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, forwardRef, OnInit } from '@angular/core';
+import { Component, Input, Output, EventEmitter, forwardRef, OnInit, HostListener, ElementRef } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 
@@ -25,8 +25,13 @@ import { CommonModule } from '@angular/common';
         class="time-input">
       
       <!-- Modal del Time Picker -->
-      <div *ngIf="isPickerOpen" class="picker-overlay" (click)="onOverlayClick($event)">
-        <div class="picker-modal" (click)="onModalClick($event)">
+      <div *ngIf="isPickerOpen" 
+           class="picker-overlay" 
+           (mousedown)="onBackdropMouseDown($event)"
+           (mouseup)="onBackdropMouseUp($event)">
+        <div class="picker-modal" 
+             (mousedown)="$event.stopPropagation()"
+             (mouseup)="$event.stopPropagation()">
           <!-- Header con tiempo seleccionado -->
           <div class="picker-header">
             <!-- Tiempos de referencia (nueva versión) -->
@@ -406,6 +411,9 @@ export class MuiTimePickerComponent implements OnInit, ControlValueAccessor {
   private value: string = '';
   private onChange = (value: string) => {};
   private onTouched = () => {};
+  private backdropMouseDownPos: { x: number, y: number } | null = null;
+
+  constructor(private elementRef: ElementRef) {}
 
   ngOnInit() {
     // Inicializar con hora actual si no hay valor
@@ -415,6 +423,42 @@ export class MuiTimePickerComponent implements OnInit, ControlValueAccessor {
       this.selectedMinute = Math.round(now.getMinutes() / 5) * 5;
       this.ampm = now.getHours() >= 12 ? 'PM' : 'AM';
     }
+  }
+
+  // Detectar clicks fuera del componente
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: Event) {
+    if (this.isPickerOpen && !this.elementRef.nativeElement.contains(event.target)) {
+      this.cancelSelection();
+    }
+  }
+
+  // Detectar Escape key para cerrar
+  @HostListener('document:keydown.escape')
+  onEscapeKey() {
+    if (this.isPickerOpen) {
+      this.cancelSelection();
+    }
+  }
+
+  onBackdropMouseDown(event: MouseEvent) {
+    // Guardar la posición del mousedown para comparar con mouseup
+    this.backdropMouseDownPos = { x: event.clientX, y: event.clientY };
+  }
+
+  onBackdropMouseUp(event: MouseEvent) {
+    // Solo cerrar si el mouseup está cerca del mousedown (es un click, no un drag)
+    if (this.backdropMouseDownPos) {
+      const deltaX = Math.abs(event.clientX - this.backdropMouseDownPos.x);
+      const deltaY = Math.abs(event.clientY - this.backdropMouseDownPos.y);
+      const threshold = 5; // Píxeles de tolerancia para considerar que es un click
+      
+      if (deltaX <= threshold && deltaY <= threshold) {
+        this.cancelSelection();
+      }
+    }
+    
+    this.backdropMouseDownPos = null;
   }
 
   get displayValue(): string {
@@ -429,18 +473,9 @@ export class MuiTimePickerComponent implements OnInit, ControlValueAccessor {
     this.currentView = 'hour';
     this.isPickerOpen = true;
     this.onTouched();
-  }
-
-  // Mejorado: manejo de eventos para evitar conflictos
-  onOverlayClick(event: MouseEvent) {
-    event.preventDefault();
-    event.stopPropagation();
-    this.cancelSelection(event);
-  }
-
-  onModalClick(event: MouseEvent) {
-    event.preventDefault();
-    event.stopPropagation();
+    
+    // Bloquear scroll del body
+    document.body.style.overflow = 'hidden';
   }
 
   cancelSelection(event?: MouseEvent) {
@@ -449,6 +484,8 @@ export class MuiTimePickerComponent implements OnInit, ControlValueAccessor {
       event.stopPropagation();
     }
     this.isPickerOpen = false;
+    this.backdropMouseDownPos = null;
+    document.body.style.overflow = '';
   }
 
   setView(view: 'hour' | 'minute') {
@@ -487,6 +524,8 @@ export class MuiTimePickerComponent implements OnInit, ControlValueAccessor {
     // Usar setTimeout para asegurar que el estado se actualice correctamente
     setTimeout(() => {
       this.isPickerOpen = false;
+      this.backdropMouseDownPos = null;
+      document.body.style.overflow = '';
     }, 50);
   }
 

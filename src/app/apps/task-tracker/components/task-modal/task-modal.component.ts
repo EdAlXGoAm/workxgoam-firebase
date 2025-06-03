@@ -6,11 +6,12 @@ import { Project } from '../../models/project.model';
 import { Environment } from '../../models/environment.model';
 import { MuiTimePickerComponent } from '../mui-time-picker/mui-time-picker.component';
 import { PrioritySelectorComponent } from '../priority-selector/priority-selector.component';
+import { AndroidDatePickerComponent } from '../android-date-picker/android-date-picker.component';
 
 @Component({
   selector: 'app-task-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule, MuiTimePickerComponent, PrioritySelectorComponent],
+  imports: [CommonModule, FormsModule, MuiTimePickerComponent, PrioritySelectorComponent, AndroidDatePickerComponent],
   template: `
     <div *ngIf="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] md:max-h-[95vh] overflow-hidden flex flex-col">
@@ -85,13 +86,14 @@ import { PrioritySelectorComponent } from '../priority-selector/priority-selecto
                   <div class="grid grid-cols-2 gap-2">
                     <div>
                       <label class="block text-xs text-gray-500 mb-1">Fecha</label>
-                      <input 
-                        type="date" 
+                      <app-android-date-picker
                         [(ngModel)]="startDate"
-                        (ngModelChange)="onDateChange('start', $event)"
+                        (dateChange)="onDateChange('start', $event)"
                         name="startDate"
-                        class="w-full px-3 py-2 border rounded-lg text-sm" 
-                        required>
+                        label="Fecha de inicio"
+                        placeholder="Seleccionar fecha"
+                        [required]="true">
+                      </app-android-date-picker>
                     </div>
                     <div>
                       <label class="block text-xs text-gray-500 mb-1">Hora</label>
@@ -118,13 +120,14 @@ import { PrioritySelectorComponent } from '../priority-selector/priority-selecto
                   <div class="grid grid-cols-2 gap-2">
                     <div>
                       <label class="block text-xs text-gray-500 mb-1">Fecha</label>
-                      <input 
-                        type="date" 
+                      <app-android-date-picker
                         [(ngModel)]="endDate"
-                        (ngModelChange)="onDateChange('end', $event)"
+                        (dateChange)="onDateChange('end', $event)"
                         name="endDate"
-                        class="w-full px-3 py-2 border rounded-lg text-sm" 
-                        required>
+                        label="Fecha de fin"
+                        placeholder="Seleccionar fecha"
+                        [required]="true">
+                      </app-android-date-picker>
                     </div>
                     <div>
                       <label class="block text-xs text-gray-500 mb-1">Hora</label>
@@ -197,12 +200,13 @@ import { PrioritySelectorComponent } from '../priority-selector/priority-selecto
                 <div class="grid grid-cols-2 gap-2">
                   <div>
                     <label class="block text-xs text-gray-500 mb-1">Fecha</label>
-                    <input 
-                      type="date" 
+                    <app-android-date-picker
                       [(ngModel)]="deadlineDate"
-                      (ngModelChange)="onDateChange('deadline', $event)"
+                      (dateChange)="onDateChange('deadline', $event)"
                       name="deadlineDate"
-                      class="w-full px-3 py-2 border rounded-lg text-sm">
+                      label="Fecha límite"
+                      placeholder="Seleccionar fecha límite">
+                    </app-android-date-picker>
                   </div>
                   <div>
                     <label class="block text-xs text-gray-500 mb-1">Hora</label>
