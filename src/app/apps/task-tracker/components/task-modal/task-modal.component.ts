@@ -346,7 +346,7 @@ import { AndroidDatePickerComponent } from '../android-date-picker/android-date-
                   <!-- Botón para editar recordatorios -->
                   <div class="flex justify-end">
                     <button type="button" 
-                            (click)="openRemindersModal.emit()" 
+                            (click)="prepareTaskDatesForReminders(); openRemindersModal.emit()" 
                             class="w-1/3 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors">
                       <i class="fas fa-edit mr-2"></i>Editar Recordatorios
                     </button>
@@ -1209,5 +1209,12 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     
     // Forzar la actualización de la vista para recalcular las descripciones
     this.cdr.detectChanges();
+  }
+  
+  // Preparo los campos de fecha/hora antes de abrir el modal de recordatorios
+  prepareTaskDatesForReminders() {
+    this.task.start = this.combineDateTime(this.startDate, this.startTime);
+    this.task.end = this.combineDateTime(this.endDate, this.endTime);
+    this.task.deadline = this.deadlineDate && this.deadlineTime ? this.combineDateTime(this.deadlineDate, this.deadlineTime) : null;
   }
 } 

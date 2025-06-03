@@ -53,11 +53,11 @@ import { CommonModule } from '@angular/common';
                 </span>
               </div>
               <div class="am-pm-selector">
-                <button 
+                <button type="button"
                   (click)="setAMPM('AM')" 
                   [class.active]="ampm === 'AM'"
                   class="am-pm-btn">AM</button>
-                <button 
+                <button type="button"
                   (click)="setAMPM('PM')" 
                   [class.active]="ampm === 'PM'"
                   class="am-pm-btn">PM</button>
@@ -170,8 +170,8 @@ import { CommonModule } from '@angular/common';
           
           <!-- Actions -->
           <div class="picker-actions">
-            <button (click)="cancelSelection($event)" class="cancel-btn">CANCELAR</button>
-            <button (click)="confirmTime($event)" class="ok-btn">OK</button>
+            <button type="button" (click)="cancelSelection($event)" class="cancel-btn">CANCELAR</button>
+            <button type="button" (click)="confirmTime($event)" class="ok-btn">OK</button>
           </div>
         </div>
       </div>
