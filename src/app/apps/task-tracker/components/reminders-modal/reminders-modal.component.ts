@@ -2,11 +2,13 @@ import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, OnChanges } 
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Task } from '../../models/task.model';
+import { AndroidDatePickerComponent } from '../android-date-picker/android-date-picker.component';
+import { MuiTimePickerComponent } from '../mui-time-picker/mui-time-picker.component';
 
 @Component({
   selector: 'app-reminders-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, AndroidDatePickerComponent, MuiTimePickerComponent],
   template: `
     <div *ngIf="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[95vh] overflow-hidden flex flex-col">
@@ -240,17 +242,24 @@ import { Task } from '../../models/task.model';
                     <div class="space-y-4">
                       <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">📅 Fecha del recordatorio:</label>
-                        <input 
-                          type="date" 
+                        <app-android-date-picker
                           [(ngModel)]="manualDate"
-                          class="w-full px-4 py-3 text-base rounded-lg border-2 border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-colors">
+                          name="manualDate"
+                          label="Fecha del recordatorio"
+                          placeholder="Seleccionar fecha"
+                          [required]="true">
+                        </app-android-date-picker>
                       </div>
                       <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">🕐 Hora del recordatorio:</label>
-                        <input 
-                          type="time" 
+                        <app-mui-time-picker
                           [(ngModel)]="manualTime"
-                          class="w-full px-4 py-3 text-base rounded-lg border-2 border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-colors">
+                          name="manualTime"
+                          label="Hora del recordatorio"
+                          placeholder="HH:MM"
+                          [referenceTime]="getCurrentTime()"
+                          referenceLabel="Hora actual">
+                        </app-mui-time-picker>
                       </div>
                     </div>
                     
@@ -749,6 +758,7 @@ export class RemindersModalComponent implements OnInit, OnDestroy, OnChanges {
   // UI state
   showHelp = false;
   sidebarExpanded = false; // Estado del sidebar en móviles
+  isEditing = false; // Flag para indicar si estamos en modo edición
   
   ngOnInit() {
     this.resetInputs();
@@ -801,7 +811,11 @@ export class RemindersModalComponent implements OnInit, OnDestroy, OnChanges {
   
   setActiveTab(tab: 'relative' | 'now' | 'ai' | 'manual') {
     this.activeTab = tab;
-    this.resetInputs();
+    // Solo resetear inputs si no estamos en modo edición
+    if (!this.isEditing) {
+      this.resetInputs();
+    }
+    this.isEditing = false; // Resetear el flag después de cambiar de tab
   }
   
   private resetInputs() {
@@ -815,6 +829,13 @@ export class RemindersModalComponent implements OnInit, OnDestroy, OnChanges {
     this.fromNowError = '';
     this.aiError = '';
     this.manualError = '';
+  }
+  
+  getCurrentTime(): string {
+    const now = new Date();
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
   }
   
   get categorizedReminders() {
@@ -1001,7 +1022,7 @@ export class RemindersModalComponent implements OnInit, OnDestroy, OnChanges {
       }
 
       let reminderDate: Date;
-      const baseDate = new Date(referenceDate + (referenceDate.includes('Z') ? '' : 'Z'));
+      const baseDate = new Date(referenceDate);
 
       if (this.relativeDirection === 'during') {
         // Para "durante", usar directamente la fecha de referencia
@@ -1064,7 +1085,9 @@ export class RemindersModalComponent implements OnInit, OnDestroy, OnChanges {
         return;
       }
 
-      this.addReminder(reminderDate);
+      // Convertir a UTC antes de guardar para evitar offset de zona
+      const utcDate = new Date(reminderDate.getTime() + reminderDate.getTimezoneOffset() * 60000);
+      this.addReminder(utcDate);
       this.fromNowTime = '';
       this.fromNowError = '';
     } catch (error) {
@@ -1084,15 +1107,20 @@ export class RemindersModalComponent implements OnInit, OnDestroy, OnChanges {
       const month = parseInt(this.manualDate.substring(5, 7)) - 1;
       const day = parseInt(this.manualDate.substring(8, 10));
       
-      const reminderDate = new Date(year, month, day, parseInt(hours), parseInt(minutes), 0, 0);
+      // Crear la fecha en hora local
+      const localDate = new Date(year, month, day, parseInt(hours), parseInt(minutes), 0, 0);
+      
+      // Convertir a UTC para mantener consistencia con el formato de guardado
+      // Ya que los recordatorios se interpretan como UTC al mostrar
+      const utcDate = new Date(localDate.getTime() + localDate.getTimezoneOffset() * 60000);
       
       const now = new Date();
-      if (reminderDate < now) {
+      if (localDate < now) {
         this.manualError = 'El recordatorio no puede ser en el pasado. Por favor, selecciona una fecha y hora futura.';
         return;
       }
       
-      this.addReminder(reminderDate);
+      this.addReminder(utcDate);
       this.manualDate = '';
       this.manualTime = '';
       this.manualError = '';
@@ -1162,7 +1190,10 @@ export class RemindersModalComponent implements OnInit, OnDestroy, OnChanges {
         return;
       }
 
-      this.addReminder(reminderDate);
+      // Convertir a UTC antes de guardar para evitar offset de zona
+      const utcDate = new Date(reminderDate.getTime() + reminderDate.getTimezoneOffset() * 60000);
+      this.addReminder(utcDate);
+
       this.aiInput = '';
       this.aiError = '';
     } catch (error) {
@@ -1171,7 +1202,15 @@ export class RemindersModalComponent implements OnInit, OnDestroy, OnChanges {
   }
   
   private addReminder(reminderDate: Date) {
-    const reminderString = reminderDate.toISOString();
+    // Guardar en formato ISO local (sin zona horaria) para consistencia
+    const year = reminderDate.getFullYear();
+    const month = String(reminderDate.getMonth() + 1).padStart(2, '0');
+    const day = String(reminderDate.getDate()).padStart(2, '0');
+    const hours = String(reminderDate.getHours()).padStart(2, '0');
+    const minutes = String(reminderDate.getMinutes()).padStart(2, '0');
+    
+    const reminderString = `${year}-${month}-${day}T${hours}:${minutes}`;
+    
     const updatedReminders = [...this.reminders, reminderString];
     updatedReminders.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
     this.remindersChanged.emit(updatedReminders);
@@ -1180,13 +1219,15 @@ export class RemindersModalComponent implements OnInit, OnDestroy, OnChanges {
   editReminder(index: number) {
     const reminder = this.reminders[index];
     if (reminder) {
-      const reminderDate = new Date(reminder);
+      // Usar splitDateTime que ahora maneja correctamente el formato ISO
       const { date, time } = this.splitDateTime(reminder);
       
       this.manualDate = date;
       this.manualTime = time;
+      this.isEditing = true; // Marcar que estamos editando
       this.setActiveTab('manual');
       
+      // Eliminar el recordatorio después de cargar los valores
       this.deleteReminder(index);
     }
   }
@@ -1245,8 +1286,32 @@ export class RemindersModalComponent implements OnInit, OnDestroy, OnChanges {
   private splitDateTime(dateTimeString: string): { date: string, time: string } {
     if (!dateTimeString) return { date: '', time: '' };
     
-    const dateTime = new Date(dateTimeString + (dateTimeString.includes('Z') ? '' : 'Z'));
+    // Los recordatorios se guardan en formato ISO local (YYYY-MM-DDTHH:mm)
+    // Pero cuando se muestran en la lista, se interpretan como UTC
+    // Por lo tanto, al editar, necesitamos hacer la conversión inversa
     
+    let dateTime: Date;
+    
+    if (dateTimeString.includes('T') && dateTimeString.length === 16) {
+      // Formato ISO sin zona horaria (YYYY-MM-DDTHH:mm)
+      // Este formato se interpreta como UTC cuando se muestra en la lista
+      // Así que necesitamos convertirlo de vuelta a hora local
+      const utcDate = new Date(dateTimeString + 'Z'); // Interpretar como UTC
+      
+      // Convertir a hora local (la fecha ya está en la zona horaria local del navegador)
+      dateTime = new Date(utcDate.getTime());
+    } else {
+      // Intentar parsear como fecha normal
+      dateTime = new Date(dateTimeString);
+    }
+    
+    // Verificar si la fecha es válida
+    if (isNaN(dateTime.getTime())) {
+      console.error('Fecha inválida:', dateTimeString);
+      return { date: '', time: '' };
+    }
+    
+    // Extraer los componentes en hora local
     const year = dateTime.getFullYear();
     const month = String(dateTime.getMonth() + 1).padStart(2, '0');
     const day = String(dateTime.getDate()).padStart(2, '0');
