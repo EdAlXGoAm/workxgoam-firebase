@@ -88,7 +88,7 @@ import { RemindersModalComponent } from './components/reminders-modal/reminders-
                 <span class="text-sm text-gray-600">{{emptyEnvironmentsCount}} ambiente(s) vacío(s)</span>
                 <button (click)="toggleAllEmptyEnvironments()" 
                         class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg border transition-colors">
-                  <i class="fas" [ngClass]="collapsedEmptyEnvironments ? 'fa-chevron-down' : 'fa-chevron-up'" class="mr-1"></i>
+                  <i class="fas mr-1" [ngClass]="collapsedEmptyEnvironments ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
                   {{ collapsedEmptyEnvironments ? 'Expandir' : 'Contraer' }} vacíos
                 </button>
               </div>
@@ -107,12 +107,19 @@ import { RemindersModalComponent } from './components/reminders-modal/reminders-
                         [style.background-color]="env.color + 'aa'" 
                         [style.color]="'black'">{{env.name}}</h3>
                     <div class="flex items-center ml-2">
+                      <!-- Micro botón para contraer/expandir todas las tareas de los proyectos del ambiente -->
+                      <button *ngIf="environmentHasTasks(env.id)"
+                              (click)="toggleCollapseAllProjectsInEnvironment(env.id)"
+                              class="p-1 text-gray-500 hover:text-gray-700 mr-1"
+                              [title]="areAllProjectsCollapsed(env.id) ? 'Expandir proyectos' : 'Contraer proyectos'">
+                        <i class="fas" [ngClass]="areAllProjectsCollapsed(env.id) ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
+                      </button>
                       <!-- Botón de colapso solo para environments vacíos -->
                       <button *ngIf="!environmentHasTasks(env.id)"
                               (click)="toggleEnvironmentCollapse(env.id)"
                               class="p-1 text-gray-500 hover:text-gray-700 mr-1"
                               [title]="isEnvironmentCollapsed(env.id) ? 'Expandir ambiente' : 'Contraer ambiente'">
-                        <i class="fas" [ngClass]="isEnvironmentCollapsed(env.id) ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
+                        <i class="fas mr-1" [ngClass]="isEnvironmentCollapsed(env.id) ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
                       </button>
                       <button (click)="onEnvironmentContextMenu($event, env)" class="p-1 text-gray-500 hover:text-gray-700">
                         <i class="fas fa-ellipsis-v"></i>
@@ -135,6 +142,12 @@ import { RemindersModalComponent } from './components/reminders-modal/reminders-
                           <h4 class="text-sm font-medium text-gray-700">
                             <i class="fas fa-folder mr-1"></i>{{project.name}}
                           </h4>
+                        <button *ngIf="getTasksByProject(project.id).length > 0"
+                                (click)="toggleProjectCollapse(project.id)"
+                                class="p-1 text-gray-500 hover:text-gray-700"
+                                [title]="isProjectCollapsed(project.id) ? 'Expandir proyecto' : 'Contraer proyecto'">
+                          <i class="fas" [ngClass]="isProjectCollapsed(project.id) ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
+                        </button>
                         </div>
                         <button 
                           (click)="openNewTaskModalForProject(env.id, project.id)"
@@ -145,52 +158,66 @@ import { RemindersModalComponent } from './components/reminders-modal/reminders-
                       </div>
                       
                       <!-- Tareas del proyecto -->
-                      <div class="space-y-2 ml-2">
-                        <div *ngFor="let task of getTasksByProject(project.id)"
-                             class="task-card bg-white p-3 rounded-lg shadow-sm border border-gray-200 relative"
-                             [class.status-completed]="task.status === 'completed'"
-                             [class.status-in-progress]="task.status === 'in-progress'"
-                             [class.status-pending]="task.status === 'pending'"
-                             [class.task-overdue]="isTaskOverdue(task)"
-                             [class.task-running]="isTaskRunning(task)">
-                          <!-- Barra de progreso superior -->
-                          <div class="progress-bar-container">
-                            <div class="progress-bar" 
-                                 [class.progress-pending]="task.status === 'pending'"
-                                 [class.progress-in-progress]="task.status === 'in-progress'"
-                                 [class.progress-completed]="task.status === 'completed'">
+                      <div class="space-y-2 ml-2" *ngIf="!isProjectCollapsed(project.id) && getTasksByProject(project.id).length > 0">
+                        <ng-container *ngFor="let task of getTasksByProject(project.id); let i = index">
+                          <!-- Modo LISTA: separador por día + item compacto -->
+                          <ng-container *ngIf="getEnvironmentViewMode(env.id) === 'list'; else cardItem">
+                            <div *ngIf="shouldShowDaySeparator(project.id, i)" class="day-separator"><span>{{ formatListDay(task.start) }}</span></div>
+                            <div class="task-list-item" 
+                                 [class.status-completed]="task.status === 'completed'"
+                                 [class.status-in-progress]="task.status === 'in-progress'"
+                                 [class.status-pending]="task.status === 'pending'"
+                                 [class.task-overdue]="isTaskOverdue(task)"
+                                 [class.task-running]="isTaskRunning(task)"
+                                 (click)="onTaskContextMenu($event, task)"
+                                 (contextmenu)="onTaskQuickContextMenu($event, task)"
+                                 [attr.title]="getTaskTooltip(task)">
+                              <div class="flex items-center gap-2">
+                                <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-xs"></i>
+                                <span class="text-base">{{ task.emoji || '📋' }}</span>
+                                <span class="truncate flex-1">{{task.name}}</span>
+                                <span class="text-xs text-gray-500 ml-2 whitespace-nowrap">{{ formatTime12(task.start) }}</span>
+                              </div>
                             </div>
-                          </div>
-                          
-                          <button (click)="onTaskContextMenu($event, task)" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
-                            <i class="fas fa-ellipsis-v"></i>
-                          </button>
-                          <div class="flex items-center justify-between mb-2">
-                            <div class="flex items-center gap-1">
-                              <span class="text-lg">{{task.emoji}}</span>
-                              <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-sm" title="Tarea oculta"></i>
+                          </ng-container>
+                          <!-- Modo TARJETAS: tarjeta completa -->
+                          <ng-template #cardItem>
+                            <div class="task-card bg-white p-3 rounded-lg shadow-sm border border-gray-200 relative"
+                                 [class.status-completed]="task.status === 'completed'"
+                                 [class.status-in-progress]="task.status === 'in-progress'"
+                                 [class.status-pending]="task.status === 'pending'"
+                                 [class.task-overdue]="isTaskOverdue(task)"
+                                 [class.task-running]="isTaskRunning(task)">
+                              <!-- Barra de progreso superior -->
+                              <div class="progress-bar-container">
+                                <div class="progress-bar" 
+                                     [class.progress-pending]="task.status === 'pending'"
+                                     [class.progress-in-progress]="task.status === 'in-progress'"
+                                     [class.progress-completed]="task.status === 'completed'">
+                                </div>
+                              </div>
+                              
+                              <button (click)="onTaskContextMenu($event, task)" (contextmenu)="onTaskQuickContextMenu($event, task)" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
+                                <i class="fas fa-ellipsis-v"></i>
+                              </button>
+                              <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center gap-1">
+                                  <span class="text-lg">{{ task.emoji || '📋' }}</span>
+                                  <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-sm" title="Tarea oculta"></i>
+                                </div>
+                                <span class="text-xs px-2 py-1 rounded" [class]="'priority-' + task.priority">
+                                  {{task.priority}}
+                                </span>
+                              </div>
+                              <h4 class="font-medium">{{task.name}}</h4>
+                              <p class="text-sm text-gray-600 mt-1">{{task.description}}</p>
+                              <div class="mt-2 text-xs text-gray-500">
+                                <div>Inicio: {{formatDate(task.start)}}</div>
+                                <div>Fin: {{formatDate(task.end)}}</div>
+                              </div>
                             </div>
-                            <span class="text-xs px-2 py-1 rounded" [class]="'priority-' + task.priority">
-                              {{task.priority}}
-                            </span>
-                          </div>
-                          <h4 class="font-medium">{{task.name}}</h4>
-                          <p class="text-sm text-gray-600 mt-1">{{task.description}}</p>
-                          <div class="mt-2 text-xs text-gray-500">
-                            <div>Inicio: {{formatDate(task.start)}}</div>
-                            <div>Fin: {{formatDate(task.end)}}</div>
-                          </div>
-                        </div>
-                        
-                        <!-- Mensaje si el proyecto no tiene tareas -->
-                        <div *ngIf="getTasksByProject(project.id).length === 0" class="text-center py-4">
-                          <p class="text-gray-500 text-sm">No hay tareas en este proyecto</p>
-                          <button 
-                            (click)="openNewTaskModalForProject(env.id, project.id)"
-                            class="mt-2 text-indigo-600 hover:text-indigo-800 text-sm">
-                            <i class="fas fa-plus mr-1"></i>Crear primera tarea
-                          </button>
-                        </div>
+                          </ng-template>
+                        </ng-container>
                       </div>
                     </div>
                     
@@ -215,7 +242,7 @@ import { RemindersModalComponent } from './components/reminders-modal/reminders-
                             </div>
                           </div>
                           
-                          <button (click)="onTaskContextMenu($event, task)" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
+                          <button (click)="onTaskContextMenu($event, task)" (contextmenu)="onTaskQuickContextMenu($event, task)" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
                             <i class="fas fa-ellipsis-v"></i>
                           </button>
                           <div class="flex items-center justify-between mb-2">
@@ -572,9 +599,21 @@ import { RemindersModalComponent } from './components/reminders-modal/reminders-
         </div>
       </div>
 
+      <!-- Quick Context Menu (Completar y Ocultar) -->
+      <div *ngIf="showQuickContextMenu"
+           class="context-menu"
+           [style.left]="quickContextMenuPosition.x + 'px'"
+           [style.top]="quickContextMenuPosition.y + 'px'"
+           (click)="$event.stopPropagation()">
+        <div class="context-menu-item context-menu-item-completed" (click)="completeAndHide(selectedTask!)">
+          <i class="fas fa-check"></i>
+          <span>Completar y Ocultar</span>
+        </div>
+      </div>
+
       <!-- Environment Context Menu -->
       <div *ngIf="showEnvironmentContextMenu" 
-           class="context-menu" 
+           class="context-menu environment-context-menu" 
            [style.left]="environmentContextMenuPosition.x + 'px'" 
            [style.top]="environmentContextMenuPosition.y + 'px'"
            (click)="$event.stopPropagation()">
@@ -603,6 +642,12 @@ import { RemindersModalComponent } from './components/reminders-modal/reminders-
           <span>Ocultar ocultos</span>
         </div>
         <hr class="my-1 border-gray-200">
+        <!-- Alternar vista de proyectos/tareas dentro del ambiente -->
+        <div class="context-menu-item" (click)="toggleEnvironmentViewMode(selectedEnvironment!.id)">
+          <i class="fas" [ngClass]="getEnvironmentViewMode(selectedEnvironment!.id) === 'cards' ? 'fa-list' : 'fa-th-large'"></i>
+          <span>{{ getEnvironmentViewMode(selectedEnvironment!.id) === 'cards' ? 'Ver lista' : 'Ver tarjetas' }}</span>
+        </div>
+        <hr class="my-1 border-gray-200">
         <div class="context-menu-item context-menu-item-danger" (click)="deleteEnvironment(selectedEnvironment!)">
           <i class="fas fa-trash"></i>
           <span>Eliminar Ambiente</span>
@@ -611,7 +656,7 @@ import { RemindersModalComponent } from './components/reminders-modal/reminders-
 
       <!-- Project Context Menu -->
       <div *ngIf="showProjectContextMenu" 
-           class="context-menu" 
+           class="context-menu project-context-menu" 
            [style.left]="projectContextMenuPosition.x + 'px'" 
            [style.top]="projectContextMenuPosition.y + 'px'"
            (click)="$event.stopPropagation()">
@@ -750,7 +795,7 @@ import { RemindersModalComponent } from './components/reminders-modal/reminders-
                 type="button" 
                 (click)="confirmStatusChangeWithVisibility(true)"
                 class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700">
-                <i class="fas" [ngClass]="statusChangeWillHide ? 'fa-eye-slash' : 'fa-eye'" class="mr-2"></i>
+                <i class="fas mr-2" [ngClass]="statusChangeWillHide ? 'fa-eye-slash' : 'fa-eye'"></i>
                 <span *ngIf="statusChangeWillHide">Sí, ocultar</span>
                 <span *ngIf="!statusChangeWillHide">Sí, mostrar</span>
               </button>
@@ -831,6 +876,34 @@ import { RemindersModalComponent } from './components/reminders-modal/reminders-
       transform: translateY(-2px);
       box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
     }
+    .task-list-item {
+      padding: 8px 10px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: #ffffff;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      max-width: 75%;
+    }
+    .task-list-item:hover {
+      background: #f9fafb;
+    }
+    .day-separator {
+      display: flex;
+      align-items: center;
+      text-align: center;
+      color: #6b7280;
+      font-size: 12px;
+      margin: 8px 0;
+    }
+    .day-separator::before,
+    .day-separator::after {
+      content: '';
+      flex: 1;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .day-separator:not(:empty)::before { margin-right: .5em; }
+    .day-separator:not(:empty)::after { margin-left: .5em; }
     
     .emoji-picker {
       position: absolute;
@@ -926,6 +999,8 @@ import { RemindersModalComponent } from './components/reminders-modal/reminders-
       background: #eff6ff;
       color: #2563eb;
     }
+
+  /* Quick context menu can reuse the same styles; no extra rules needed */
 
     .task-options {
       position: absolute;
@@ -1101,9 +1176,13 @@ export class TaskTrackerComponent implements OnInit {
   // Nuevo: Estado para contraer environments vacíos
   collapsedEmptyEnvironments = true; // Por defecto contraídos
   collapsedEnvironments: { [envId: string]: boolean } = {}; // Control individual
+  // Nuevo: Estado para contraer proyectos (por defecto expandidos)
+  collapsedProjects: { [projectId: string]: boolean } = {};
 
   // Control de visibilidad de tareas ocultas por environment
   environmentHiddenVisibility: { [envId: string]: 'hidden' | 'show-all' | 'show-24h' } = {}; // Control de visibilidad individual por environment
+  // Modo de vista por environment: 'cards' o 'list'
+  environmentViewMode: { [envId: string]: 'cards' | 'list' } = {};
 
   newTask: Partial<Task> = {
     name: '',
@@ -1137,6 +1216,9 @@ export class TaskTrackerComponent implements OnInit {
   showContextMenu = false;
   contextMenuPosition = { x: 0, y: 0 };
   selectedTask: Task | null = null;
+  // Menú contextual rápido para "Completar y Ocultar"
+  showQuickContextMenu = false;
+  quickContextMenuPosition = { x: 0, y: 0 };
   showEditTaskModal = false;
   showHidden = false;
   selectableProjectsForNewTask: Project[] = [];
@@ -1256,6 +1338,8 @@ export class TaskTrackerComponent implements OnInit {
     this.initializeNewTask();
     // Cargar el estado del filtro desde localStorage
     this.loadShowHiddenState();
+    // Cargar modos de vista por environment desde localStorage
+    this.loadEnvironmentViewModes();
   }
 
   async loadInitialData(): Promise<void> {
@@ -1813,6 +1897,8 @@ export class TaskTrackerComponent implements OnInit {
   onTaskContextMenu(event: MouseEvent, task: Task) {
     event.preventDefault();
     event.stopPropagation();
+    // Cerrar menú rápido si estuviera abierto
+    this.closeQuickContextMenu();
     this.selectedTask = task;
     
     // Calcular la altura aproximada del menú contextual
@@ -1873,6 +1959,63 @@ export class TaskTrackerComponent implements OnInit {
     
     this.contextMenuPosition = { x: finalX, y: finalY };
     this.showContextMenu = true;
+  }
+
+  onTaskQuickContextMenu(event: MouseEvent, task: Task) {
+    // Click derecho sobre los tres puntos: abrir menú rápido con una sola acción
+    event.preventDefault();
+    event.stopPropagation();
+    this.selectedTask = task;
+
+    // Dimensiones aproximadas del menú rápido (1 item)
+    const menuHeight = 40 + 16; // 1 item * 40px + padding
+    const menuWidth = 200;
+
+    const viewportHeight = window.innerHeight;
+    const clickX = event.clientX;
+    const clickY = event.clientY;
+
+    const spaceBelow = viewportHeight - clickY;
+    const spaceAbove = clickY;
+
+    let finalY = clickY;
+    if (spaceBelow < menuHeight && spaceAbove >= menuHeight) {
+      finalY = clickY - menuHeight;
+    } else if (spaceBelow < menuHeight && spaceAbove > spaceBelow) {
+      finalY = clickY - menuHeight;
+    } else if (spaceBelow < menuHeight && spaceAbove < menuHeight) {
+      if (spaceAbove > spaceBelow) {
+        finalY = 10;
+      } else {
+        finalY = viewportHeight - menuHeight - 10;
+      }
+    }
+
+    let finalX = clickX;
+    const spaceRight = window.innerWidth - clickX;
+    if (spaceRight < menuWidth) {
+      finalX = clickX - menuWidth;
+    }
+    if (finalX < 0) finalX = 10;
+
+    this.quickContextMenuPosition = { x: finalX, y: finalY };
+    this.showQuickContextMenu = true;
+
+    // Asegurar cierre de otros menús
+    this.showContextMenu = false;
+    this.showEnvironmentContextMenu = false;
+    this.showProjectContextMenu = false;
+  }
+
+  async completeAndHide(task: Task) {
+    try {
+      // Aplicar directamente: marcar completada y ocultar
+      await this.applyStatusChange(task, 'completed', true);
+      this.closeQuickContextMenu();
+    } catch (error) {
+      console.error('Error al completar y ocultar:', error);
+      this.closeQuickContextMenu();
+    }
   }
 
   onEnvironmentContextMenu(event: MouseEvent, environment: Environment) {
@@ -1992,6 +2135,9 @@ export class TaskTrackerComponent implements OnInit {
     if (this.showProjectContextMenu && event.target && !(event.target as Element).closest('.project-context-menu')) {
       this.closeProjectContextMenu();
     }
+    if (this.showQuickContextMenu && event.target && !(event.target as Element).closest('.context-menu')) {
+      this.closeQuickContextMenu();
+    }
   }
 
   closeContextMenu() {
@@ -2004,6 +2150,10 @@ export class TaskTrackerComponent implements OnInit {
 
   closeProjectContextMenu() {
     this.showProjectContextMenu = false;
+  }
+
+  closeQuickContextMenu() {
+    this.showQuickContextMenu = false;
   }
 
   async editTask(task: Task) {
@@ -2077,6 +2227,43 @@ export class TaskTrackerComponent implements OnInit {
     // Abrir el modal después de inicializar todo
     this.showEditTaskModal = true;
     this.closeContextMenu();
+  }
+
+  // Tooltip completo de tarea para modo lista
+  getTaskTooltip(task: Task): string {
+    const start = this.formatDate(task.start);
+    const end = this.formatDate(task.end);
+    const prio = task.priority;
+    const hiddenIcon = task.hidden ? '🙈 ' : '';
+    return `${hiddenIcon}${task.emoji || ''} ${task.name}\nPrioridad: ${prio}\nInicio: ${start}\nFin: ${end}`.trim();
+  }
+
+  // Utilidades para modo lista
+  private getProjectTasksSorted(projectId: string): Task[] {
+    return this.getTasksByProject(projectId);
+  }
+
+  shouldShowDaySeparator(projectId: string, index: number): boolean {
+    const tasks = this.getProjectTasksSorted(projectId);
+    if (index === 0) return true;
+    const prev = tasks[index - 1];
+    const curr = tasks[index];
+    return this.getDateKey(prev.start) !== this.getDateKey(curr.start);
+  }
+
+  private getDateKey(dateString: string): string {
+    const d = new Date(dateString + (dateString.includes('Z') ? '' : 'Z'));
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+
+  formatListDay(dateString: string): string {
+    const d = new Date(dateString + (dateString.includes('Z') ? '' : 'Z'));
+    return d.toLocaleDateString('es-MX', { weekday: 'short', year: 'numeric', month: 'short', day: '2-digit' });
+  }
+
+  formatTime12(dateString: string): string {
+    const d = new Date(dateString + (dateString.includes('Z') ? '' : 'Z'));
+    return d.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true });
   }
 
   async deleteTask(task: Task) {
@@ -3070,6 +3257,36 @@ export class TaskTrackerComponent implements OnInit {
     );
   }
 
+  // Estado de colapso por proyecto
+  isProjectCollapsed(projectId: string): boolean {
+    // Por defecto, los proyectos están expandidos (false)
+    return !!this.collapsedProjects[projectId];
+  }
+
+  toggleProjectCollapse(projectId: string): void {
+    this.collapsedProjects[projectId] = !this.isProjectCollapsed(projectId);
+  }
+
+  // Determinar si todos los proyectos del ambiente están colapsados
+  areAllProjectsCollapsed(environmentId: string): boolean {
+    const projects = this.getProjectsByEnvironment(environmentId);
+    if (projects.length === 0) return false;
+    // Considerar solo proyectos con tareas visibles
+    const projectsWithTasks = projects.filter(p => this.getTasksByProject(p.id).length > 0);
+    if (projectsWithTasks.length === 0) return false;
+    return projectsWithTasks.every(p => this.isProjectCollapsed(p.id));
+  }
+
+  // Colapsar/expandir todos los proyectos con tareas en un environment
+  toggleCollapseAllProjectsInEnvironment(environmentId: string): void {
+    const shouldCollapse = !this.areAllProjectsCollapsed(environmentId);
+    this.getProjectsByEnvironment(environmentId)
+      .filter(p => this.getTasksByProject(p.id).length > 0)
+      .forEach(p => {
+        this.collapsedProjects[p.id] = shouldCollapse;
+      });
+  }
+
   isEnvironmentCollapsed(environmentId: string): boolean {
     // Si el environment tiene tareas, nunca está colapsado
     if (this.environmentHasTasks(environmentId)) {
@@ -3120,6 +3337,36 @@ export class TaskTrackerComponent implements OnInit {
     this.closeEnvironmentContextMenu();
     // Refrescar la vista aplicando los filtros
     this.processTasks();
+  }
+
+  // Vista por environment: cards/list
+  getEnvironmentViewMode(envId: string): 'cards' | 'list' {
+    return this.environmentViewMode[envId] || 'cards';
+  }
+
+  toggleEnvironmentViewMode(envId: string): void {
+    const current = this.getEnvironmentViewMode(envId);
+    this.environmentViewMode[envId] = current === 'cards' ? 'list' : 'cards';
+    this.closeEnvironmentContextMenu();
+    this.saveEnvironmentViewModes();
+  }
+
+  private loadEnvironmentViewModes(): void {
+    try {
+      const raw = localStorage.getItem('taskTracker_envViewModes');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          this.environmentViewMode = parsed;
+        }
+      }
+    } catch {}
+  }
+
+  private saveEnvironmentViewModes(): void {
+    try {
+      localStorage.setItem('taskTracker_envViewModes', JSON.stringify(this.environmentViewMode));
+    } catch {}
   }
 
   // Métodos para el modal de confirmación de cambio de estado
