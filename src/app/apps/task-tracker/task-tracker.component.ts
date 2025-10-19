@@ -15,33 +15,23 @@ import { TimelineSvgComponent } from './components/timeline-svg/timeline-svg.com
 import { CurrentTaskInfoComponent } from './components/current-task-info/current-task-info.component';
 import { TaskModalComponent } from './components/task-modal/task-modal.component';
 import { RemindersModalComponent } from './components/reminders-modal/reminders-modal.component';
+import { TaskTrackerHeaderComponent } from './components/amain_components/task-tracker-header';
+import { EnvironmentModalComponent } from './components/environment-modal/environment-modal.component';
+import { BoardViewComponent } from './components/amain_components/board-view';
+import { ChangeStatusModalComponent } from './components/change-status-modal/change-status-modal';
 
 @Component({
   selector: 'app-task-tracker',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, TimelineSvgComponent, CurrentTaskInfoComponent, TaskModalComponent, RemindersModalComponent],
+  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, TimelineSvgComponent, CurrentTaskInfoComponent, TaskModalComponent, RemindersModalComponent, TaskTrackerHeaderComponent, EnvironmentModalComponent, BoardViewComponent, ChangeStatusModalComponent],
   template: `
     <div class="min-h-screen bg-gray-50">
       <!-- Header -->
-      <header class="bg-indigo-600 text-white shadow-lg">
-        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div class="flex items-center space-x-3">
-            <i class="fas fa-tasks text-2xl"></i>
-            <h1 class="text-2xl font-bold">TaskFlow</h1>
-          </div>
-          <div class="flex items-center space-x-4">
-            <button (click)="openNewTaskModal()" class="bg-white text-indigo-600 px-4 py-2 rounded-lg font-medium hover:bg-indigo-50 transition">
-              <i class="fas fa-plus mr-2"></i>Nueva Tarea
-            </button>
-            <div class="relative">
-              <button class="flex items-center space-x-2">
-                <img [src]="userPhotoUrl" alt="User" class="w-8 h-8 rounded-full">
-                <span class="hidden md:inline">{{userName}}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <app-task-tracker-header
+        [userName]="userName"
+        [userPhotoUrl]="userPhotoUrl"
+        (createTask)="openNewTaskModal()">
+      </app-task-tracker-header>
 
       <!-- Main Content -->
       <main class="max-w-7xl mx-auto px-4 py-6">
@@ -81,203 +71,21 @@ import { RemindersModalComponent } from './components/reminders-modal/reminders-
         <!-- Views Container -->
         <div class="views-container">
           <!-- Board View -->
-          <div *ngIf="currentView === 'board'" class="w-full bg-white rounded-lg shadow-md p-4">
-            <div class="flex justify-between items-center mb-4">
-              <h2 class="text-xl font-bold">Vista de Tablero</h2>
-              <div *ngIf="emptyEnvironmentsCount > 0" class="flex items-center space-x-2">
-                <span class="text-sm text-gray-600">{{emptyEnvironmentsCount}} ambiente(s) vacío(s)</span>
-                <button (click)="toggleAllEmptyEnvironments()" 
-                        class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg border transition-colors">
-                  <i class="fas mr-1" [ngClass]="collapsedEmptyEnvironments ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
-                  {{ collapsedEmptyEnvironments ? 'Expandir' : 'Contraer' }} vacíos
-                </button>
-              </div>
-            </div>
-            <!-- Timeline View integrada -->
-            <div class="mb-6">
-              <h3 class="text-lg font-semibold mb-2">Línea del Tiempo</h3>
-              <app-timeline-svg [tasks]="tasks" [environments]="environments" (editTask)="editTask($event)"></app-timeline-svg>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div *ngFor="let env of orderedEnvironments" class="board-column">
-                <!-- Header fijo del ambiente -->
-                <div class="environment-header p-4 pb-2">
-                  <div class="flex items-center justify-between">
-                    <h3 class="font-semibold p-2 rounded-md text-black flex-1"
-                        [style.background-color]="env.color + 'aa'" 
-                        [style.color]="'black'">{{env.name}}</h3>
-                    <div class="flex items-center ml-2">
-                      <!-- Micro botón para contraer/expandir todas las tareas de los proyectos del ambiente -->
-                      <button *ngIf="environmentHasTasks(env.id)"
-                              (click)="toggleCollapseAllProjectsInEnvironment(env.id)"
-                              class="p-1 text-gray-500 hover:text-gray-700 mr-1"
-                              [title]="areAllProjectsCollapsed(env.id) ? 'Expandir proyectos' : 'Contraer proyectos'">
-                        <i class="fas" [ngClass]="areAllProjectsCollapsed(env.id) ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
-                      </button>
-                      <!-- Botón de colapso solo para environments vacíos -->
-                      <button *ngIf="!environmentHasTasks(env.id)"
-                              (click)="toggleEnvironmentCollapse(env.id)"
-                              class="p-1 text-gray-500 hover:text-gray-700 mr-1"
-                              [title]="isEnvironmentCollapsed(env.id) ? 'Expandir ambiente' : 'Contraer ambiente'">
-                        <i class="fas mr-1" [ngClass]="isEnvironmentCollapsed(env.id) ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
-                      </button>
-                      <button (click)="onEnvironmentContextMenu($event, env)" class="p-1 text-gray-500 hover:text-gray-700">
-                        <i class="fas fa-ellipsis-v"></i>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                
-                <!-- Contenido con scroll del ambiente -->
-                <div class="environment-content px-4">
-                  <!-- Proyectos dentro del ambiente -->
-                  <div *ngIf="!isEnvironmentCollapsed(env.id)" class="space-y-4">
-                    <div *ngFor="let project of getProjectsByEnvironment(env.id)" class="project-section">
-                      <!-- Header del proyecto con botón agregar -->
-                      <div class="flex items-center justify-between mb-2 p-2 bg-gray-50 rounded-lg">
-                        <div class="flex items-center gap-2">
-                          <button (click)="onProjectContextMenu($event, project)" class="p-1 text-gray-500 hover:text-gray-700">
-                            <i class="fas fa-ellipsis-v"></i>
-                          </button>
-                          <h4 class="text-sm font-medium text-gray-700">
-                            <i class="fas fa-folder mr-1"></i>{{project.name}}
-                          </h4>
-                        <button *ngIf="getTasksByProject(project.id).length > 0"
-                                (click)="toggleProjectCollapse(project.id)"
-                                class="p-1 text-gray-500 hover:text-gray-700"
-                                [title]="isProjectCollapsed(project.id) ? 'Expandir proyecto' : 'Contraer proyecto'">
-                          <i class="fas" [ngClass]="isProjectCollapsed(project.id) ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
-                        </button>
-                        </div>
-                        <button 
-                          (click)="openNewTaskModalForProject(env.id, project.id)"
-                          class="bg-indigo-600 text-white px-2 py-1 rounded text-xs hover:bg-indigo-700 transition-colors"
-                          title="Agregar tarea a {{project.name}}">
-                          <i class="fas fa-plus mr-1"></i>Agregar
-                        </button>
-                      </div>
-                      
-                      <!-- Tareas del proyecto -->
-                      <div class="space-y-2 ml-2" *ngIf="!isProjectCollapsed(project.id) && getTasksByProject(project.id).length > 0">
-                        <ng-container *ngFor="let task of getTasksByProject(project.id); let i = index">
-                          <!-- Modo LISTA: separador por día + item compacto -->
-                          <ng-container *ngIf="getEnvironmentViewMode(env.id) === 'list'; else cardItem">
-                            <div *ngIf="shouldShowDaySeparator(project.id, i)" class="day-separator"><span>{{ formatListDay(task.start) }}</span></div>
-                            <div class="task-list-item" 
-                                 [class.status-completed]="task.status === 'completed'"
-                                 [class.status-in-progress]="task.status === 'in-progress'"
-                                 [class.status-pending]="task.status === 'pending'"
-                                 [class.task-overdue]="isTaskOverdue(task)"
-                                 [class.task-running]="isTaskRunning(task)"
-                                 (click)="onTaskContextMenu($event, task)"
-                                 (contextmenu)="onTaskQuickContextMenu($event, task)"
-                                 [attr.title]="getTaskTooltip(task)">
-                              <div class="flex items-center gap-2">
-                                <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-xs"></i>
-                                <span class="text-base">{{ task.emoji || '📋' }}</span>
-                                <span class="truncate flex-1">{{task.name}}</span>
-                                <span class="text-xs text-gray-500 ml-2 whitespace-nowrap">{{ formatTime12(task.start) }}</span>
-                              </div>
-                            </div>
-                          </ng-container>
-                          <!-- Modo TARJETAS: tarjeta completa -->
-                          <ng-template #cardItem>
-                            <div class="task-card bg-white p-3 rounded-lg shadow-sm border border-gray-200 relative"
-                                 [class.status-completed]="task.status === 'completed'"
-                                 [class.status-in-progress]="task.status === 'in-progress'"
-                                 [class.status-pending]="task.status === 'pending'"
-                                 [class.task-overdue]="isTaskOverdue(task)"
-                                 [class.task-running]="isTaskRunning(task)">
-                              <!-- Barra de progreso superior -->
-                              <div class="progress-bar-container">
-                                <div class="progress-bar" 
-                                     [class.progress-pending]="task.status === 'pending'"
-                                     [class.progress-in-progress]="task.status === 'in-progress'"
-                                     [class.progress-completed]="task.status === 'completed'">
-                                </div>
-                              </div>
-                              
-                              <button (click)="onTaskContextMenu($event, task)" (contextmenu)="onTaskQuickContextMenu($event, task)" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
-                                <i class="fas fa-ellipsis-v"></i>
-                              </button>
-                              <div class="flex items-center justify-between mb-2">
-                                <div class="flex items-center gap-1">
-                                  <span class="text-lg">{{ task.emoji || '📋' }}</span>
-                                  <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-sm" title="Tarea oculta"></i>
-                                </div>
-                                <span class="text-xs px-2 py-1 rounded" [class]="'priority-' + task.priority">
-                                  {{task.priority}}
-                                </span>
-                              </div>
-                              <h4 class="font-medium">{{task.name}}</h4>
-                              <p class="text-sm text-gray-600 mt-1">{{task.description}}</p>
-                              <div class="mt-2 text-xs text-gray-500">
-                                <div>Inicio: {{formatDate(task.start)}}</div>
-                                <div>Fin: {{formatDate(task.end)}}</div>
-                              </div>
-                            </div>
-                          </ng-template>
-                        </ng-container>
-                      </div>
-                    </div>
-                    
-                    <!-- Tareas sin proyecto asignado dentro del ambiente -->
-                    <div *ngIf="getTasksWithoutProjectInEnvironment(env.id).length > 0" class="project-section">
-                      <div class="flex items-center justify-between mb-2 p-2 bg-yellow-50 rounded-lg border border-yellow-200">
-                        <h4 class="text-sm font-medium text-yellow-700">
-                          <i class="fas fa-exclamation-triangle mr-1"></i>Sin proyecto asignado
-                        </h4>
-                      </div>
-                      <div class="space-y-2 ml-2">
-                        <div *ngFor="let task of getTasksWithoutProjectInEnvironment(env.id)"
-                             class="task-card bg-white p-3 rounded-lg shadow-sm border border-yellow-200 relative"
-                             [class.task-overdue]="isTaskOverdue(task)"
-                             [class.task-running]="isTaskRunning(task)">
-                          <!-- Barra de progreso superior -->
-                          <div class="progress-bar-container">
-                            <div class="progress-bar" 
-                                 [class.progress-pending]="task.status === 'pending'"
-                                 [class.progress-in-progress]="task.status === 'in-progress'"
-                                 [class.progress-completed]="task.status === 'completed'">
-                            </div>
-                          </div>
-                          
-                          <button (click)="onTaskContextMenu($event, task)" (contextmenu)="onTaskQuickContextMenu($event, task)" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
-                            <i class="fas fa-ellipsis-v"></i>
-                          </button>
-                          <div class="flex items-center justify-between mb-2">
-                            <div class="flex items-center gap-1">
-                              <span class="text-lg">{{task.emoji}}</span>
-                              <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-sm" title="Tarea oculta"></i>
-                            </div>
-                            <span class="text-xs px-2 py-1 rounded" [class]="'priority-' + task.priority">
-                              {{task.priority}}
-                            </span>
-                          </div>
-                          <h4 class="font-medium">{{task.name}}</h4>
-                          <p class="text-sm text-gray-600 mt-1">{{task.description}}</p>
-                          <div class="mt-2 text-xs text-gray-500">
-                            <div>Inicio: {{formatDate(task.start)}}</div>
-                            <div>Fin: {{formatDate(task.end)}}</div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <!-- Mensaje si el ambiente no tiene proyectos -->
-                    <div *ngIf="getProjectsByEnvironment(env.id).length === 0" class="text-center py-6">
-                      <p class="text-gray-500 text-sm mb-2">No hay proyectos en este ambiente</p>
-                      <button 
-                        (click)="openNewProjectModal()"
-                        class="bg-gray-200 text-gray-700 px-3 py-2 rounded text-sm hover:bg-gray-300 transition-colors">
-                        <i class="fas fa-plus mr-1"></i>Crear proyecto
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <app-board-view *ngIf="currentView === 'board'"
+            [tasks]="filteredTasks"
+            [projects]="projects"
+            [environments]="environments"
+            [showHidden]="showHidden"
+            [environmentHiddenVisibility]="environmentHiddenVisibility"
+            [environmentViewMode]="environmentViewMode"
+            (editTask)="editTask($event)"
+            (taskContextMenu)="onTaskContextMenu($event.mouseEvent, $event.task)"
+            (taskQuickContextMenu)="onTaskQuickContextMenu($event.mouseEvent, $event.task)"
+            (environmentContextMenu)="onEnvironmentContextMenu($event.mouseEvent, $event.environment)"
+            (projectContextMenu)="onProjectContextMenu($event.mouseEvent, $event.project)"
+            (addTaskToProject)="openNewTaskModalForProject($event.environmentId, $event.projectId)"
+            (createProject)="createProjectForEnvironment($event)">
+          </app-board-view>
 
           <!-- Timeline View -->
           <div *ngIf="currentView === 'timeline'" class="w-full bg-white rounded-lg shadow-md p-4">
@@ -418,111 +226,14 @@ import { RemindersModalComponent } from './components/reminders-modal/reminders-
       </app-task-modal>
 
       <!-- New Environment Modal -->
-      <div *ngIf="showNewEnvironmentModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all">
-          <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200">
-            <h3 class="text-xl font-semibold text-gray-800">Nuevo Ambiente</h3>
-            <button (click)="closeNewEnvironmentModal()" class="text-gray-400 hover:text-gray-600 transition">
-              <i class="fas fa-times fa-lg"></i>
-            </button>
-          </div>
-          <div class="p-6">
-            <form (ngSubmit)="saveNewEnvironment()" class="space-y-4">
-              <div>
-                <label for="envName" class="block text-sm font-medium text-gray-700 mb-1">Nombre del Ambiente</label>
-                <input type="text" id="envName" name="envName" [(ngModel)]="newEnvironment.name" required 
-                       class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                       placeholder="Ingresa el nombre del ambiente">
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-3">Color</label>
-                
-                <!-- Colores sugeridos -->
-                <div class="mb-6">
-                  <p class="text-xs text-gray-500 mb-3">Colores sugeridos:</p>
-                  <div class="flex flex-wrap gap-2">
-                    <button
-                      *ngFor="let color of suggestedColors"
-                      type="button"
-                      (click)="selectSuggestedColor(color)"
-                      class="w-8 h-8 rounded-full border-2 hover:scale-110 transition-transform focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                      [style.background-color]="color"
-                      [class.border-gray-800]="newEnvironment.color === color"
-                      [class.border-gray-300]="newEnvironment.color !== color"
-                      [title]="color">
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Color Picker Personalizado -->
-                <div class="mb-4">
-                  <p class="text-xs text-gray-500 mb-3">O elige un color personalizado:</p>
-                  <div class="flex gap-4">
-                    <!-- Área principal del color picker -->
-                    <div class="relative">
-                      <div 
-                        class="w-48 h-32 border border-gray-300 rounded-lg cursor-crosshair relative overflow-hidden"
-                        [style.background]="'linear-gradient(to right, white, hsl(' + colorPickerHue + ', 100%, 50%)), linear-gradient(to top, black, transparent)'"
-                        (click)="onColorAreaClick($event)">
-                        
-                        <!-- Indicador de posición -->
-                        <div 
-                          class="absolute w-3 h-3 border-2 border-white rounded-full transform -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-                          [style.left]="colorPickerSaturation + '%'"
-                          [style.top]="(100 - colorPickerLightness) + '%'"
-                          style="box-shadow: 0 0 0 1px rgba(0,0,0,0.3);">
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Barra de matiz -->
-                    <div class="relative">
-                      <div 
-                        class="w-6 h-32 border border-gray-300 rounded cursor-pointer"
-                        style="background: linear-gradient(to bottom, 
-                          hsl(0, 100%, 50%) 0%, 
-                          hsl(60, 100%, 50%) 16.66%, 
-                          hsl(120, 100%, 50%) 33.33%, 
-                          hsl(180, 100%, 50%) 50%, 
-                          hsl(240, 100%, 50%) 66.66%, 
-                          hsl(300, 100%, 50%) 83.33%, 
-                          hsl(360, 100%, 50%) 100%)"
-                        (click)="onHueBarClick($event)">
-                        
-                        <!-- Indicador de matiz -->
-                        <div 
-                          class="absolute w-full h-0.5 bg-white border border-gray-400 transform -translate-y-1/2 pointer-events-none"
-                          [style.top]="(colorPickerHue / 360) * 100 + '%'">
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Vista previa -->
-                    <div class="flex flex-col items-center gap-2">
-                      <p class="text-xs text-gray-500">Vista previa:</p>
-                      <div 
-                        class="w-16 h-16 border border-gray-300 rounded-lg"
-                        [style.background-color]="newEnvironment.color || '#3B82F6'">
-                      </div>
-                      <p class="text-xs font-mono text-gray-600">{{ newEnvironment.color || '#3B82F6' }}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="flex justify-end space-x-3 pt-4">
-                <button type="button" (click)="closeNewEnvironmentModal()"
-                        class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none">
-                  Cancelar
-                </button>
-                <button type="submit"
-                        class="px-4 py-2 bg-indigo-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                  Crear Ambiente
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
+      <app-environment-modal
+        *ngIf="showNewEnvironmentModal"
+        [showModal]="showNewEnvironmentModal"
+        [suggestedColors]="suggestedColors"
+        [initialEnvironment]="newEnvironment"
+        (closeModal)="closeNewEnvironmentModal()"
+        (saveEnvironment)="onSaveNewEnvironment($event)">
+      </app-environment-modal>
 
       <!-- New Project Modal -->
       <div *ngIf="showNewProjectModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -759,50 +470,13 @@ import { RemindersModalComponent } from './components/reminders-modal/reminders-
       </div>
 
       <!-- Status Change Confirmation Modal -->
-      <div *ngIf="showStatusChangeModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
-          <div class="p-6">
-            <div class="flex justify-between items-center mb-4">
-              <h3 class="text-xl font-bold">{{ getStatusChangeModalTitle() }}</h3>
-              <button (click)="closeStatusChangeModal()" class="text-gray-500 hover:text-gray-700">
-                <i class="fas fa-times"></i>
-              </button>
-            </div>
-            
-            <div class="mb-6">
-              <p class="text-gray-700 mb-4">{{ getStatusChangeModalMessage() }}</p>
-              
-              <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <div class="flex items-center">
-                  <i class="fas fa-info-circle text-blue-600 mr-2"></i>
-                  <span class="text-blue-700 text-sm">
-                    <span *ngIf="statusChangeWillHide">Las tareas ocultas no aparecerán en la vista normal, pero puedes verlas activando el filtro de tareas ocultas.</span>
-                    <span *ngIf="!statusChangeWillHide">Si la tarea estaba oculta, volverá a ser visible en la vista normal.</span>
-                  </span>
-                </div>
-              </div>
-            </div>
-            
-            <div class="flex justify-end space-x-3">
-              <button 
-                type="button" 
-                (click)="confirmStatusChangeWithVisibility(false)"
-                class="px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50">
-                <span *ngIf="statusChangeWillHide">No ocultar</span>
-                <span *ngIf="!statusChangeWillHide">No mostrar</span>
-              </button>
-              <button 
-                type="button" 
-                (click)="confirmStatusChangeWithVisibility(true)"
-                class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700">
-                <i class="fas mr-2" [ngClass]="statusChangeWillHide ? 'fa-eye-slash' : 'fa-eye'"></i>
-                <span *ngIf="statusChangeWillHide">Sí, ocultar</span>
-                <span *ngIf="!statusChangeWillHide">Sí, mostrar</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <app-change-status-modal
+        *ngIf="showStatusChangeModal"
+        [statusChangeWillHide]="statusChangeWillHide"
+        [pendingStatusChange]="pendingStatusChange"
+        (closeModal)="closeStatusChangeModal()"
+        (confirmChangeVisibility)="confirmStatusChangeWithVisibility($event)">
+      </app-change-status-modal>
 
       <!-- Modal de Gestión de Recordatorios -->
       <app-reminders-modal
@@ -1542,103 +1216,6 @@ export class TaskTrackerComponent implements OnInit {
     return date.toISOString().slice(0, 16);
   }
 
-  private formatDateTimeLocal(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
-  }
-
-  toggleEmojiPicker() {
-    this.showEmojiPicker = !this.showEmojiPicker;
-  }
-
-  selectEmoji(emoji: string) {
-    if (this.showNewTaskModal && this.newTask) {
-      this.newTask.emoji = emoji;
-    } else if (this.showEditTaskModal && this.selectedTask) {
-      this.selectedTask.emoji = emoji;
-    }
-    this.showEmojiPicker = false;
-  }
-
-  addReminder() {
-    // Determinar si estamos en nueva tarea o editando
-    const isEditing = this.showEditTaskModal && this.selectedTask;
-    const remindersList = isEditing ? this.selectedTask!.reminders : this.newTask.reminders;
-    
-    // Agregar nuevo recordatorio con fecha/hora por defecto (en 1 hora)
-    const defaultReminderTime = new Date(Date.now() + 60 * 60 * 1000); // 1 hora desde ahora
-    
-    const dateStr = `${defaultReminderTime.getFullYear()}-${String(defaultReminderTime.getMonth() + 1).padStart(2, '0')}-${String(defaultReminderTime.getDate()).padStart(2, '0')}`;
-    const timeStr = `${defaultReminderTime.getHours().toString().padStart(2, '0')}:${defaultReminderTime.getMinutes().toString().padStart(2, '0')}`;
-    
-    if (isEditing) {
-      // Modo edición
-      if (!this.selectedTask!.reminders) {
-        this.selectedTask!.reminders = [];
-      }
-      this.editTaskReminderDates.push(dateStr);
-      this.editTaskReminderTimes.push(timeStr);
-      this.editTaskReminderErrors.push('');
-      this.selectedTask!.reminders.push(this.combineDateTime(dateStr, timeStr));
-    } else {
-      // Modo nueva tarea
-      if (!this.newTask.reminders) {
-        this.newTask.reminders = [];
-      }
-      this.newTaskReminderDates.push(dateStr);
-      this.newTaskReminderTimes.push(timeStr);
-      this.newTaskReminderErrors.push('');
-      this.newTask.reminders.push(this.combineDateTime(dateStr, timeStr));
-    }
-  }
-
-  removeReminder(index: number) {
-    // Determinar si estamos en nueva tarea o editando
-    const isEditing = this.showEditTaskModal && this.selectedTask;
-    
-    if (isEditing) {
-      // Modo edición
-      if (this.selectedTask!.reminders) {
-        this.selectedTask!.reminders.splice(index, 1);
-        this.editTaskReminderDates.splice(index, 1);
-        this.editTaskReminderTimes.splice(index, 1);
-        this.editTaskReminderErrors.splice(index, 1);
-      }
-    } else {
-      // Modo nueva tarea
-      if (this.newTask.reminders) {
-        this.newTask.reminders.splice(index, 1);
-        this.newTaskReminderDates.splice(index, 1);
-        this.newTaskReminderTimes.splice(index, 1);
-        this.newTaskReminderErrors.splice(index, 1);
-      }
-    }
-  }
-
-  addFragment() {
-    if (!this.newTask.fragments) {
-      this.newTask.fragments = [];
-    }
-    const now = new Date();
-    const startTime = new Date(now.getTime() + 30 * 60000);
-    const endTime = new Date(startTime.getTime() + 60 * 60000);
-    
-    this.newTask.fragments.push({
-      start: this.formatDateTimeLocal(startTime),
-      end: this.formatDateTimeLocal(endTime)
-    });
-  }
-
-  removeFragment(index: number) {
-    if (this.newTask.fragments) {
-      this.newTask.fragments.splice(index, 1);
-    }
-  }
 
   openNewEnvironmentModal() {
     this.showNewEnvironmentModal = true;
@@ -1745,6 +1322,16 @@ export class TaskTrackerComponent implements OnInit {
     }
   }
 
+  async onSaveNewEnvironment(env: { name: string; color: string }) {
+    try {
+      this.newEnvironment.name = env.name;
+      this.newEnvironment.color = env.color;
+      await this.saveNewEnvironment();
+    } catch (error) {
+      console.error('Error en onSaveNewEnvironment:', error);
+    }
+  }
+
   async saveNewProject() {
     try {
       const createdProjectId = await this.projectService.createProject(this.newProject as Omit<Project, 'id' | 'userId' | 'createdAt' | 'updatedAt'>);
@@ -1789,14 +1376,6 @@ export class TaskTrackerComponent implements OnInit {
     };
   }
 
-  getTaskProgress(task: Task): number {
-    const start = new Date(task.start + (task.start.includes('Z') ? '' : 'Z'));
-    const end = new Date(task.end + (task.end.includes('Z') ? '' : 'Z'));
-    const now = new Date();
-    const total = end.getTime() - start.getTime();
-    const current = now.getTime() - start.getTime();
-    return Math.min(100, Math.max(0, (current / total) * 100));
-  }
 
   getTasksByEnvironment(environmentId: string): Task[] {
     const visibility = this.getEnvironmentHiddenVisibility(environmentId);
@@ -1833,9 +1412,6 @@ export class TaskTrackerComponent implements OnInit {
       });
   }
 
-  getProjectsByEnvironment(environmentId: string): Project[] {
-    return this.projects.filter(project => project.environment === environmentId);
-  }
 
   getTasksByProject(projectId: string): Task[] {
     // Obtener el environment del proyecto para aplicar su configuración de visibilidad
@@ -1875,24 +1451,6 @@ export class TaskTrackerComponent implements OnInit {
       });
   }
 
-  getProjectName(projectId: string): string {
-    const project = this.projects.find(p => p.id === projectId);
-    return project ? project.name : 'Sin proyecto';
-  }
-
-  formatDate(dateString: string): string {
-    if (!dateString) return '';
-    
-    // El string viene de la base de datos en UTC, convertir a hora local
-    const date = new Date(dateString + (dateString.includes('Z') ? '' : 'Z')); // Asegurar que se interprete como UTC
-    
-    return date.toLocaleString('es-ES', {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  }
 
   onTaskContextMenu(event: MouseEvent, task: Task) {
     event.preventDefault();
@@ -2229,42 +1787,6 @@ export class TaskTrackerComponent implements OnInit {
     this.closeContextMenu();
   }
 
-  // Tooltip completo de tarea para modo lista
-  getTaskTooltip(task: Task): string {
-    const start = this.formatDate(task.start);
-    const end = this.formatDate(task.end);
-    const prio = task.priority;
-    const hiddenIcon = task.hidden ? '🙈 ' : '';
-    return `${hiddenIcon}${task.emoji || ''} ${task.name}\nPrioridad: ${prio}\nInicio: ${start}\nFin: ${end}`.trim();
-  }
-
-  // Utilidades para modo lista
-  private getProjectTasksSorted(projectId: string): Task[] {
-    return this.getTasksByProject(projectId);
-  }
-
-  shouldShowDaySeparator(projectId: string, index: number): boolean {
-    const tasks = this.getProjectTasksSorted(projectId);
-    if (index === 0) return true;
-    const prev = tasks[index - 1];
-    const curr = tasks[index];
-    return this.getDateKey(prev.start) !== this.getDateKey(curr.start);
-  }
-
-  private getDateKey(dateString: string): string {
-    const d = new Date(dateString + (dateString.includes('Z') ? '' : 'Z'));
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  }
-
-  formatListDay(dateString: string): string {
-    const d = new Date(dateString + (dateString.includes('Z') ? '' : 'Z'));
-    return d.toLocaleDateString('es-MX', { weekday: 'short', year: 'numeric', month: 'short', day: '2-digit' });
-  }
-
-  formatTime12(dateString: string): string {
-    const d = new Date(dateString + (dateString.includes('Z') ? '' : 'Z'));
-    return d.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true });
-  }
 
   async deleteTask(task: Task) {
     if (confirm('¿Estás seguro de que quieres eliminar esta tarea?')) {
@@ -2470,34 +1992,6 @@ export class TaskTrackerComponent implements OnInit {
     return env?.name;
   }
 
-  getTasksWithoutProjectInEnvironment(environmentId: string): Task[] {
-    const visibility = this.getEnvironmentHiddenVisibility(environmentId);
-    
-    return this.filteredTasks.filter(task => {
-      // Filtrar por environment y sin proyecto
-      if (task.environment !== environmentId || (task.project && task.project !== '')) return false;
-      
-      // Aplicar filtro de visibilidad según la configuración del environment
-      if (task.hidden) {
-        switch (visibility) {
-          case 'hidden':
-            return false; // No mostrar tareas ocultas
-          case 'show-all':
-            return true; // Mostrar todas las tareas ocultas
-          case 'show-24h':
-            // Mostrar solo las tareas ocultas de las últimas 24 horas
-            const taskDate = new Date(task.start + (task.start.includes('Z') ? '' : 'Z'));
-            const now = new Date();
-            const hoursDiff = (now.getTime() - taskDate.getTime()) / (1000 * 60 * 60);
-            return hoursDiff <= 24;
-          default:
-            return false;
-        }
-      }
-      
-      return true; // Mostrar tareas no ocultas
-    });
-  }
 
   createProjectForEnvironment(environmentId: string) {
     // Preseleccionar el ambiente en el nuevo proyecto
@@ -2605,12 +2099,6 @@ export class TaskTrackerComponent implements OnInit {
     localStorage.setItem('taskTracker_showHidden', JSON.stringify(this.showHidden));
   }
 
-  getCurrentTime(): string {
-    const now = new Date();
-    const hours = now.getHours().toString().padStart(2, '0');
-    const minutes = now.getMinutes().toString().padStart(2, '0');
-    return `${hours}:${minutes}`;
-  }
 
   calculateDuration(startDate: string, startTime: string, endDate: string, endTime: string): number {
     if (!startDate || !startTime || !endDate || !endTime) {
@@ -2670,27 +2158,6 @@ export class TaskTrackerComponent implements OnInit {
     this.validateEditTaskDates();
   }
 
-  // Métodos para el color picker personalizado
-  selectSuggestedColor(color: string): void {
-    this.newEnvironment.color = color;
-    // Convertir hex a HSL para sincronizar el color picker
-    const hsl = this.hexToHsl(color);
-    this.colorPickerHue = hsl.h;
-    this.colorPickerSaturation = hsl.s;
-    this.colorPickerLightness = hsl.l;
-  }
-
-  // Convertir HSL a HEX
-  hslToHex(h: number, s: number, l: number): string {
-    l /= 100;
-    const a = s * Math.min(l, 1 - l) / 100;
-    const f = (n: number) => {
-      const k = (n + h / 30) % 12;
-      const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-      return Math.round(255 * color).toString(16).padStart(2, '0');
-    };
-    return `#${f(0)}${f(8)}${f(4)}`;
-  }
 
   // Convertir HEX a HSL
   hexToHsl(hex: string): {h: number, s: number, l: number} {
@@ -2720,31 +2187,6 @@ export class TaskTrackerComponent implements OnInit {
     };
   }
 
-  // Actualizar color basado en HSL
-  updateColorFromHsl(): void {
-    const hexColor = this.hslToHex(this.colorPickerHue, this.colorPickerSaturation, this.colorPickerLightness);
-    this.newEnvironment.color = hexColor;
-  }
-
-  // Manejar click en el área de saturación/luminosidad
-  onColorAreaClick(event: MouseEvent): void {
-    const rect = (event.target as HTMLElement).getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    
-    this.colorPickerSaturation = Math.round((x / rect.width) * 100);
-    this.colorPickerLightness = Math.round(100 - (y / rect.height) * 100);
-    this.updateColorFromHsl();
-  }
-
-  // Manejar click en la barra de matiz
-  onHueBarClick(event: MouseEvent): void {
-    const rect = (event.target as HTMLElement).getBoundingClientRect();
-    const y = event.clientY - rect.top;
-    
-    this.colorPickerHue = Math.round((y / rect.height) * 360);
-    this.updateColorFromHsl();
-  }
 
   // Inicializar color picker al abrir modal
   initializeColorPicker(): void {
@@ -2802,10 +2244,6 @@ export class TaskTrackerComponent implements OnInit {
     this.updateNewTaskDuration();
   }
 
-  onNewTaskDeadlineTimeChange(time: string) {
-    this.newTaskDeadlineTime = time;
-    this.updateNewTaskDateTime('deadline');
-  }
 
   onEditTaskStartTimeChange(time: string) {
     this.editTaskStartTime = time;
@@ -2819,10 +2257,6 @@ export class TaskTrackerComponent implements OnInit {
     this.updateEditTaskDuration();
   }
 
-  onEditTaskDeadlineTimeChange(time: string) {
-    this.editTaskDeadlineTime = time;
-    this.updateEditTaskDateTime('deadline');
-  }
 
   private updateNewTaskDateTime(field: 'start' | 'end' | 'deadline') {
     let dateValue = '';
@@ -2954,40 +2388,6 @@ export class TaskTrackerComponent implements OnInit {
       return false;
     }
 
-    return true;
-  }
-
-  isNewTaskFormValid(): boolean {
-    return this.validateNewTaskDates() && this.validateNewTaskReminders();
-  }
-
-  isEditTaskFormValid(): boolean {
-    return this.validateEditTaskDates() && this.validateEditTaskReminders();
-  }
-
-  private validateNewTaskReminders(): boolean {
-    if (!this.newTask.reminders || this.newTask.reminders.length === 0) {
-      return true; // Los recordatorios son opcionales
-    }
-
-    for (let i = 0; i < this.newTask.reminders.length; i++) {
-      if (!this.validateNewTaskReminder(i)) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  private validateEditTaskReminders(): boolean {
-    if (!this.selectedTask?.reminders || this.selectedTask.reminders.length === 0) {
-      return true; // Los recordatorios son opcionales
-    }
-
-    for (let i = 0; i < this.selectedTask.reminders.length; i++) {
-      if (!this.validateEditTaskReminder(i)) {
-        return false;
-      }
-    }
     return true;
   }
 
@@ -3206,29 +2606,6 @@ export class TaskTrackerComponent implements OnInit {
     }
   }
 
-  isTaskOverdue(task: Task): boolean {
-    // Solo marcar como vencida si no está completada
-    if (task.status === 'completed' || task.completed) {
-      return false;
-    }
-    
-    const endDate = new Date(task.end + (task.end.includes('Z') ? '' : 'Z'));
-    const now = new Date();
-    return endDate < now;
-  }
-
-  isTaskRunning(task: Task): boolean {
-    // Verificar si la tarea está en progreso (no completada y en horario actual)
-    if (task.status === 'completed' || task.completed) {
-      return false;
-    }
-    
-    const startDate = new Date(task.start + (task.start.includes('Z') ? '' : 'Z'));
-    const endDate = new Date(task.end + (task.end.includes('Z') ? '' : 'Z'));
-    const now = new Date();
-    
-    return startDate <= now && now <= endDate;
-  }
 
   // Nuevo: Métodos para manejar environments
   get orderedEnvironments(): Environment[] {
@@ -3257,66 +2634,6 @@ export class TaskTrackerComponent implements OnInit {
     );
   }
 
-  // Estado de colapso por proyecto
-  isProjectCollapsed(projectId: string): boolean {
-    // Por defecto, los proyectos están expandidos (false)
-    return !!this.collapsedProjects[projectId];
-  }
-
-  toggleProjectCollapse(projectId: string): void {
-    this.collapsedProjects[projectId] = !this.isProjectCollapsed(projectId);
-  }
-
-  // Determinar si todos los proyectos del ambiente están colapsados
-  areAllProjectsCollapsed(environmentId: string): boolean {
-    const projects = this.getProjectsByEnvironment(environmentId);
-    if (projects.length === 0) return false;
-    // Considerar solo proyectos con tareas visibles
-    const projectsWithTasks = projects.filter(p => this.getTasksByProject(p.id).length > 0);
-    if (projectsWithTasks.length === 0) return false;
-    return projectsWithTasks.every(p => this.isProjectCollapsed(p.id));
-  }
-
-  // Colapsar/expandir todos los proyectos con tareas en un environment
-  toggleCollapseAllProjectsInEnvironment(environmentId: string): void {
-    const shouldCollapse = !this.areAllProjectsCollapsed(environmentId);
-    this.getProjectsByEnvironment(environmentId)
-      .filter(p => this.getTasksByProject(p.id).length > 0)
-      .forEach(p => {
-        this.collapsedProjects[p.id] = shouldCollapse;
-      });
-  }
-
-  isEnvironmentCollapsed(environmentId: string): boolean {
-    // Si el environment tiene tareas, nunca está colapsado
-    if (this.environmentHasTasks(environmentId)) {
-      return false;
-    }
-    
-    // Para environments vacíos, verificar el estado global o individual
-    if (this.collapsedEnvironments.hasOwnProperty(environmentId)) {
-      return this.collapsedEnvironments[environmentId];
-    }
-    
-    return this.collapsedEmptyEnvironments;
-  }
-
-  toggleEnvironmentCollapse(environmentId: string): void {
-    // Solo permitir colapsar environments vacíos
-    if (!this.environmentHasTasks(environmentId)) {
-      this.collapsedEnvironments[environmentId] = !this.isEnvironmentCollapsed(environmentId);
-    }
-  }
-
-  toggleAllEmptyEnvironments(): void {
-    this.collapsedEmptyEnvironments = !this.collapsedEmptyEnvironments;
-    // Limpiar estados individuales para que se use el estado global
-    this.collapsedEnvironments = {};
-  }
-
-  get emptyEnvironmentsCount(): number {
-    return this.environments.filter(env => !this.environmentHasTasks(env.id)).length;
-  }
 
   getEnvironmentHiddenVisibility(envId: string): 'show-all' | 'show-24h' | 'hidden' {
     // Si el filtro global está activado, siempre mostrar todas las tareas ocultas
@@ -3386,114 +2703,6 @@ export class TaskTrackerComponent implements OnInit {
     }
   }
 
-  getStatusChangeModalTitle(): string {
-    if (!this.pendingStatusChange) return '';
-    
-    const statusNames = {
-      'pending': 'Pendiente',
-      'in-progress': 'En Progreso', 
-      'completed': 'Completada'
-    };
-    
-    return `Cambiar estado a ${statusNames[this.pendingStatusChange.status]}`;
-  }
-
-  getStatusChangeModalMessage(): string {
-    if (!this.pendingStatusChange) return '';
-    
-    if (this.statusChangeWillHide) {
-      return '¿Deseas ocultar la tarea después de marcarla como completada?';
-    } else {
-      return '¿Deseas mostrar la tarea después de cambiar su estado? (en caso de que esté oculta)';
-    }
-  }
-
-  // Métodos para manejar recordatorios en nueva tarea
-  onNewTaskReminderDateChange(index: number, date: string) {
-    this.newTaskReminderDates[index] = date;
-    this.updateNewTaskReminderDateTime(index);
-  }
-
-  onNewTaskReminderTimeChange(index: number, time: string) {
-    this.newTaskReminderTimes[index] = time;
-    this.updateNewTaskReminderDateTime(index);
-  }
-
-  // Métodos para manejar recordatorios en edición de tarea
-  onEditTaskReminderDateChange(index: number, date: string) {
-    this.editTaskReminderDates[index] = date;
-    this.updateEditTaskReminderDateTime(index);
-  }
-
-  onEditTaskReminderTimeChange(index: number, time: string) {
-    this.editTaskReminderTimes[index] = time;
-    this.updateEditTaskReminderDateTime(index);
-  }
-
-  private updateNewTaskReminderDateTime(index: number) {
-    const date = this.newTaskReminderDates[index];
-    const time = this.newTaskReminderTimes[index];
-    
-    if (date && time) {
-      const combinedDateTime = this.combineDateTime(date, time);
-      if (this.newTask.reminders) {
-        this.newTask.reminders[index] = combinedDateTime;
-      }
-      this.validateNewTaskReminder(index);
-    }
-  }
-
-  private updateEditTaskReminderDateTime(index: number) {
-    const date = this.editTaskReminderDates[index];
-    const time = this.editTaskReminderTimes[index];
-    
-    if (date && time && this.selectedTask?.reminders) {
-      const combinedDateTime = this.combineDateTime(date, time);
-      this.selectedTask.reminders[index] = combinedDateTime;
-      this.validateEditTaskReminder(index);
-    }
-  }
-
-  private validateNewTaskReminder(index: number): boolean {
-    const reminderDateTime = this.newTask.reminders?.[index];
-    if (!reminderDateTime) {
-      this.newTaskReminderErrors[index] = '';
-      return true;
-    }
-
-    const reminderDate = new Date(reminderDateTime);
-    const now = new Date();
-
-    // Opcional: validar que el recordatorio no sea en el pasado
-    if (reminderDate < now) {
-      this.newTaskReminderErrors[index] = 'El recordatorio no puede ser en el pasado';
-      return false;
-    }
-
-    this.newTaskReminderErrors[index] = '';
-    return true;
-  }
-
-  private validateEditTaskReminder(index: number): boolean {
-    const reminderDateTime = this.selectedTask?.reminders?.[index];
-    if (!reminderDateTime) {
-      this.editTaskReminderErrors[index] = '';
-      return true;
-    }
-
-    const reminderDate = new Date(reminderDateTime);
-    const now = new Date();
-
-    // Opcional: validar que el recordatorio no sea en el pasado
-    if (reminderDate < now) {
-      this.editTaskReminderErrors[index] = 'El recordatorio no puede ser en el pasado';
-      return false;
-    }
-
-    this.editTaskReminderErrors[index] = '';
-    return true;
-  }
-
   // Métodos para modal de recordatorios
   openRemindersModal(context: 'new' | 'edit') {
     this.remindersModalContext = context;
@@ -3503,11 +2712,6 @@ export class TaskTrackerComponent implements OnInit {
 
   closeRemindersModal() {
     this.showRemindersModal = false;
-    this.resetReminderInputs();
-  }
-
-  setRemindersTab(tab: 'relative' | 'now' | 'ai' | 'manual') {
-    this.remindersActiveTab = tab;
     this.resetReminderInputs();
   }
 
@@ -3523,455 +2727,4 @@ export class TaskTrackerComponent implements OnInit {
     this.reminderManualError = '';
   }
 
-  // Obtener fechas de referencia para el modal
-  getTaskReferenceDates() {
-    if (this.remindersModalContext === 'new') {
-      return {
-        start: this.newTask.start,
-        end: this.newTask.end,
-        deadline: this.newTask.deadline
-      };
-    } else {
-      return {
-        start: this.selectedTask?.start,
-        end: this.selectedTask?.end,
-        deadline: this.selectedTask?.deadline
-      };
-    }
-  }
-
-  // Categorizar recordatorios
-  getCategorizedReminders() {
-    const reminders = this.remindersModalContext === 'new' 
-      ? this.newTask.reminders || []
-      : this.selectedTask?.reminders || [];
-    
-    const dates = this.getTaskReferenceDates();
-    // Asegurar que todas las fechas se interpreten como UTC
-    const startDate = dates.start ? new Date(dates.start + (dates.start.includes('Z') ? '' : 'Z')) : null;
-    const endDate = dates.end ? new Date(dates.end + (dates.end.includes('Z') ? '' : 'Z')) : null;
-    const deadlineDate = dates.deadline ? new Date(dates.deadline + (dates.deadline.includes('Z') ? '' : 'Z')) : null;
-
-    const categorized = {
-      beforeStart: [] as Array<{reminder: string, index: number, description: string}>,
-      duringEvent: [] as Array<{reminder: string, index: number, description: string}>,
-      beforeDeadline: [] as Array<{reminder: string, index: number, description: string}>,
-      afterDeadline: [] as Array<{reminder: string, index: number, description: string}>
-    };
-
-    reminders.forEach((reminder, index) => {
-      // Asegurar que el recordatorio se interprete como UTC
-      const reminderDate = new Date(reminder + (reminder.includes('Z') ? '' : 'Z'));
-      const description = this.generateReminderDescription(reminderDate, dates);
-      
-      if (startDate && reminderDate < startDate) {
-        // Antes del inicio del evento
-        categorized.beforeStart.push({reminder, index, description});
-      } else if (endDate && reminderDate <= endDate) {
-        // Durante el evento (entre inicio y fin)
-        categorized.duringEvent.push({reminder, index, description});
-      } else if (deadlineDate && endDate && reminderDate > endDate && reminderDate <= deadlineDate) {
-        // Entre el fin del evento y la fecha límite
-        categorized.beforeDeadline.push({reminder, index, description});
-      } else if (deadlineDate && reminderDate > deadlineDate) {
-        // Después de la fecha límite
-        categorized.afterDeadline.push({reminder, index, description});
-      } else {
-        // Si no hay fecha límite pero está después del fin, va a "durante el evento"
-        categorized.duringEvent.push({reminder, index, description});
-      }
-    });
-
-    return categorized;
-  }
-
-  // Getter para vista de recordatorios - maneja contexto actual automáticamente
-  get currentCategorizedReminders() {
-    if (this.showRemindersModal) {
-      return this.getCategorizedReminders();
-    }
-    
-    // Para las vistas principales, determinar contexto según modal activo
-    if (this.showEditTaskModal && this.selectedTask?.reminders) {
-      this.remindersModalContext = 'edit';
-      return this.getCategorizedReminders();
-    } else if (this.showNewTaskModal && this.newTask.reminders) {
-      this.remindersModalContext = 'new';
-      return this.getCategorizedReminders();
-    }
-    
-    // Valor por defecto si no hay contexto válido
-    return {
-      beforeStart: [],
-      duringEvent: [],
-      beforeDeadline: [],
-      afterDeadline: []
-    };
-  }
-
-  private generateReminderDescription(reminderDate: Date, dates: any): string {
-    // Asegurar que todas las fechas se interpreten como UTC
-    const startDate = dates.start ? new Date(dates.start + (dates.start.includes('Z') ? '' : 'Z')) : null;
-    const endDate = dates.end ? new Date(dates.end + (dates.end.includes('Z') ? '' : 'Z')) : null;
-    const deadlineDate = dates.deadline ? new Date(dates.deadline + (dates.deadline.includes('Z') ? '' : 'Z')) : null;
-
-    // Si hay fecha límite y el recordatorio está después del fin del evento, 
-    // calcular en relación a la fecha límite
-    if (deadlineDate && endDate && reminderDate > endDate) {
-      if (reminderDate <= deadlineDate) {
-        const diffMinutes = Math.floor((deadlineDate.getTime() - reminderDate.getTime()) / (1000 * 60));
-        return this.formatTimeDifference(diffMinutes, 'antes del límite');
-      } else {
-        const diffMinutes = Math.floor((reminderDate.getTime() - deadlineDate.getTime()) / (1000 * 60));
-        return this.formatTimeDifference(diffMinutes, 'después del límite');
-      }
-    }
-    
-    // Lógica original para otros casos
-    if (startDate && reminderDate < startDate) {
-      const diffMinutes = Math.floor((startDate.getTime() - reminderDate.getTime()) / (1000 * 60));
-      return this.formatTimeDifference(diffMinutes, 'antes del inicio');
-    } else if (endDate && reminderDate > endDate && !deadlineDate) {
-      // Solo usar "después del final" si NO hay fecha límite
-      const diffMinutes = Math.floor((reminderDate.getTime() - endDate.getTime()) / (1000 * 60));
-      return this.formatTimeDifference(diffMinutes, 'después del final');
-    } else if (startDate) {
-      const diffMinutes = Math.floor((reminderDate.getTime() - startDate.getTime()) / (1000 * 60));
-      return this.formatTimeDifference(Math.abs(diffMinutes), diffMinutes >= 0 ? 'después del inicio' : 'antes del inicio');
-    }
-    
-    return 'Recordatorio personalizado';
-  }
-
-  private formatTimeDifference(minutes: number, context: string): string {
-    if (minutes < 60) {
-      return `${minutes} minutos ${context}`;
-    } else if (minutes < 1440) {
-      const hours = Math.floor(minutes / 60);
-      const remainingMinutes = minutes % 60;
-      if (remainingMinutes === 0) {
-        return `${hours} hora${hours > 1 ? 's' : ''} ${context}`;
-      } else {
-        return `${hours}h ${remainingMinutes}m ${context}`;
-      }
-    } else {
-      const days = Math.floor(minutes / 1440);
-      const remainingHours = Math.floor((minutes % 1440) / 60);
-      if (remainingHours === 0) {
-        return `${days} día${days > 1 ? 's' : ''} ${context}`;
-      } else {
-        return `${days}d ${remainingHours}h ${context}`;
-      }
-    }
-  }
-
-  // Métodos para agregar recordatorios desde el modal especializado
-  addRelativeReminder() {
-    try {
-      const dates = this.getTaskReferenceDates();
-      const referenceDate = dates[this.reminderRelativeReference];
-      
-      if (!referenceDate) {
-        this.reminderRelativeError = 'Fecha de referencia no disponible';
-        return;
-      }
-
-      const minutes = this.parseTimeExpression(this.reminderRelativeTime);
-      if (minutes === null) {
-        this.reminderRelativeError = 'Formato de tiempo inválido';
-        return;
-      }
-
-      // Asegurar que la fecha de referencia se interprete como UTC
-      const baseDate = new Date(referenceDate + (referenceDate.includes('Z') ? '' : 'Z'));
-      const reminderDate = new Date(baseDate.getTime() + 
-        (this.reminderRelativeDirection === 'before' ? -minutes : minutes) * 60 * 1000);
-
-      // Validar que el recordatorio no sea en el pasado
-      const now = new Date();
-      if (reminderDate < now) {
-        this.reminderRelativeError = 'El recordatorio calculado está en el pasado. Por favor, ajusta el tiempo para que sea en el futuro.';
-        return;
-      }
-
-      this.addReminderToCurrentContext(reminderDate);
-      this.reminderRelativeTime = '';
-      this.reminderRelativeError = '';
-    } catch (error) {
-      this.reminderRelativeError = 'Error al calcular el recordatorio';
-    }
-  }
-
-  addFromNowReminder() {
-    try {
-      const minutes = this.parseTimeExpression(this.reminderFromNowTime);
-      if (minutes === null) {
-        this.reminderFromNowError = 'Formato de tiempo inválido';
-        return;
-      }
-
-      const now = new Date();
-      let reminderDate: Date;
-
-      switch (this.reminderFromNowDirection) {
-        case 'in':
-          reminderDate = new Date(now.getTime() + minutes * 60 * 1000);
-          break;
-        case 'before':
-          reminderDate = new Date(now.getTime() - minutes * 60 * 1000);
-          break;
-        case 'after':
-          reminderDate = new Date(now.getTime() + minutes * 60 * 1000);
-          break;
-        default:
-          reminderDate = new Date(now.getTime() + minutes * 60 * 1000);
-      }
-
-      // Validar que el recordatorio no sea en el pasado
-      if (reminderDate < now) {
-        this.reminderFromNowError = 'El recordatorio no puede ser en el pasado. Por favor, usa "En" con un tiempo positivo.';
-        return;
-      }
-
-      this.addReminderToCurrentContext(reminderDate);
-      this.reminderFromNowTime = '';
-      this.reminderFromNowError = '';
-    } catch (error) {
-      this.reminderFromNowError = 'Error al calcular el recordatorio';
-    }
-  }
-
-  addManualReminder() {
-    try {
-      if (!this.reminderManualDate || !this.reminderManualTime) {
-        this.reminderManualError = 'Fecha y hora son requeridos';
-        return;
-      }
-
-      // Crear fecha directamente en zona horaria local sin conversión
-      const [hours, minutes] = this.reminderManualTime.split(':');
-      const year = parseInt(this.reminderManualDate.substring(0, 4));
-      const month = parseInt(this.reminderManualDate.substring(5, 7)) - 1; // Meses en JS son 0-11
-      const day = parseInt(this.reminderManualDate.substring(8, 10));
-      
-      const reminderDate = new Date(year, month, day, parseInt(hours), parseInt(minutes), 0, 0);
-      
-      // Validar que el recordatorio no sea en el pasado
-      const now = new Date();
-      if (reminderDate < now) {
-        this.reminderManualError = 'El recordatorio no puede ser en el pasado. Por favor, selecciona una fecha y hora futura.';
-        return;
-      }
-      
-      this.addReminderToCurrentContext(reminderDate);
-      this.reminderManualDate = '';
-      this.reminderManualTime = '';
-      this.reminderManualError = '';
-    } catch (error) {
-      this.reminderManualError = 'Fecha u hora inválidas';
-    }
-  }
-
-  processAiReminder() {
-    // Por ahora, implementaremos un parsing básico de lenguaje natural
-    try {
-      const input = this.reminderAiInput.toLowerCase().trim();
-      const dates = this.getTaskReferenceDates();
-      
-      // Patrones básicos de reconocimiento
-      const patterns = [
-        {
-          regex: /(\d+)\s*(minuto|minutos|min|m)\s*(antes|después)\s*del?\s*(inicio|final|límite)/,
-          handler: (matches: RegExpMatchArray) => {
-            const minutes = parseInt(matches[1]);
-            const direction = matches[3] === 'antes' ? 'before' : 'after';
-            const reference = matches[4] === 'inicio' ? 'start' : 
-                            matches[4] === 'final' ? 'end' : 'deadline';
-            
-            const refDate = dates[reference as keyof typeof dates];
-            if (!refDate) throw new Error('Fecha de referencia no encontrada');
-            
-            // Asegurar que la fecha se interprete como UTC
-            const baseDate = new Date(refDate + (refDate.includes('Z') ? '' : 'Z'));
-            return new Date(baseDate.getTime() + 
-              (direction === 'before' ? -minutes : minutes) * 60 * 1000);
-          }
-        },
-        {
-          regex: /(\d+)\s*(hora|horas|h)\s*(antes|después)\s*del?\s*(inicio|final|límite)/,
-          handler: (matches: RegExpMatchArray) => {
-            const hours = parseInt(matches[1]);
-            const direction = matches[3] === 'antes' ? 'before' : 'after';
-            const reference = matches[4] === 'inicio' ? 'start' : 
-                            matches[4] === 'final' ? 'end' : 'deadline';
-            
-            const refDate = dates[reference as keyof typeof dates];
-            if (!refDate) throw new Error('Fecha de referencia no encontrada');
-            
-            // Asegurar que la fecha se interprete como UTC
-            const baseDate = new Date(refDate + (refDate.includes('Z') ? '' : 'Z'));
-            return new Date(baseDate.getTime() + 
-              (direction === 'before' ? -hours : hours) * 60 * 60 * 1000);
-          }
-        }
-      ];
-
-      let reminderDate: Date | null = null;
-      
-      for (const pattern of patterns) {
-        const matches = input.match(pattern.regex);
-        if (matches) {
-          reminderDate = pattern.handler(matches);
-          break;
-        }
-      }
-
-      if (!reminderDate) {
-        this.reminderAiError = 'No se pudo interpretar el recordatorio. Intenta con: "15 minutos antes del inicio"';
-        return;
-      }
-
-      // Validar que el recordatorio no sea en el pasado
-      const now = new Date();
-      if (reminderDate < now) {
-        this.reminderAiError = 'El recordatorio interpretado está en el pasado. Por favor, especifica un recordatorio futuro.';
-        return;
-      }
-
-      this.addReminderToCurrentContext(reminderDate);
-      this.reminderAiInput = '';
-      this.reminderAiError = '';
-    } catch (error) {
-      this.reminderAiError = 'Error al interpretar el recordatorio';
-    }
-  }
-
-  private addReminderToCurrentContext(reminderDate: Date) {
-    const reminderString = reminderDate.toISOString();
-    
-    if (this.remindersModalContext === 'new') {
-      if (!this.newTask.reminders) this.newTask.reminders = [];
-      this.newTask.reminders.push(reminderString);
-      this.newTask.reminders.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-    } else {
-      if (!this.selectedTask!.reminders) this.selectedTask!.reminders = [];
-      this.selectedTask!.reminders.push(reminderString);
-      this.selectedTask!.reminders.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-    }
-  }
-
-  // Parser de expresiones de tiempo con soporte para matemáticas
-  private parseTimeExpression(input: string): number | null {
-    try {
-      let expression = input.trim().toLowerCase();
-      
-      // Reemplazar unidades de tiempo
-      expression = expression.replace(/\s*h\s*/g, '*60');
-      expression = expression.replace(/\s*m\s*/g, '');
-      expression = expression.replace(/\s*min\s*/g, '');
-      expression = expression.replace(/\s*minuto[s]?\s*/g, '');
-      expression = expression.replace(/\s*hora[s]?\s*/g, '*60');
-      
-      // Limpiar espacios
-      expression = expression.replace(/\s+/g, '');
-      
-      // Validar que solo contenga números, operadores y paréntesis
-      if (!/^[\d+\-*/().]+$/.test(expression)) {
-        return null;
-      }
-      
-      // Evaluar la expresión matemática de forma segura
-      const result = this.safeEval(expression);
-      return typeof result === 'number' && !isNaN(result) ? Math.round(result) : null;
-    } catch {
-      return null;
-    }
-  }
-
-  private safeEval(expression: string): number {
-    // Implementación segura de evaluación matemática
-    const allowedChars = /^[\d+\-*/().]+$/;
-    if (!allowedChars.test(expression)) {
-      throw new Error('Invalid expression');
-    }
-    
-    try {
-      return Function(`"use strict"; return (${expression})`)();
-    } catch {
-      throw new Error('Evaluation failed');
-    }
-  }
-
-  // Métodos para gestionar recordatorios individuales
-  editReminder(index: number) {
-    const reminders = this.remindersModalContext === 'new' 
-      ? this.newTask.reminders || []
-      : this.selectedTask?.reminders || [];
-    
-    const reminder = reminders[index];
-    if (reminder) {
-      const reminderDate = new Date(reminder);
-      const { date, time } = this.splitDateTime(reminder);
-      
-      this.reminderManualDate = date;
-      this.reminderManualTime = time;
-      this.setRemindersTab('manual');
-      
-      // Eliminar el recordatorio actual para reemplazarlo
-      this.deleteReminder(index);
-    }
-  }
-
-  cloneReminder(index: number) {
-    const reminders = this.remindersModalContext === 'new' 
-      ? this.newTask.reminders || []
-      : this.selectedTask?.reminders || [];
-    
-    const reminder = reminders[index];
-    if (reminder) {
-      // Clonar el recordatorio agregando 5 minutos
-      // Asegurar que la fecha se interprete como UTC
-      const originalDate = new Date(reminder + (reminder.includes('Z') ? '' : 'Z'));
-      const clonedDate = new Date(originalDate.getTime() + 5 * 60 * 1000);
-      this.addReminderToCurrentContext(clonedDate);
-    }
-  }
-
-  deleteReminder(index: number) {
-    if (this.remindersModalContext === 'new') {
-      if (this.newTask.reminders) {
-        this.newTask.reminders.splice(index, 1);
-      }
-    } else {
-      if (this.selectedTask?.reminders) {
-        this.selectedTask.reminders.splice(index, 1);
-      }
-    }
-  }
-
-  formatReminderDateTime(dateTimeString: string): string {
-    // Asegurar que el string se interprete como UTC si no tiene indicador de zona horaria
-    const utcString = dateTimeString.includes('Z') || dateTimeString.includes('+') 
-      ? dateTimeString 
-      : dateTimeString + 'Z';
-    
-    // Crear fecha desde el string UTC
-    const date = new Date(utcString);
-    
-    // Verificar si la fecha es válida
-    if (isNaN(date.getTime())) {
-      return 'Fecha inválida';
-    }
-    
-    // Formatear usando la zona horaria de México con formato de 12 horas
-    return date.toLocaleString('es-MX', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: 'numeric',  // Cambiado de '2-digit' a 'numeric' para formato 12h
-      minute: '2-digit',
-      hour12: true,     // Especificar formato de 12 horas
-      timeZone: 'America/Mexico_City'
-    });
-  }
 } 
