@@ -327,6 +327,67 @@ export class TaskTrackerComponent implements OnInit {
   filterTasks() {
     let tasksToFilter = this.tasks.filter(task => task.environment && task.environment !== '');
     
+    // Aplicar filtros por fecha por environment
+    tasksToFilter = tasksToFilter.filter(task => {
+      if (!task.environment) return true;
+      
+      const visibility = this.getEnvironmentHiddenVisibility(task.environment);
+      const dateRange = this.environmentDateRanges[task.environment];
+      const hasDateRangeFilter = dateRange && (dateRange.mode === 'day' && dateRange.singleDate || dateRange.mode === 'range' && dateRange.startDate && dateRange.endDate);
+      
+      // Si hay filtro por fecha activo, aplicarlo
+      if (hasDateRangeFilter) {
+        // Extraer solo la fecha (sin hora) de la tarea
+        const taskStartDate = new Date(task.start + (task.start.includes('Z') ? '' : 'Z'));
+        const taskYear = taskStartDate.getUTCFullYear();
+        const taskMonth = taskStartDate.getUTCMonth();
+        const taskDay = taskStartDate.getUTCDate();
+        
+        if (dateRange.mode === 'day' && dateRange.singleDate) {
+          // Filtrar por día único
+          const filterParts = dateRange.singleDate.split('-');
+          if (filterParts.length === 3) {
+            const filterYear = parseInt(filterParts[0], 10);
+            const filterMonth = parseInt(filterParts[1], 10) - 1;
+            const filterDay = parseInt(filterParts[2], 10);
+            
+            if (taskYear !== filterYear || taskMonth !== filterMonth || taskDay !== filterDay) {
+              return false;
+            }
+          } else {
+            return false;
+          }
+        } else if (dateRange.mode === 'range' && dateRange.startDate && dateRange.endDate) {
+          // Filtrar por rango de fechas
+          const startParts = dateRange.startDate.split('-');
+          const endParts = dateRange.endDate.split('-');
+          
+          if (startParts.length === 3 && endParts.length === 3) {
+            const startYear = parseInt(startParts[0], 10);
+            const startMonth = parseInt(startParts[1], 10) - 1;
+            const startDay = parseInt(startParts[2], 10);
+            
+            const endYear = parseInt(endParts[0], 10);
+            const endMonth = parseInt(endParts[1], 10) - 1;
+            const endDay = parseInt(endParts[2], 10);
+            
+            // Crear fechas para comparación (solo fecha, sin hora)
+            const taskDate = new Date(Date.UTC(taskYear, taskMonth, taskDay));
+            const startDate = new Date(Date.UTC(startYear, startMonth, startDay));
+            const endDate = new Date(Date.UTC(endYear, endMonth, endDay));
+            
+            if (taskDate < startDate || taskDate > endDate) {
+              return false;
+            }
+          } else {
+            return false;
+          }
+        }
+      }
+      
+      return true;
+    });
+    
     if (this.searchQuery) {
       const q = this.searchQuery.toLowerCase();
       tasksToFilter = tasksToFilter.filter(task =>
@@ -585,45 +646,22 @@ export class TaskTrackerComponent implements OnInit {
   getTasksByEnvironment(environmentId: string): Task[] {
     const visibility = this.getEnvironmentHiddenVisibility(environmentId);
     const dateRange = this.environmentDateRanges[environmentId];
+    const hasDateRangeFilter = dateRange && (dateRange.mode === 'day' && dateRange.singleDate || dateRange.mode === 'range' && dateRange.startDate && dateRange.endDate);
     
-    return this.filteredTasks
+    const filtered = this.filteredTasks
       .filter(task => {
         // Filtrar por environment
         if (task.environment !== environmentId) return false;
         
-        // Aplicar filtro por fecha si está activo
-        if (visibility === 'date-range' && dateRange) {
-          const taskStartDate = new Date(task.start + (task.start.includes('Z') ? '' : 'Z'));
-          taskStartDate.setHours(0, 0, 0, 0);
-          
-          if (dateRange.mode === 'day' && dateRange.singleDate) {
-            // Filtrar por día único
-            const filterDate = new Date(dateRange.singleDate);
-            filterDate.setHours(0, 0, 0, 0);
-            const taskDateOnly = new Date(taskStartDate);
-            taskDateOnly.setHours(0, 0, 0, 0);
-            
-            if (taskDateOnly.getTime() !== filterDate.getTime()) {
-              return false;
-            }
-          } else if (dateRange.mode === 'range' && dateRange.startDate && dateRange.endDate) {
-            // Filtrar por rango de fechas
-            const startDate = new Date(dateRange.startDate);
-            startDate.setHours(0, 0, 0, 0);
-            const endDate = new Date(dateRange.endDate);
-            endDate.setHours(23, 59, 59, 999);
-            
-            if (taskStartDate < startDate || taskStartDate > endDate) {
-              return false;
-            }
-          } else {
-            // Si no hay fecha seleccionada, no mostrar nada
-            return false;
-          }
-        }
-        
         // Aplicar filtro de visibilidad según la configuración del environment
+        // Si hay filtro por fecha activo, las tareas ya fueron filtradas por fecha en filterTasks()
+        // y las tareas ocultas que pasaron el filtro se muestran
         if (task.hidden) {
+          // Si hay filtro por fecha activo, las tareas ocultas que pasaron el filtro se muestran
+          if (hasDateRangeFilter) {
+            return true; // Ya pasó el filtro por fecha en filterTasks()
+          }
+          
           switch (visibility) {
             case 'hidden':
               return false; // No mostrar tareas ocultas
@@ -637,6 +675,7 @@ export class TaskTrackerComponent implements OnInit {
               return hoursDiff <= 24;
             case 'date-range':
               // En modo date-range, las tareas ocultas también se muestran si están en el rango
+              // (el filtro por fecha ya se aplicó arriba, así que si llegamos aquí, la tarea está en el rango)
               return true;
             default:
               return false;
@@ -644,13 +683,29 @@ export class TaskTrackerComponent implements OnInit {
         }
         
         return true; // Mostrar tareas no ocultas
-      })
-      .sort((a, b) => {
-        const dateA = new Date(a.start + (a.start.includes('Z') ? '' : 'Z')).getTime();
-        const dateB = new Date(b.start + (b.start.includes('Z') ? '' : 'Z')).getTime();
-        const sortOrder = this.getEnvironmentSortOrder(environmentId);
-        return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
       });
+    
+    const sortOrder = this.getEnvironmentSortOrder(environmentId);
+    
+    // Ordenar primero por día (sin hora) según el ordenamiento, luego por hora dentro del día
+    return filtered.sort((a, b) => {
+      const dateA = new Date(a.start + (a.start.includes('Z') ? '' : 'Z'));
+      const dateB = new Date(b.start + (b.start.includes('Z') ? '' : 'Z'));
+      
+      // Obtener solo la fecha (sin hora) para comparar días
+      const dayA = new Date(dateA.getUTCFullYear(), dateA.getUTCMonth(), dateA.getUTCDate()).getTime();
+      const dayB = new Date(dateB.getUTCFullYear(), dateB.getUTCMonth(), dateB.getUTCDate()).getTime();
+      
+      // Comparar días primero
+      if (dayA !== dayB) {
+        return sortOrder === 'desc' ? dayB - dayA : dayA - dayB;
+      }
+      
+      // Si están en el mismo día, ordenar por hora según el ordenamiento
+      const timeA = dateA.getTime();
+      const timeB = dateB.getTime();
+      return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
+    });
   }
 
 
@@ -660,45 +715,22 @@ export class TaskTrackerComponent implements OnInit {
     const environmentId = project?.environment || '';
     const visibility = this.getEnvironmentHiddenVisibility(environmentId);
     const dateRange = this.environmentDateRanges[environmentId];
+    const hasDateRangeFilter = dateRange && (dateRange.mode === 'day' && dateRange.singleDate || dateRange.mode === 'range' && dateRange.startDate && dateRange.endDate);
     
-    return this.filteredTasks
+    const filtered = this.filteredTasks
       .filter(task => {
         // Filtrar por proyecto
         if (task.project !== projectId) return false;
         
-        // Aplicar filtro por fecha si está activo
-        if (visibility === 'date-range' && dateRange) {
-          const taskStartDate = new Date(task.start + (task.start.includes('Z') ? '' : 'Z'));
-          taskStartDate.setHours(0, 0, 0, 0);
-          
-          if (dateRange.mode === 'day' && dateRange.singleDate) {
-            // Filtrar por día único
-            const filterDate = new Date(dateRange.singleDate);
-            filterDate.setHours(0, 0, 0, 0);
-            const taskDateOnly = new Date(taskStartDate);
-            taskDateOnly.setHours(0, 0, 0, 0);
-            
-            if (taskDateOnly.getTime() !== filterDate.getTime()) {
-              return false;
-            }
-          } else if (dateRange.mode === 'range' && dateRange.startDate && dateRange.endDate) {
-            // Filtrar por rango de fechas
-            const startDate = new Date(dateRange.startDate);
-            startDate.setHours(0, 0, 0, 0);
-            const endDate = new Date(dateRange.endDate);
-            endDate.setHours(23, 59, 59, 999);
-            
-            if (taskStartDate < startDate || taskStartDate > endDate) {
-              return false;
-            }
-          } else {
-            // Si no hay fecha seleccionada, no mostrar nada
-            return false;
-          }
-        }
-        
         // Aplicar filtro de visibilidad según la configuración del environment padre
+        // Si hay filtro por fecha activo, las tareas ya fueron filtradas por fecha en filterTasks()
+        // y las tareas ocultas que pasaron el filtro se muestran
         if (task.hidden) {
+          // Si hay filtro por fecha activo, las tareas ocultas que pasaron el filtro se muestran
+          if (hasDateRangeFilter) {
+            return true; // Ya pasó el filtro por fecha en filterTasks()
+          }
+          
           switch (visibility) {
             case 'hidden':
               return false; // No mostrar tareas ocultas
@@ -712,6 +744,7 @@ export class TaskTrackerComponent implements OnInit {
               return hoursDiff <= 24;
             case 'date-range':
               // En modo date-range, las tareas ocultas también se muestran si están en el rango
+              // (el filtro por fecha ya se aplicó arriba, así que si llegamos aquí, la tarea está en el rango)
               return true;
             default:
               return false;
@@ -719,13 +752,29 @@ export class TaskTrackerComponent implements OnInit {
         }
         
         return true; // Mostrar tareas no ocultas
-      })
-      .sort((a, b) => {
-        const dateA = new Date(a.start + (a.start.includes('Z') ? '' : 'Z')).getTime();
-        const dateB = new Date(b.start + (b.start.includes('Z') ? '' : 'Z')).getTime();
-        const sortOrder = this.getEnvironmentSortOrder(environmentId);
-        return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
       });
+    
+    const sortOrder = this.getEnvironmentSortOrder(environmentId);
+    
+    // Ordenar primero por día (sin hora) según el ordenamiento, luego por hora dentro del día
+    return filtered.sort((a, b) => {
+      const dateA = new Date(a.start + (a.start.includes('Z') ? '' : 'Z'));
+      const dateB = new Date(b.start + (b.start.includes('Z') ? '' : 'Z'));
+      
+      // Obtener solo la fecha (sin hora) para comparar días
+      const dayA = new Date(dateA.getUTCFullYear(), dateA.getUTCMonth(), dateA.getUTCDate()).getTime();
+      const dayB = new Date(dateB.getUTCFullYear(), dateB.getUTCMonth(), dateB.getUTCDate()).getTime();
+      
+      // Comparar días primero
+      if (dayA !== dayB) {
+        return sortOrder === 'desc' ? dayB - dayA : dayA - dayB;
+      }
+      
+      // Si están en el mismo día, ordenar por hora según el ordenamiento
+      const timeA = dateA.getTime();
+      const timeB = dateB.getTime();
+      return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
+    });
   }
 
 

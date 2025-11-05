@@ -316,7 +316,7 @@ export class BoardViewComponent {
 
   getTasksByEnvironment(environmentId: string): Task[] {
     const visibility = this.resolveEnvironmentHiddenVisibility(environmentId);
-    return this.tasks
+    const filtered = this.tasks
       .filter(task => {
         if (task.environment !== environmentId) return false;
         if (task.hidden) {
@@ -336,20 +336,36 @@ export class BoardViewComponent {
           }
         }
         return true;
-      })
-      .sort((a, b) => {
-        const dateA = new Date(a.start + (a.start.includes('Z') ? '' : 'Z')).getTime();
-        const dateB = new Date(b.start + (b.start.includes('Z') ? '' : 'Z')).getTime();
-        const sortOrder = this.getEnvironmentSortOrder(environmentId);
-        return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
       });
+    
+    const sortOrder = this.getEnvironmentSortOrder(environmentId);
+    
+    // Ordenar primero por día (sin hora) según el ordenamiento, luego por hora dentro del día
+    return filtered.sort((a, b) => {
+      const dateA = new Date(a.start + (a.start.includes('Z') ? '' : 'Z'));
+      const dateB = new Date(b.start + (b.start.includes('Z') ? '' : 'Z'));
+      
+      // Obtener solo la fecha (sin hora) para comparar días
+      const dayA = new Date(dateA.getFullYear(), dateA.getMonth(), dateA.getDate()).getTime();
+      const dayB = new Date(dateB.getFullYear(), dateB.getMonth(), dateB.getDate()).getTime();
+      
+      // Comparar días primero
+      if (dayA !== dayB) {
+        return sortOrder === 'desc' ? dayB - dayA : dayA - dayB;
+      }
+      
+      // Si están en el mismo día, ordenar por hora según el ordenamiento
+      const timeA = dateA.getTime();
+      const timeB = dateB.getTime();
+      return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
+    });
   }
 
   getTasksByProject(projectId: string): Task[] {
     const project = this.projects.find(p => p.id === projectId);
     const environmentId = project?.environment || '';
     const visibility = this.resolveEnvironmentHiddenVisibility(environmentId);
-    return this.tasks
+    const filtered = this.tasks
       .filter(task => {
         if (task.project !== projectId) return false;
         if (task.hidden) {
@@ -369,18 +385,34 @@ export class BoardViewComponent {
           }
         }
         return true;
-      })
-      .sort((a, b) => {
-        const dateA = new Date(a.start + (a.start.includes('Z') ? '' : 'Z')).getTime();
-        const dateB = new Date(b.start + (b.start.includes('Z') ? '' : 'Z')).getTime();
-        const sortOrder = this.getEnvironmentSortOrder(environmentId);
-        return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
       });
+    
+    const sortOrder = this.getEnvironmentSortOrder(environmentId);
+    
+    // Ordenar primero por día (sin hora) según el ordenamiento, luego por hora dentro del día
+    return filtered.sort((a, b) => {
+      const dateA = new Date(a.start + (a.start.includes('Z') ? '' : 'Z'));
+      const dateB = new Date(b.start + (b.start.includes('Z') ? '' : 'Z'));
+      
+      // Obtener solo la fecha (sin hora) para comparar días
+      const dayA = new Date(dateA.getFullYear(), dateA.getMonth(), dateA.getDate()).getTime();
+      const dayB = new Date(dateB.getFullYear(), dateB.getMonth(), dateB.getDate()).getTime();
+      
+      // Comparar días primero
+      if (dayA !== dayB) {
+        return sortOrder === 'desc' ? dayB - dayA : dayA - dayB;
+      }
+      
+      // Si están en el mismo día, ordenar por hora según el ordenamiento
+      const timeA = dateA.getTime();
+      const timeB = dateB.getTime();
+      return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
+    });
   }
 
   getTasksWithoutProjectInEnvironment(environmentId: string): Task[] {
     const visibility = this.resolveEnvironmentHiddenVisibility(environmentId);
-    return this.tasks.filter(task => {
+    const filtered = this.tasks.filter(task => {
       if (task.environment !== environmentId || (task.project && task.project !== '')) return false;
       if (task.hidden) {
         switch (visibility) {
@@ -399,6 +431,28 @@ export class BoardViewComponent {
         }
       }
       return true;
+    });
+    
+    const sortOrder = this.getEnvironmentSortOrder(environmentId);
+    
+    // Ordenar primero por día (sin hora) según el ordenamiento, luego por hora dentro del día
+    return filtered.sort((a, b) => {
+      const dateA = new Date(a.start + (a.start.includes('Z') ? '' : 'Z'));
+      const dateB = new Date(b.start + (b.start.includes('Z') ? '' : 'Z'));
+      
+      // Obtener solo la fecha (sin hora) para comparar días
+      const dayA = new Date(dateA.getFullYear(), dateA.getMonth(), dateA.getDate()).getTime();
+      const dayB = new Date(dateB.getFullYear(), dateB.getMonth(), dateB.getDate()).getTime();
+      
+      // Comparar días primero
+      if (dayA !== dayB) {
+        return sortOrder === 'desc' ? dayB - dayA : dayA - dayB;
+      }
+      
+      // Si están en el mismo día, ordenar por hora según el ordenamiento
+      const timeA = dateA.getTime();
+      const timeB = dateB.getTime();
+      return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
     });
   }
 
