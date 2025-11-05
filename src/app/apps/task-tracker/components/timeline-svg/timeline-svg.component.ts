@@ -223,12 +223,43 @@ import { Subscription } from 'rxjs';
       border-radius: 12px;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
       position: relative; /* Asegurar que sea el contenedor de referencia */
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
     }
     
     .timeline-svg {
       display: block;
       background: #f9fafb;
       border-radius: 12px;
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+    }
+    
+    /* Deshabilitar selección de texto en todos los elementos del SVG */
+    .timeline-svg text {
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+    }
+    
+    /* Deshabilitar selección en los rectángulos de tareas también */
+    .timeline-svg rect {
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+    }
+    
+    .timeline-svg circle {
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
     }
 
     /* Controles de navegación de fechas */
@@ -254,10 +285,18 @@ import { Subscription } from 'rxjs';
     .date-display {
       min-width: 120px;
       text-align: center;
+      user-select: text !important;
+      -webkit-user-select: text !important;
+      -moz-user-select: text !important;
+      -ms-user-select: text !important;
     }
     
     .date-picker {
       min-width: 120px;
+      user-select: text !important;
+      -webkit-user-select: text !important;
+      -moz-user-select: text !important;
+      -ms-user-select: text !important;
     }
     
     .date-picker:focus {
