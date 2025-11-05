@@ -137,6 +137,34 @@ export class TaskService {
     });
   }
 
+  async getTasksByNameAndProject(taskName: string, projectId: string): Promise<Task[]> {
+    const user = this.authService.getCurrentUser();
+    if (!user) throw new Error('Usuario no autenticado');
+    if (!taskName || taskName.trim() === '') return [];
+    if (!projectId) return [];
+
+    const tasksRef = collection(this.firestore, `${EnvironmentService.COLLECTION_PREFIX}tasks`);
+    const q = query(
+      tasksRef, 
+      where('userId', '==', user.uid),
+      where('name', '==', taskName.trim()),
+      where('project', '==', projectId)
+    );
+    const querySnapshot = await getDocs(q);
+    
+    const tasks = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Task));
+
+    // Ordenar por fecha más reciente (usando updatedAt o createdAt)
+    return tasks.sort((a, b) => {
+      const dateA = new Date(a.updatedAt || a.createdAt).getTime();
+      const dateB = new Date(b.updatedAt || b.createdAt).getTime();
+      return dateB - dateA; // Más reciente primero
+    });
+  }
+
   async getRecentTasksByProject(projectId: string, limit: number = 20): Promise<Task[]> {
     const user = this.authService.getCurrentUser();
     if (!user) throw new Error('Usuario no autenticado');

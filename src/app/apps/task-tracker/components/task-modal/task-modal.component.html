@@ -9,7 +9,17 @@
       </div>
     </div>
     
-    <div class="flex-1 overflow-y-auto">
+    <!-- Indicador de carga -->
+    <div *ngIf="isLoading" class="flex-1 flex items-center justify-center p-8">
+      <div class="text-center">
+        <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
+        <p class="text-gray-600 font-medium">Cargando datos...</p>
+        <p class="text-gray-500 text-sm mt-2">Preparando el formulario</p>
+      </div>
+    </div>
+    
+    <!-- Contenido del formulario -->
+    <div *ngIf="!isLoading" class="flex-1 overflow-y-auto">
       <div class="p-4 md:p-6">
         
         <!-- Selector de tareas recientes -->
@@ -399,14 +409,71 @@
               <label class="block text-sm font-medium text-gray-700 mb-1">Fragmentos (Pausas)</label>
               <div #fragmentsContainer class="space-y-2">
                 <div *ngFor="let fragment of task.fragments; let i = index" class="fragment-item bg-gray-100 p-3 rounded-lg">
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
-                    <div>
-                      <label class="block text-xs font-medium text-gray-500 mb-1">Inicio</label>
-                      <input type="datetime-local" [(ngModel)]="task.fragments![i].start" class="w-full px-3 py-2 border rounded-lg text-sm">
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
+                    <!-- Inicio del fragmento -->
+                    <div class="bg-blue-50 rounded-lg border border-blue-200 p-3">
+                      <div class="flex items-center mb-2">
+                        <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-2">
+                          <i class="fas fa-play text-white text-xs"></i>
+                        </div>
+                        <label class="text-xs font-medium text-gray-700">Inicio</label>
+                      </div>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-2 pl-10">
+                        <div>
+                          <label class="block text-xs text-gray-500 mb-1">FECHA</label>
+                          <app-android-date-picker
+                            [ngModel]="getFragmentStartDate(i)"
+                            (dateChange)="onFragmentStartDateChange(i, $event)"
+                            [name]="'fragmentStartDate' + i"
+                            label="Fecha de inicio"
+                            placeholder="Seleccionar fecha"
+                            [required]="true">
+                          </app-android-date-picker>
+                        </div>
+                        <div>
+                          <label class="block text-xs text-gray-500 mb-1">HORA</label>
+                          <app-mui-time-picker
+                            [ngModel]="getFragmentStartTime(i)"
+                            (timeChange)="onFragmentStartTimeChange(i, $event)"
+                            [name]="'fragmentStartTime' + i"
+                            label="Hora de inicio"
+                            placeholder="HH:MM">
+                          </app-mui-time-picker>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <label class="block text-xs font-medium text-gray-500 mb-1">Fin</label>
-                      <input type="datetime-local" [(ngModel)]="task.fragments![i].end" class="w-full px-3 py-2 border rounded-lg text-sm">
+                    
+                    <!-- Fin del fragmento -->
+                    <div class="bg-green-50 rounded-lg border border-green-200 p-3">
+                      <div class="flex items-center mb-2">
+                        <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center mr-2">
+                          <i class="fas fa-stop text-white text-xs"></i>
+                        </div>
+                        <label class="text-xs font-medium text-gray-700">Fin</label>
+                      </div>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-2 pl-10">
+                        <div>
+                          <label class="block text-xs text-gray-500 mb-1">FECHA</label>
+                          <app-android-date-picker
+                            [ngModel]="getFragmentEndDate(i)"
+                            (dateChange)="onFragmentEndDateChange(i, $event)"
+                            [name]="'fragmentEndDate' + i"
+                            label="Fecha de fin"
+                            placeholder="Seleccionar fecha"
+                            [required]="true">
+                          </app-android-date-picker>
+                        </div>
+                        <div>
+                          <label class="block text-xs text-gray-500 mb-1">HORA</label>
+                          <app-mui-time-picker
+                            [ngModel]="getFragmentEndTime(i)"
+                            (timeChange)="onFragmentEndTimeChange(i, $event)"
+                            [name]="'fragmentEndTime' + i"
+                            label="Hora de fin"
+                            placeholder="HH:MM">
+                          </app-mui-time-picker>
+                        </div>
+                      </div>
                     </div>
                   </div>
                   <button type="button" (click)="removeFragment(i)" class="text-red-500 hover:text-red-700 text-sm">
@@ -432,7 +499,7 @@
     </div>
     
     <!-- Botones fijos al final -->
-    <div class="p-4 md:p-6 border-t border-gray-200 bg-gray-50 flex-shrink-0">
+    <div *ngIf="!isLoading" class="p-4 md:p-6 border-t border-gray-200 bg-gray-50 flex-shrink-0">
       <div class="flex justify-end space-x-3">
         <button type="button" (click)="closeModal()" class="px-4 py-2 border rounded-lg font-medium">
           Cancelar
@@ -509,3 +576,54 @@
   </div>
 </div>
 
+<!-- Modal de confirmación para mantener duración de fragmento -->
+<div *ngIf="showFragmentDurationConfirmModal && pendingFragmentIndex !== null" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+  <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+    <div class="flex items-center mb-4">
+      <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mr-4">
+        <i class="fas fa-clock text-blue-600 text-xl"></i>
+      </div>
+      <h3 class="text-lg font-bold text-gray-900">¿Mantener duración del fragmento?</h3>
+    </div>
+    
+    <div class="mb-6">
+      <p class="text-gray-600 mb-3">
+        Has modificado la fecha/hora de inicio del fragmento. La duración actual del fragmento es de 
+        <span class="font-semibold text-indigo-600">{{ formatDuration(calculateFragmentDuration(pendingFragmentIndex)) }}</span>.
+      </p>
+      <p class="text-gray-600">
+        ¿Deseas ajustar automáticamente la fecha/hora de fin para mantener esta duración?
+      </p>
+    </div>
+    
+    <div class="bg-gray-50 rounded-lg p-4 mb-6">
+      <div class="space-y-2 text-sm">
+        <div class="flex justify-between">
+          <span class="text-gray-600">Nueva fecha/hora de inicio:</span>
+          <span class="font-medium">{{ formatDateTime(pendingFragmentStartDate, pendingFragmentStartTime) }}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-gray-600">Fecha/hora de fin actual:</span>
+          <span class="font-medium">{{ formatDateTime(getFragmentEndDate(pendingFragmentIndex), getFragmentEndTime(pendingFragmentIndex)) }}</span>
+        </div>
+        <div class="flex justify-between text-indigo-600">
+          <span>Nueva fecha/hora de fin (si mantiene duración):</span>
+          <span class="font-medium">{{ formatDateTime(calculatedFragmentEndDate, calculatedFragmentEndTime) }}</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="flex justify-end space-x-3">
+      <button type="button" 
+              (click)="cancelFragmentDurationAdjustment()" 
+              class="px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+        No, mantener fecha de fin actual
+      </button>
+      <button type="button" 
+              (click)="confirmFragmentDurationAdjustment()" 
+              class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors">
+        Sí, ajustar fecha de fin
+      </button>
+    </div>
+  </div>
+</div>

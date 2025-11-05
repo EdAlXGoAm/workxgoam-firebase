@@ -48,6 +48,7 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   selectableProjects: Project[] = [];
   taskTypes: TaskType[] = [];
   selectableTaskTypes: TaskType[] = [];
+  isLoading = false;
   
   // Tareas recientes del proyecto
   recentTasks: Task[] = [];
@@ -62,6 +63,19 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   calculatedEndTime = '';
   previousStartDate = '';
   previousStartTime = '';
+  
+  // Modal de confirmación de duración para fragmentos
+  showFragmentDurationConfirmModal = false;
+  pendingFragmentIndex: number | null = null;
+  pendingFragmentStartDate = '';
+  pendingFragmentStartTime = '';
+  calculatedFragmentEndDate = '';
+  calculatedFragmentEndTime = '';
+  previousFragmentStartDate = '';
+  previousFragmentStartTime = '';
+  
+  // Flag para evitar recursión infinita en sincronización
+  private isSyncingFragment = false;
   
   // Fechas originales para calcular el desplazamiento de recordatorios
   originalStartDateTime: Date | null = null;
@@ -98,6 +112,9 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     if (this.task.end) {
       this.originalEndDateTime = new Date(this.task.end + (this.task.end.includes('Z') ? '' : 'Z'));
     }
+    
+    // Sincronizar el primer fragmento con las fechas principales si existe
+    this.syncFirstFragmentWithMainDates();
   }
   
   ngOnDestroy() {
@@ -105,16 +122,12 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     this.enableBodyScroll();
   }
   
-  ngOnChanges(changes: any) {
+  async ngOnChanges(changes: any) {
     if (this.showModal) {
       this.disableBodyScroll();
-      // Recargar tipos cuando se abre el modal
-      if (changes.showModal && changes.showModal.currentValue && this.task.project) {
-        this.onProjectChange();
-        // Cargar tareas recientes si no estamos editando
-        if (!this.isEditing) {
-          this.loadRecentTasks();
-        }
+      // Mostrar carga mientras se obtienen los datos
+      if (changes.showModal && changes.showModal.currentValue) {
+        await this.loadInitialData();
       }
     } else {
       this.enableBodyScroll();
@@ -122,6 +135,34 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
       this.recentTasks = [];
       this.showRecentTasksSelector = false;
       this.selectedRecentTaskIndex = '';
+      this.isLoading = false;
+    }
+  }
+  
+  private async loadInitialData() {
+    this.isLoading = true;
+    
+    try {
+      // Cargar tipos de tarea siempre
+      await this.loadTaskTypes();
+      
+      // Si hay un proyecto seleccionado, cargar datos relacionados
+      if (this.task.project) {
+        // Filtrar tipos seleccionables
+        this.selectableTaskTypes = this.taskTypes.filter(t => t.projectId === this.task.project);
+        
+        // Cargar tareas recientes solo si no estamos editando
+        if (!this.isEditing) {
+          await this.loadRecentTasks();
+        }
+      } else {
+        this.selectableTaskTypes = [];
+      }
+    } catch (error) {
+      console.error('Error al cargar datos iniciales:', error);
+    } finally {
+      this.isLoading = false;
+      this.cdr.detectChanges();
     }
   }
   
@@ -169,6 +210,24 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
       const deadlineDateTime = this.splitDateTime(this.task.deadline);
       this.deadlineDate = deadlineDateTime.date;
       this.deadlineTime = deadlineDateTime.time;
+    }
+    
+    // Si hay fragmentos y fechas principales, sincronizar el primer fragmento
+    // Si no hay fechas principales pero sí hay primer fragmento, usar ese para las fechas principales
+    if (this.task.fragments && this.task.fragments.length > 0) {
+      if (this.startDate && this.startTime && this.endDate && this.endTime) {
+        // Hay fechas principales, sincronizar el primer fragmento con ellas
+        this.task.fragments[0].start = this.combineDateTime(this.startDate, this.startTime);
+        this.task.fragments[0].end = this.combineDateTime(this.endDate, this.endTime);
+      } else if (this.task.fragments[0]?.start && this.task.fragments[0]?.end) {
+        // No hay fechas principales pero sí hay primer fragmento, usar ese
+        const fragmentStart = this.splitDateTime(this.task.fragments[0].start);
+        const fragmentEnd = this.splitDateTime(this.task.fragments[0].end);
+        this.startDate = fragmentStart.date;
+        this.startTime = fragmentStart.time;
+        this.endDate = fragmentEnd.date;
+        this.endTime = fragmentEnd.time;
+      }
     }
   }
   
@@ -342,12 +401,16 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
       // Comportamiento normal para otros campos
       if (field === 'start') {
         this.startDate = date;
+        // Sincronizar con el primer fragmento si existe
+        this.syncFirstFragmentStart();
         // Si no se muestra el modal, ajustar recordatorios directamente
         if (!this.shouldShowDurationConfirmModal() && this.task.reminders && this.task.reminders.length > 0) {
           this.adjustReminders(date, this.startTime, this.endDate, this.endTime);
         }
       } else if (field === 'end') {
         this.endDate = date;
+        // Sincronizar con el primer fragmento si existe
+        this.syncFirstFragmentEnd();
       }
       this.updateDuration();
       this.validateDates();
@@ -370,6 +433,8 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     } else {
       // Comportamiento normal
       this.startTime = time;
+      // Sincronizar con el primer fragmento si existe
+      this.syncFirstFragmentStart();
       // Si no se muestra el modal, ajustar recordatorios directamente
       if (!this.shouldShowDurationConfirmModal() && this.task.reminders && this.task.reminders.length > 0 && this.startDate) {
         this.adjustReminders(this.startDate, time, this.endDate, this.endTime);
@@ -381,6 +446,8 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   
   onEndTimeChange(time: string) {
     this.endTime = time;
+    // Sincronizar con el primer fragmento si existe
+    this.syncFirstFragmentEnd();
     this.updateDuration();
     this.validateDates();
   }
@@ -432,20 +499,196 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     if (!this.task.fragments) {
       this.task.fragments = [];
     }
-    const now = new Date();
-    const startTime = new Date(now.getTime() + 30 * 60000);
-    const endTime = new Date(startTime.getTime() + 60 * 60000);
+    
+    // Si es el primer fragmento y hay fechas principales (inicio y fin), usar esas
+    if (this.task.fragments.length === 0 && this.startDate && this.startTime && this.endDate && this.endTime) {
+      this.task.fragments.push({
+        start: this.combineDateTime(this.startDate, this.startTime),
+        end: this.combineDateTime(this.endDate, this.endTime)
+      });
+      return;
+    }
+    
+    // Determinar la fecha/hora de inicio del fragmento
+    let fragmentStartDate: string;
+    let fragmentStartTime: string;
+    
+    if (this.startDate && this.startTime) {
+      // Si hay fecha/hora de inicio de la tarea, usar esa como referencia
+      fragmentStartDate = this.startDate;
+      fragmentStartTime = this.roundTimeToNearest30Minutes(this.startTime);
+    } else {
+      // Si no hay fecha/hora de inicio, usar la fecha/hora actual redondeada
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      fragmentStartDate = `${year}-${month}-${day}`;
+      
+      const currentTime = this.getCurrentTime();
+      fragmentStartTime = this.roundTimeToNearest30Minutes(currentTime);
+    }
+    
+    // Calcular la fecha/hora de fin (1 hora después del inicio)
+    const endDateTime = this.calculateNewEndDateTime(fragmentStartDate, fragmentStartTime, 1);
+    const fragmentEndDate = endDateTime.date;
+    const fragmentEndTime = endDateTime.time;
     
     this.task.fragments.push({
-      start: this.formatDateTimeLocal(startTime),
-      end: this.formatDateTimeLocal(endTime)
+      start: this.combineDateTime(fragmentStartDate, fragmentStartTime),
+      end: this.combineDateTime(fragmentEndDate, fragmentEndTime)
     });
+  }
+
+  private roundTimeToNearest30Minutes(time: string): string {
+    if (!time) return '00:00';
+    
+    const [hours, minutes] = time.split(':').map(Number);
+    const roundedMinutes = Math.round(minutes / 30) * 30;
+    
+    // Si los minutos redondeados son 60, incrementar la hora y poner minutos en 0
+    let finalHours = hours;
+    let finalMinutes = roundedMinutes;
+    
+    if (roundedMinutes === 60) {
+      finalHours = (hours + 1) % 24;
+      finalMinutes = 0;
+    }
+    
+    return `${String(finalHours).padStart(2, '0')}:${String(finalMinutes).padStart(2, '0')}`;
   }
   
   removeFragment(index: number) {
     if (this.task.fragments) {
       this.task.fragments.splice(index, 1);
+      // Si se eliminó el primer fragmento y ahora hay otro, ese pasa a ser el primero
+      // No modificamos las fechas principales para evitar pérdida de datos
     }
+  }
+
+  // Métodos para manejar fecha/hora de fragmentos
+  getFragmentStartDate(fragmentIndex: number): string {
+    if (!this.task.fragments || !this.task.fragments[fragmentIndex]?.start) {
+      return '';
+    }
+    return this.splitDateTime(this.task.fragments[fragmentIndex].start).date;
+  }
+
+  getFragmentStartTime(fragmentIndex: number): string {
+    if (!this.task.fragments || !this.task.fragments[fragmentIndex]?.start) {
+      return '';
+    }
+    return this.splitDateTime(this.task.fragments[fragmentIndex].start).time;
+  }
+
+  getFragmentEndDate(fragmentIndex: number): string {
+    if (!this.task.fragments || !this.task.fragments[fragmentIndex]?.end) {
+      return '';
+    }
+    return this.splitDateTime(this.task.fragments[fragmentIndex].end).date;
+  }
+
+  getFragmentEndTime(fragmentIndex: number): string {
+    if (!this.task.fragments || !this.task.fragments[fragmentIndex]?.end) {
+      return '';
+    }
+    return this.splitDateTime(this.task.fragments[fragmentIndex].end).time;
+  }
+
+  onFragmentStartDateChange(fragmentIndex: number, date: string) {
+    if (!this.task.fragments || !this.task.fragments[fragmentIndex]) {
+      return;
+    }
+    
+    // Si es el primer fragmento, sincronizar con fechas principales
+    if (fragmentIndex === 0 && !this.isSyncingFragment) {
+      this.startDate = date;
+      this.onDateChange('start', date);
+      return;
+    }
+    
+    // Para otros fragmentos, mostrar modal de confirmación si corresponde
+    if (this.shouldShowFragmentDurationConfirmModal(fragmentIndex)) {
+      const currentTime = this.getFragmentStartTime(fragmentIndex) || '00:00';
+      this.pendingFragmentIndex = fragmentIndex;
+      this.pendingFragmentStartDate = date;
+      this.pendingFragmentStartTime = currentTime;
+      
+      // Calcular la nueva fecha/hora de fin manteniendo la duración
+      const fragmentDuration = this.calculateFragmentDuration(fragmentIndex);
+      const newEndDateTime = this.calculateNewEndDateTime(date, currentTime, fragmentDuration);
+      this.calculatedFragmentEndDate = newEndDateTime.date;
+      this.calculatedFragmentEndTime = newEndDateTime.time;
+      
+      this.showFragmentDurationConfirmModal = true;
+    } else {
+      const currentTime = this.getFragmentStartTime(fragmentIndex) || '00:00';
+      this.task.fragments[fragmentIndex].start = this.combineDateTime(date, currentTime);
+    }
+  }
+
+  onFragmentStartTimeChange(fragmentIndex: number, time: string) {
+    if (!this.task.fragments || !this.task.fragments[fragmentIndex]) {
+      return;
+    }
+    
+    // Si es el primer fragmento, sincronizar con fechas principales
+    if (fragmentIndex === 0 && !this.isSyncingFragment) {
+      this.startTime = time;
+      this.onStartTimeChange(time);
+      return;
+    }
+    
+    // Para otros fragmentos, mostrar modal de confirmación si corresponde
+    if (this.shouldShowFragmentDurationConfirmModal(fragmentIndex)) {
+      const currentDate = this.getFragmentStartDate(fragmentIndex) || new Date().toISOString().split('T')[0];
+      this.pendingFragmentIndex = fragmentIndex;
+      this.pendingFragmentStartDate = currentDate;
+      this.pendingFragmentStartTime = time;
+      
+      // Calcular la nueva fecha/hora de fin manteniendo la duración
+      const fragmentDuration = this.calculateFragmentDuration(fragmentIndex);
+      const newEndDateTime = this.calculateNewEndDateTime(currentDate, time, fragmentDuration);
+      this.calculatedFragmentEndDate = newEndDateTime.date;
+      this.calculatedFragmentEndTime = newEndDateTime.time;
+      
+      this.showFragmentDurationConfirmModal = true;
+    } else {
+      const currentDate = this.getFragmentStartDate(fragmentIndex) || new Date().toISOString().split('T')[0];
+      this.task.fragments[fragmentIndex].start = this.combineDateTime(currentDate, time);
+    }
+  }
+
+  onFragmentEndDateChange(fragmentIndex: number, date: string) {
+    if (!this.task.fragments || !this.task.fragments[fragmentIndex]) {
+      return;
+    }
+    
+    // Si es el primer fragmento, sincronizar con fechas principales
+    if (fragmentIndex === 0 && !this.isSyncingFragment) {
+      this.endDate = date;
+      this.onDateChange('end', date);
+      return;
+    }
+    
+    const currentTime = this.getFragmentEndTime(fragmentIndex) || '00:00';
+    this.task.fragments[fragmentIndex].end = this.combineDateTime(date, currentTime);
+  }
+
+  onFragmentEndTimeChange(fragmentIndex: number, time: string) {
+    if (!this.task.fragments || !this.task.fragments[fragmentIndex]) {
+      return;
+    }
+    
+    // Si es el primer fragmento, sincronizar con fechas principales
+    if (fragmentIndex === 0 && !this.isSyncingFragment) {
+      this.endTime = time;
+      this.onEndTimeChange(time);
+      return;
+    }
+    
+    const currentDate = this.getFragmentEndDate(fragmentIndex) || new Date().toISOString().split('T')[0];
+    this.task.fragments[fragmentIndex].end = this.combineDateTime(currentDate, time);
   }
   
   openTimeCalculator(type: 'start' | 'end') {
@@ -744,10 +987,146 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     this.startTime = this.pendingStartTime;
     this.endDate = this.calculatedEndDate;
     this.endTime = this.calculatedEndTime;
+    // Sincronizar con el primer fragmento si existe
+    this.syncFirstFragmentWithMainDates();
     // Ajustar los recordatorios con el nuevo inicio
     this.adjustReminders(this.pendingStartDate, this.pendingStartTime, this.calculatedEndDate, this.calculatedEndTime);
     // La duración se mantiene igual
     this.validateDates();
+  }
+  
+  // Métodos para sincronizar el primer fragmento con las fechas principales
+  private syncFirstFragmentWithMainDates() {
+    if (!this.task.fragments || this.task.fragments.length === 0) {
+      return;
+    }
+    
+    // Si hay fecha/hora de inicio y fin principales, sincronizar con el primer fragmento
+    if (this.startDate && this.startTime && this.endDate && this.endTime) {
+      this.task.fragments[0].start = this.combineDateTime(this.startDate, this.startTime);
+      this.task.fragments[0].end = this.combineDateTime(this.endDate, this.endTime);
+    } else if (this.task.fragments[0]?.start && this.task.fragments[0]?.end) {
+      // Si no hay fechas principales pero sí hay primer fragmento, sincronizar hacia las fechas principales
+      const fragmentStart = this.splitDateTime(this.task.fragments[0].start);
+      const fragmentEnd = this.splitDateTime(this.task.fragments[0].end);
+      this.startDate = fragmentStart.date;
+      this.startTime = fragmentStart.time;
+      this.endDate = fragmentEnd.date;
+      this.endTime = fragmentEnd.time;
+    }
+  }
+  
+  private syncFirstFragmentStart() {
+    if (this.isSyncingFragment || !this.task.fragments || this.task.fragments.length === 0) {
+      return;
+    }
+    
+    if (this.startDate && this.startTime) {
+      this.isSyncingFragment = true;
+      this.task.fragments[0].start = this.combineDateTime(this.startDate, this.startTime);
+      this.isSyncingFragment = false;
+    }
+  }
+  
+  private syncFirstFragmentEnd() {
+    if (this.isSyncingFragment || !this.task.fragments || this.task.fragments.length === 0) {
+      return;
+    }
+    
+    if (this.endDate && this.endTime) {
+      this.isSyncingFragment = true;
+      this.task.fragments[0].end = this.combineDateTime(this.endDate, this.endTime);
+      this.isSyncingFragment = false;
+    }
+  }
+  
+  // Métodos para el modal de confirmación de duración de fragmentos
+  private shouldShowFragmentDurationConfirmModal(fragmentIndex: number): boolean {
+    if (!this.task.fragments || !this.task.fragments[fragmentIndex]) {
+      return false;
+    }
+    
+    const fragment = this.task.fragments[fragmentIndex];
+    const fragmentDuration = this.calculateFragmentDuration(fragmentIndex);
+    
+    // Mostrar el modal solo si hay una duración definida mayor a 0 y hay fecha/hora de inicio y fin
+    return fragmentDuration > 0 && 
+           !!fragment.start && !!fragment.end;
+  }
+  
+  calculateFragmentDuration(fragmentIndex: number): number {
+    if (!this.task.fragments || !this.task.fragments[fragmentIndex]) {
+      return 0;
+    }
+    
+    const fragment = this.task.fragments[fragmentIndex];
+    if (!fragment.start || !fragment.end) {
+      return 0;
+    }
+    
+    const startDateTime = this.splitDateTime(fragment.start);
+    const endDateTime = this.splitDateTime(fragment.end);
+    
+    return this.calculateDuration(
+      startDateTime.date,
+      startDateTime.time,
+      endDateTime.date,
+      endDateTime.time
+    );
+  }
+  
+  cancelFragmentDurationAdjustment() {
+    if (this.pendingFragmentIndex === null) {
+      return;
+    }
+    
+    // Cerrar el modal sin hacer cambios
+    this.showFragmentDurationConfirmModal = false;
+    
+    // Aplicar los cambios de fecha/hora de inicio sin ajustar el fin
+    if (this.task.fragments && this.task.fragments[this.pendingFragmentIndex]) {
+      this.task.fragments[this.pendingFragmentIndex].start = this.combineDateTime(
+        this.pendingFragmentStartDate,
+        this.pendingFragmentStartTime
+      );
+    }
+    
+    // Limpiar valores pendientes
+    this.pendingFragmentIndex = null;
+    this.pendingFragmentStartDate = '';
+    this.pendingFragmentStartTime = '';
+    this.calculatedFragmentEndDate = '';
+    this.calculatedFragmentEndTime = '';
+  }
+  
+  confirmFragmentDurationAdjustment() {
+    if (this.pendingFragmentIndex === null) {
+      return;
+    }
+    
+    // Aplicar los cambios manteniendo la duración
+    this.showFragmentDurationConfirmModal = false;
+    
+    if (this.task.fragments && this.task.fragments[this.pendingFragmentIndex]) {
+      this.task.fragments[this.pendingFragmentIndex].start = this.combineDateTime(
+        this.pendingFragmentStartDate,
+        this.pendingFragmentStartTime
+      );
+      this.task.fragments[this.pendingFragmentIndex].end = this.combineDateTime(
+        this.calculatedFragmentEndDate,
+        this.calculatedFragmentEndTime
+      );
+    }
+    
+    // Limpiar valores pendientes
+    this.pendingFragmentIndex = null;
+    this.pendingFragmentStartDate = '';
+    this.pendingFragmentStartTime = '';
+    this.calculatedFragmentEndDate = '';
+    this.calculatedFragmentEndTime = '';
+    
+    // Forzar actualización de la vista
+    this.cdr.detectChanges();
   }
   
   private calculateNewEndDateTime(newStartDate: string, newStartTime: string, duration: number): { date: string, time: string } {
@@ -802,22 +1181,30 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   }
   
   async onTaskNameBlur() {
-    // Solo buscar si hay un nombre válido
+    // Solo buscar si hay un nombre válido y un proyecto seleccionado
     if (!this.task.name || this.task.name.trim() === '') {
       return;
     }
     
+    // Solo buscar si hay un proyecto seleccionado para evitar cruces entre proyectos
+    if (!this.task.project) {
+      return;
+    }
+    
     try {
-      // Buscar tareas con el mismo nombre
-      const matchingTasks = await this.taskService.getTasksByName(this.task.name.trim());
+      // Buscar tareas con el mismo nombre y proyecto
+      const matchingTasks = await this.taskService.getTasksByNameAndProject(
+        this.task.name.trim(), 
+        this.task.project
+      );
       
       // Si hay coincidencias, tomar la más reciente (ya viene ordenada)
       if (matchingTasks.length > 0) {
         const mostRecentTask = matchingTasks[0];
         
         // Copiar los valores: tipo, emoji, descripción, prioridad y duración
-        // Solo copiar el tipo si hay un proyecto seleccionado y el tipo es válido para ese proyecto
-        if (mostRecentTask.type && this.task.project) {
+        // Solo copiar el tipo si es válido para el proyecto actual
+        if (mostRecentTask.type) {
           // Asegurar que los tipos estén cargados
           await this.loadTaskTypes();
           const isValidType = this.selectableTaskTypes.some(t => t.id === mostRecentTask.type);
@@ -851,14 +1238,11 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
           }
         }
         
-        // Si hay un proyecto en la tarea encontrada y coincide con el proyecto actual o no hay proyecto seleccionado
-        // No cambiamos el proyecto automáticamente para no interferir con la selección del usuario
-        
         // Forzar actualización de la vista
         this.cdr.detectChanges();
       }
     } catch (error) {
-      console.error('Error al buscar tareas por nombre:', error);
+      console.error('Error al buscar tareas por nombre y proyecto:', error);
       // No mostrar error al usuario, solo registrar en consola
     }
   }
