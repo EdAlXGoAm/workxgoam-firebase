@@ -1,10 +1,11 @@
-import { Component, Input, Output, EventEmitter, OnInit, HostListener, ViewChild, ElementRef, AfterViewInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges, HostListener, ViewChild, ElementRef, AfterViewInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Task } from '../../models/task.model';
 import { Environment } from '../../models/environment.model';
 import { TaskType } from '../../models/task-type.model';
 import { Project } from '../../models/project.model';
 import { TimelineFocusService } from '../../services/timeline-focus.service';
+import { ProjectService } from '../../services/project.service';
 import { Subscription } from 'rxjs';
 
 @Component({
@@ -332,18 +333,22 @@ import { Subscription } from 'rxjs';
     }
   `]
 })
-export class TimelineSvgComponent implements OnInit, AfterViewInit, OnDestroy {
+export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, OnDestroy {
   @Input() tasks: Task[] = [];
   @Input() environments: Environment[] = [];
   @Input() taskTypes: TaskType[] = [];
-  @Input() projects: Project[] = [];
+  @Input() projects: Project[] = []; // Mantener el input por si se pasa desde el padre
+  
+  // Proyectos cargados directamente desde el servicio
+  private loadedProjects: Project[] = [];
   
   focusedEnvironmentId: string | null = null;
   private focusSubscription?: Subscription;
 
   constructor(
     private cdr: ChangeDetectorRef,
-    private timelineFocusService: TimelineFocusService
+    private timelineFocusService: TimelineFocusService,
+    private projectService: ProjectService
   ) {}
 
   // 🎯 Output para notificar al componente padre cuando se quiere editar una tarea
@@ -402,7 +407,20 @@ export class TimelineSvgComponent implements OnInit, AfterViewInit, OnDestroy {
     return new Date(utcString);
   }
 
-  ngOnInit() {
+  async ngOnInit() {
+    // Cargar proyectos directamente desde el servicio
+    try {
+      this.loadedProjects = await this.projectService.getProjects();
+    } catch (error) {
+      console.error('Error al cargar proyectos:', error);
+      this.loadedProjects = [];
+    }
+    
+    // Usar proyectos del input si están disponibles, sino usar los cargados del servicio
+    if (this.projects.length > 0) {
+      this.loadedProjects = this.projects;
+    }
+    
     // Suscribirse al servicio para recibir cambios en el ambiente enfocado
     this.focusedEnvironmentId = this.timelineFocusService.getCurrentFocusedEnvironmentId();
     this.focusSubscription = this.timelineFocusService.getFocusedEnvironmentId().subscribe(envId => {
@@ -411,10 +429,21 @@ export class TimelineSvgComponent implements OnInit, AfterViewInit, OnDestroy {
       if (changed) {
         this.cdr.markForCheck();
         this.cdr.detectChanges();
+        this.updateSvgDimensions();
       }
     });
     
     this.updateSvgDimensions();
+  }
+  
+  ngOnChanges(changes: SimpleChanges) {
+    // Actualizar proyectos cargados si vienen del input
+    if (changes['projects'] && this.projects.length > 0) {
+      this.loadedProjects = this.projects;
+      this.cdr.markForCheck();
+      this.cdr.detectChanges();
+      this.updateSvgDimensions();
+    }
   }
 
 
@@ -549,7 +578,9 @@ export class TimelineSvgComponent implements OnInit, AfterViewInit, OnDestroy {
     
     // Si hay un ambiente enfocado, modificar el formato del nombre
     if (this.focusedEnvironmentId && task.project) {
-      const project = this.projects.find(p => p.id === task.project);
+      const projectsToUse = this.loadedProjects.length > 0 ? this.loadedProjects : this.projects;
+      const project = projectsToUse.find(p => p.id === task.project);
+      
       if (project) {
         const projectInitials = this.getProjectInitials(project.name);
         name = `${projectInitials}: ${name}`;
@@ -589,9 +620,8 @@ export class TimelineSvgComponent implements OnInit, AfterViewInit, OnDestroy {
   // Función helper para obtener las primeras 3 iniciales del proyecto (sin espacios)
   getProjectInitials(projectName: string): string {
     if (!projectName) return '';
-    // Eliminar espacios en blanco
+    // Eliminar espacios en blanco y tomar las primeras 3 letras
     const withoutSpaces = projectName.replace(/\s+/g, '');
-    // Tomar las primeras 3 letras
     return withoutSpaces.substring(0, 3).toUpperCase();
   }
 
@@ -1060,7 +1090,9 @@ export class TimelineSvgComponent implements OnInit, AfterViewInit, OnDestroy {
     
     // Si hay un ambiente enfocado, agregar las iniciales del proyecto
     if (this.focusedEnvironmentId && task.project) {
-      const project = this.projects.find(p => p.id === task.project);
+      // Usar proyectos cargados del servicio o del input
+      const projectsToUse = this.loadedProjects.length > 0 ? this.loadedProjects : this.projects;
+      const project = projectsToUse.find(p => p.id === task.project);
       if (project) {
         const projectInitials = this.getProjectInitials(project.name);
         name = `${projectInitials}: ${name}`;
