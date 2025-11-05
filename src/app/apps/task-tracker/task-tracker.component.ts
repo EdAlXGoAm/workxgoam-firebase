@@ -69,6 +69,12 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
   environmentCustomOrder: { [envId: string]: number } = {};
   // Estado de carga del orden personalizado
   isLoadingEnvironmentOrder: boolean = true;
+  // Estados para sincronización del orden con base de datos
+  isSavingOrderToDatabase: boolean = false;
+  isLoadingOrderFromDatabase: boolean = false;
+  orderSyncMessage: string = '';
+  orderSyncMessageType: 'success' | 'error' | 'info' = 'info';
+  private orderSyncMessageTimeout: any = null;
   // Throttle para guardar la posición del scroll
   private scrollSaveTimeout: any = null;
   // Listener de scroll para limpiar al destruir
@@ -284,6 +290,9 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     }
     if (this.scrollSaveTimeout) {
       clearTimeout(this.scrollSaveTimeout);
+    }
+    if (this.orderSyncMessageTimeout) {
+      clearTimeout(this.orderSyncMessageTimeout);
     }
   }
 
@@ -2473,6 +2482,112 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     this.reminderFromNowError = '';
     this.reminderAiError = '';
     this.reminderManualError = '';
+  }
+
+  // Métodos para sincronización del orden con base de datos
+  async saveOrderToDatabase(): Promise<void> {
+    if (this.isSavingOrderToDatabase) return;
+    
+    this.isSavingOrderToDatabase = true;
+    this.showOrderSyncMessage('Guardando orden en base de datos...', 'info');
+    
+    try {
+      const updatePromises = this.environments.map(env => {
+        const order = this.environmentCustomOrder[env.id];
+        if (order !== undefined) {
+          return this.environmentService.updateEnvironment(env.id, { customOrder: order });
+        }
+        return Promise.resolve();
+      });
+      
+      await Promise.all(updatePromises);
+      
+      // Recargar environments para actualizar el campo customOrder
+      await this.loadEnvironments();
+      
+      this.showOrderSyncMessage('✓ Orden guardado exitosamente en base de datos', 'success');
+      console.log('Orden guardado en base de datos:', this.environmentCustomOrder);
+    } catch (error) {
+      console.error('Error al guardar orden en base de datos:', error);
+      this.showOrderSyncMessage('✗ Error al guardar orden en base de datos', 'error');
+    } finally {
+      this.isSavingOrderToDatabase = false;
+    }
+  }
+
+  async loadOrderFromDatabase(): Promise<void> {
+    if (this.isLoadingOrderFromDatabase) return;
+    
+    const confirmLoad = confirm(
+      '¿Deseas cargar el orden desde la base de datos?\n\n' +
+      'Esto sobrescribirá el orden local actual con el orden guardado en la base de datos.'
+    );
+    
+    if (!confirmLoad) return;
+    
+    this.isLoadingOrderFromDatabase = true;
+    this.showOrderSyncMessage('Cargando orden desde base de datos...', 'info');
+    
+    try {
+      // Recargar environments desde la base de datos
+      await this.loadEnvironments();
+      
+      // Extraer el orden de los environments cargados
+      const newOrder: { [envId: string]: number } = {};
+      let hasAnyOrder = false;
+      
+      this.environments.forEach(env => {
+        if (env.customOrder !== undefined && env.customOrder !== null) {
+          newOrder[env.id] = env.customOrder;
+          hasAnyOrder = true;
+        }
+      });
+      
+      if (!hasAnyOrder) {
+        this.showOrderSyncMessage('⚠ No se encontró orden guardado en la base de datos', 'info');
+        return;
+      }
+      
+      // Aplicar el nuevo orden
+      this.environmentCustomOrder = newOrder;
+      
+      // Inicializar orden para environments que no tengan orden guardado
+      this.initializeEnvironmentOrder();
+      
+      // Guardar en localStorage
+      this.saveEnvironmentCustomOrder();
+      
+      // Forzar actualización de vista
+      this.cdr.detectChanges();
+      
+      this.showOrderSyncMessage('✓ Orden cargado exitosamente desde base de datos', 'success');
+      console.log('Orden cargado desde base de datos:', this.environmentCustomOrder);
+    } catch (error) {
+      console.error('Error al cargar orden desde base de datos:', error);
+      this.showOrderSyncMessage('✗ Error al cargar orden desde base de datos', 'error');
+    } finally {
+      this.isLoadingOrderFromDatabase = false;
+    }
+  }
+
+  private showOrderSyncMessage(message: string, type: 'success' | 'error' | 'info'): void {
+    this.orderSyncMessage = message;
+    this.orderSyncMessageType = type;
+    
+    // Limpiar timeout anterior si existe
+    if (this.orderSyncMessageTimeout) {
+      clearTimeout(this.orderSyncMessageTimeout);
+    }
+    
+    // Auto-ocultar mensaje después de 4 segundos (excepto para loading)
+    if (!message.includes('...')) {
+      this.orderSyncMessageTimeout = setTimeout(() => {
+        this.orderSyncMessage = '';
+        this.cdr.detectChanges();
+      }, 4000);
+    }
+    
+    this.cdr.detectChanges();
   }
 
 } 

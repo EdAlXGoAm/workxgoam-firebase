@@ -30,6 +30,61 @@ import { TaskType } from '../../models/task-type.model';
         <app-timeline-svg [tasks]="tasks" [environments]="environments" [taskTypes]="taskTypes" (editTask)="editTask.emit($event)"></app-timeline-svg>
       </div>
 
+      <!-- Sincronización Compacta -->
+      <div class="mb-4">
+        <div class="flex items-center justify-between gap-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
+          <!-- Texto compacto -->
+          <div class="flex items-center gap-2 text-xs text-gray-600">
+            <i class="fas fa-sync-alt text-indigo-600"></i>
+            <span class="hidden sm:inline">Sincronizar orden:</span>
+            <span class="sm:hidden">Sincronizar:</span>
+          </div>
+          
+          <!-- Botones compactos -->
+          <div class="flex items-center gap-1.5">
+            <button 
+              (click)="saveOrderToDatabase.emit()"
+              [disabled]="isSavingOrderToDatabase || isLoadingOrderFromDatabase"
+              [class.opacity-50]="isSavingOrderToDatabase || isLoadingOrderFromDatabase"
+              [class.cursor-not-allowed]="isSavingOrderToDatabase || isLoadingOrderFromDatabase"
+              class="px-2.5 py-1.5 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700 transition-colors flex items-center gap-1.5"
+              [title]="'Guardar orden en base de datos'">
+              <i class="fas text-xs" [class.fa-save]="!isSavingOrderToDatabase" [class.fa-spinner]="isSavingOrderToDatabase" [class.fa-spin]="isSavingOrderToDatabase"></i>
+              <span class="hidden sm:inline">{{ isSavingOrderToDatabase ? 'Guardando...' : 'Guardar' }}</span>
+              <span class="sm:hidden">💾</span>
+            </button>
+            
+            <button 
+              (click)="loadOrderFromDatabase.emit()"
+              [disabled]="isSavingOrderToDatabase || isLoadingOrderFromDatabase"
+              [class.opacity-50]="isSavingOrderToDatabase || isLoadingOrderFromDatabase"
+              [class.cursor-not-allowed]="isSavingOrderToDatabase || isLoadingOrderFromDatabase"
+              class="px-2.5 py-1.5 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 transition-colors flex items-center gap-1.5"
+              [title]="'Cargar orden desde base de datos'">
+              <i class="fas text-xs" [class.fa-download]="!isLoadingOrderFromDatabase" [class.fa-spinner]="isLoadingOrderFromDatabase" [class.fa-spin]="isLoadingOrderFromDatabase"></i>
+              <span class="hidden sm:inline">{{ isLoadingOrderFromDatabase ? 'Cargando...' : 'Cargar' }}</span>
+              <span class="sm:hidden">📥</span>
+            </button>
+          </div>
+        </div>
+        
+        <!-- Mensaje de sincronización compacto -->
+        <div *ngIf="orderSyncMessage" 
+             class="mt-2 p-2 rounded text-xs flex items-center gap-1.5 transition-all duration-300"
+             [class.bg-green-100]="orderSyncMessageType === 'success'"
+             [class.text-green-800]="orderSyncMessageType === 'success'"
+             [class.bg-red-100]="orderSyncMessageType === 'error'"
+             [class.text-red-800]="orderSyncMessageType === 'error'"
+             [class.bg-blue-100]="orderSyncMessageType === 'info'"
+             [class.text-blue-800]="orderSyncMessageType === 'info'">
+          <i class="fas text-xs" 
+             [class.fa-check-circle]="orderSyncMessageType === 'success'"
+             [class.fa-exclamation-circle]="orderSyncMessageType === 'error'"
+             [class.fa-info-circle]="orderSyncMessageType === 'info'"></i>
+          <span>{{ orderSyncMessage }}</span>
+        </div>
+      </div>
+
       <!-- Spinner de carga mientras se ordenan los environments -->
       <div *ngIf="isLoadingEnvironmentOrder" class="flex justify-center items-center py-12">
         <div class="flex flex-col items-center">
@@ -301,6 +356,10 @@ export class BoardViewComponent {
   @Input() environmentSortOrder: { [envId: string]: 'asc' | 'desc' } = {};
   @Input() environmentCustomOrder: { [envId: string]: number } = {};
   @Input() isLoadingEnvironmentOrder: boolean = false;
+  @Input() isSavingOrderToDatabase: boolean = false;
+  @Input() isLoadingOrderFromDatabase: boolean = false;
+  @Input() orderSyncMessage: string = '';
+  @Input() orderSyncMessageType: 'success' | 'error' | 'info' = 'info';
 
   @Output() editTask = new EventEmitter<Task>();
   @Output() taskContextMenu = new EventEmitter<{ mouseEvent: MouseEvent; task: Task }>();
@@ -311,6 +370,8 @@ export class BoardViewComponent {
   @Output() createProject = new EventEmitter<string>();
   @Output() moveEnvironmentUp = new EventEmitter<string>();
   @Output() moveEnvironmentDown = new EventEmitter<string>();
+  @Output() saveOrderToDatabase = new EventEmitter<void>();
+  @Output() loadOrderFromDatabase = new EventEmitter<void>();
 
   collapsedEmptyEnvironments: boolean = true;
   collapsedEnvironments: { [envId: string]: boolean } = {};

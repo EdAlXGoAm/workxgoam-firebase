@@ -337,3 +337,49 @@
   }
 }
 
+/* Prevenir overflow horizontal en móviles */
+:host {
+  display: block;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+/* Ajustes específicos para móviles */
+@media (max-width: 768px) {
+  .board-column {
+    min-height: 150px;
+    max-height: 60vh;
+  }
+  
+  .emoji-picker {
+    width: 250px;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+  }
+  
+  .context-menu {
+    min-width: 160px;
+    max-width: 90vw;
+  }
+  
+  /* Asegurar que las tarjetas no se salgan del viewport */
+  .task-card, .task-list-item {
+    max-width: 100%;
+    width: 100%;
+  }
+  
+  /* Prevenir que el grid de environments cause overflow */
+  .grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Prevenir que elementos position fixed causen problemas */
+@media (max-width: 768px) {
+  .floating-bubble {
+    right: 10px !important;
+    width: 60px !important;
+    height: 60px !important;
+  }
+}

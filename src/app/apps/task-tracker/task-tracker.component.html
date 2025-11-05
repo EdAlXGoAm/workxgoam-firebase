@@ -55,6 +55,10 @@
         [environmentSortOrder]="environmentSortOrder"
         [environmentCustomOrder]="environmentCustomOrder"
         [isLoadingEnvironmentOrder]="isLoadingEnvironmentOrder"
+        [isSavingOrderToDatabase]="isSavingOrderToDatabase"
+        [isLoadingOrderFromDatabase]="isLoadingOrderFromDatabase"
+        [orderSyncMessage]="orderSyncMessage"
+        [orderSyncMessageType]="orderSyncMessageType"
         (editTask)="editTask($event)"
         (moveEnvironmentUp)="moveEnvironmentUp($event)"
         (moveEnvironmentDown)="moveEnvironmentDown($event)"
@@ -63,7 +67,9 @@
         (environmentContextMenu)="onEnvironmentContextMenu($event.mouseEvent, $event.environment)"
         (projectContextMenu)="onProjectContextMenu($event.mouseEvent, $event.project)"
         (addTaskToProject)="openNewTaskModalForProject($event.environmentId, $event.projectId)"
-        (createProject)="createProjectForEnvironment($event)">
+        (createProject)="createProjectForEnvironment($event)"
+        (saveOrderToDatabase)="saveOrderToDatabase()"
+        (loadOrderFromDatabase)="loadOrderFromDatabase()">
       </app-board-view>
 
       <!-- Timeline View -->

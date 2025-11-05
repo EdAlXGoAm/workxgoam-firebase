@@ -5,4 +5,5 @@ export interface Environment {
   color: string;
   createdAt: string;
   updatedAt: string;
+  customOrder?: number; // Orden personalizado sincronizable entre dispositivos (opcional para compatibilidad)
 } 
