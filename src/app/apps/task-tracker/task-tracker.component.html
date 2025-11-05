@@ -51,6 +51,7 @@
         [showHidden]="showHidden"
         [environmentHiddenVisibility]="environmentHiddenVisibility"
         [environmentViewMode]="environmentViewMode"
+        [environmentSortOrder]="environmentSortOrder"
         (editTask)="editTask($event)"
         (taskContextMenu)="onTaskContextMenu($event.mouseEvent, $event.task)"
         (taskQuickContextMenu)="onTaskQuickContextMenu($event.mouseEvent, $event.task)"
@@ -330,6 +331,12 @@
          (click)="openDateRangeModal(selectedEnvironment!.id)">
       <i class="fas fa-calendar-alt"></i>
       <span>Mostrar por fecha</span>
+    </div>
+    <hr class="my-1 border-gray-200">
+    <!-- Orden de tareas por fecha -->
+    <div class="context-menu-item" (click)="toggleEnvironmentSortOrder(selectedEnvironment!.id)">
+      <i class="fas" [ngClass]="getEnvironmentSortOrder(selectedEnvironment!.id) === 'asc' ? 'fa-sort-amount-down' : 'fa-sort-amount-up'"></i>
+      <span>Ordenar: {{ getEnvironmentSortOrderLabel(selectedEnvironment!.id) }}</span>
     </div>
     <hr class="my-1 border-gray-200">
     <!-- Alternar vista de proyectos/tareas dentro del ambiente -->

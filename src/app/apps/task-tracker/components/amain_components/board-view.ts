@@ -261,6 +261,7 @@ export class BoardViewComponent {
   @Input() showHidden: boolean = false;
   @Input() environmentHiddenVisibility: { [envId: string]: 'hidden' | 'show-all' | 'show-24h' | 'date-range' } = {};
   @Input() environmentViewMode: { [envId: string]: 'cards' | 'list' } = {};
+  @Input() environmentSortOrder: { [envId: string]: 'asc' | 'desc' } = {};
 
   @Output() editTask = new EventEmitter<Task>();
   @Output() taskContextMenu = new EventEmitter<{ mouseEvent: MouseEvent; task: Task }>();
@@ -308,6 +309,10 @@ export class BoardViewComponent {
     if (this.showHidden) return 'show-all';
     return this.environmentHiddenVisibility[envId] || 'hidden';
   }
+  
+  private getEnvironmentSortOrder(envId: string): 'asc' | 'desc' {
+    return this.environmentSortOrder[envId] || 'asc';
+  }
 
   getTasksByEnvironment(environmentId: string): Task[] {
     const visibility = this.resolveEnvironmentHiddenVisibility(environmentId);
@@ -335,7 +340,8 @@ export class BoardViewComponent {
       .sort((a, b) => {
         const dateA = new Date(a.start + (a.start.includes('Z') ? '' : 'Z')).getTime();
         const dateB = new Date(b.start + (b.start.includes('Z') ? '' : 'Z')).getTime();
-        return dateA - dateB;
+        const sortOrder = this.getEnvironmentSortOrder(environmentId);
+        return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
       });
   }
 
@@ -367,7 +373,8 @@ export class BoardViewComponent {
       .sort((a, b) => {
         const dateA = new Date(a.start + (a.start.includes('Z') ? '' : 'Z')).getTime();
         const dateB = new Date(b.start + (b.start.includes('Z') ? '' : 'Z')).getTime();
-        return dateA - dateB;
+        const sortOrder = this.getEnvironmentSortOrder(environmentId);
+        return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
       });
   }
 

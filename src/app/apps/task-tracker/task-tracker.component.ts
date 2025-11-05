@@ -54,6 +54,8 @@ export class TaskTrackerComponent implements OnInit {
   environmentDateRanges: { [envId: string]: { mode: 'day' | 'range', startDate?: string, endDate?: string, singleDate?: string } } = {};
   // Modo de vista por environment: 'cards' o 'list'
   environmentViewMode: { [envId: string]: 'cards' | 'list' } = {};
+  // Orden de tareas por environment: 'asc' (más antigua primero) o 'desc' (más reciente primero)
+  environmentSortOrder: { [envId: string]: 'asc' | 'desc' } = {};
 
   newTask: Partial<Task> = {
     name: '',
@@ -215,6 +217,8 @@ export class TaskTrackerComponent implements OnInit {
     this.loadShowHiddenState();
     // Cargar modos de vista por environment desde localStorage
     this.loadEnvironmentViewModes();
+    // Cargar órdenes de clasificación por environment desde localStorage
+    this.loadEnvironmentSortOrders();
   }
 
   async loadInitialData(): Promise<void> {
@@ -644,7 +648,8 @@ export class TaskTrackerComponent implements OnInit {
       .sort((a, b) => {
         const dateA = new Date(a.start + (a.start.includes('Z') ? '' : 'Z')).getTime();
         const dateB = new Date(b.start + (b.start.includes('Z') ? '' : 'Z')).getTime();
-        return dateA - dateB;
+        const sortOrder = this.getEnvironmentSortOrder(environmentId);
+        return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
       });
   }
 
@@ -718,7 +723,8 @@ export class TaskTrackerComponent implements OnInit {
       .sort((a, b) => {
         const dateA = new Date(a.start + (a.start.includes('Z') ? '' : 'Z')).getTime();
         const dateB = new Date(b.start + (b.start.includes('Z') ? '' : 'Z')).getTime();
-        return dateA - dateB;
+        const sortOrder = this.getEnvironmentSortOrder(environmentId);
+        return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
       });
   }
 
@@ -1976,6 +1982,25 @@ export class TaskTrackerComponent implements OnInit {
     this.closeEnvironmentContextMenu();
     this.saveEnvironmentViewModes();
   }
+  
+  // Orden de tareas por environment
+  getEnvironmentSortOrder(envId: string): 'asc' | 'desc' {
+    return this.environmentSortOrder[envId] || 'asc';
+  }
+  
+  toggleEnvironmentSortOrder(envId: string): void {
+    const current = this.getEnvironmentSortOrder(envId);
+    this.environmentSortOrder[envId] = current === 'asc' ? 'desc' : 'asc';
+    this.saveEnvironmentSortOrders();
+    this.closeEnvironmentContextMenu();
+    // Refrescar la vista aplicando el nuevo orden
+    this.processTasks();
+  }
+  
+  getEnvironmentSortOrderLabel(envId: string): string {
+    const order = this.getEnvironmentSortOrder(envId);
+    return order === 'asc' ? 'Más reciente' : 'Más antigua';
+  }
 
   private loadEnvironmentViewModes(): void {
     try {
@@ -1992,6 +2017,24 @@ export class TaskTrackerComponent implements OnInit {
   private saveEnvironmentViewModes(): void {
     try {
       localStorage.setItem('taskTracker_envViewModes', JSON.stringify(this.environmentViewMode));
+    } catch {}
+  }
+
+  private loadEnvironmentSortOrders(): void {
+    try {
+      const raw = localStorage.getItem('taskTracker_envSortOrders');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          this.environmentSortOrder = parsed;
+        }
+      }
+    } catch {}
+  }
+
+  private saveEnvironmentSortOrders(): void {
+    try {
+      localStorage.setItem('taskTracker_envSortOrders', JSON.stringify(this.environmentSortOrder));
     } catch {}
   }
 
