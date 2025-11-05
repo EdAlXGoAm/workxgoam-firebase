@@ -9,6 +9,7 @@ import { MuiTimePickerComponent } from '../mui-time-picker/mui-time-picker.compo
 import { PrioritySelectorComponent } from '../priority-selector/priority-selector.component';
 import { AndroidDatePickerComponent } from '../android-date-picker/android-date-picker.component';
 import { TaskTypeService } from '../../services/task-type.service';
+import { TaskService } from '../../services/task.service';
 
 @Component({
   selector: 'app-task-modal',
@@ -48,6 +49,11 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   taskTypes: TaskType[] = [];
   selectableTaskTypes: TaskType[] = [];
   
+  // Tareas recientes del proyecto
+  recentTasks: Task[] = [];
+  showRecentTasksSelector = false;
+  selectedRecentTaskIndex: string = '';
+  
   // Modal de confirmación de duración
   showDurationConfirmModal = false;
   pendingStartDate = '';
@@ -68,7 +74,8 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
 
   constructor(
     private cdr: ChangeDetectorRef,
-    private taskTypeService: TaskTypeService
+    private taskTypeService: TaskTypeService,
+    private taskService: TaskService
   ) {}
 
   get formId(): string {
@@ -104,9 +111,17 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
       // Recargar tipos cuando se abre el modal
       if (changes.showModal && changes.showModal.currentValue && this.task.project) {
         this.onProjectChange();
+        // Cargar tareas recientes si no estamos editando
+        if (!this.isEditing) {
+          this.loadRecentTasks();
+        }
       }
     } else {
       this.enableBodyScroll();
+      // Limpiar tareas recientes al cerrar
+      this.recentTasks = [];
+      this.showRecentTasksSelector = false;
+      this.selectedRecentTaskIndex = '';
     }
   }
   
@@ -201,9 +216,16 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     if (this.task.project) {
       await this.loadTaskTypes();
       this.selectableTaskTypes = this.taskTypes.filter(t => t.projectId === this.task.project);
+      // Cargar tareas recientes cuando se selecciona un proyecto (solo si no estamos editando)
+      if (!this.isEditing) {
+        this.loadRecentTasks();
+      }
     } else {
       this.selectableTaskTypes = [];
       this.task.type = undefined;
+      this.recentTasks = [];
+      this.showRecentTasksSelector = false;
+      this.selectedRecentTaskIndex = '';
     }
     // Si el tipo actual no está en los tipos seleccionables, limpiarlo
     if (this.task.type && !this.selectableTaskTypes.find(t => t.id === this.task.type)) {
@@ -226,6 +248,81 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     if (this.task.project) {
       this.selectableTaskTypes = this.taskTypes.filter(t => t.projectId === this.task.project);
     }
+  }
+
+  async loadRecentTasks() {
+    if (!this.task.project || this.isEditing) {
+      this.recentTasks = [];
+      this.showRecentTasksSelector = false;
+      return;
+    }
+
+    try {
+      this.recentTasks = await this.taskService.getRecentTasksByProject(this.task.project, 20);
+      this.showRecentTasksSelector = this.recentTasks.length > 0;
+    } catch (error) {
+      console.error('Error al cargar tareas recientes:', error);
+      this.recentTasks = [];
+      this.showRecentTasksSelector = false;
+    }
+  }
+
+  onRecentTaskSelect(selectedIndex: string) {
+    const index = parseInt(selectedIndex, 10);
+    if (isNaN(index) || index < 0 || index >= this.recentTasks.length) {
+      return;
+    }
+    
+    const selectedTask = this.recentTasks[index];
+    if (!selectedTask) {
+      return;
+    }
+    
+    // Autocompletar todos los campos desde la tarea seleccionada
+    this.task.name = selectedTask.name;
+    
+    // Copiar emoji
+    if (selectedTask.emoji) {
+      this.task.emoji = selectedTask.emoji;
+    }
+    
+    // Copiar descripción
+    if (selectedTask.description) {
+      this.task.description = selectedTask.description;
+    }
+    
+    // Copiar prioridad
+    if (selectedTask.priority) {
+      this.task.priority = selectedTask.priority;
+    }
+    
+    // Copiar tipo (solo si es válido para el proyecto actual)
+    if (selectedTask.type && this.task.project) {
+      const isValidType = this.selectableTaskTypes.some(t => t.id === selectedTask.type);
+      if (isValidType) {
+        this.task.type = selectedTask.type;
+      }
+    }
+    
+    // Copiar duración y ajustar fecha/hora de fin si hay fecha/hora de inicio
+    if (selectedTask.duration) {
+      this.task.duration = selectedTask.duration;
+      
+      // Si hay fecha/hora de inicio definidas, ajustar automáticamente la fecha/hora de fin
+      if (this.startDate && this.startTime) {
+        const newEndDateTime = this.calculateNewEndDateTime(this.startDate, this.startTime, selectedTask.duration);
+        this.endDate = newEndDateTime.date;
+        this.endTime = newEndDateTime.time;
+        // Validar las fechas después del ajuste
+        this.validateDates();
+      }
+    }
+    
+    // Resetear el selector para permitir seleccionar otra tarea
+    this.selectedRecentTaskIndex = '';
+    
+    // Forzar actualización de la vista
+    this.cdr.detectChanges();
   }
   
   onDateChange(field: 'start' | 'end' | 'deadline', date: string) {
@@ -702,5 +799,67 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     this.task.start = this.combineDateTime(this.startDate, this.startTime);
     this.task.end = this.combineDateTime(this.endDate, this.endTime);
     this.task.deadline = this.deadlineDate && this.deadlineTime ? this.combineDateTime(this.deadlineDate, this.deadlineTime) : null;
+  }
+  
+  async onTaskNameBlur() {
+    // Solo buscar si hay un nombre válido
+    if (!this.task.name || this.task.name.trim() === '') {
+      return;
+    }
+    
+    try {
+      // Buscar tareas con el mismo nombre
+      const matchingTasks = await this.taskService.getTasksByName(this.task.name.trim());
+      
+      // Si hay coincidencias, tomar la más reciente (ya viene ordenada)
+      if (matchingTasks.length > 0) {
+        const mostRecentTask = matchingTasks[0];
+        
+        // Copiar los valores: tipo, emoji, descripción, prioridad y duración
+        // Solo copiar el tipo si hay un proyecto seleccionado y el tipo es válido para ese proyecto
+        if (mostRecentTask.type && this.task.project) {
+          // Asegurar que los tipos estén cargados
+          await this.loadTaskTypes();
+          const isValidType = this.selectableTaskTypes.some(t => t.id === mostRecentTask.type);
+          if (isValidType) {
+            this.task.type = mostRecentTask.type;
+          }
+        }
+        
+        if (mostRecentTask.emoji) {
+          this.task.emoji = mostRecentTask.emoji;
+        }
+        
+        if (mostRecentTask.description) {
+          this.task.description = mostRecentTask.description;
+        }
+        
+        if (mostRecentTask.priority) {
+          this.task.priority = mostRecentTask.priority;
+        }
+        
+        if (mostRecentTask.duration) {
+          this.task.duration = mostRecentTask.duration;
+          
+          // Si hay fecha/hora de inicio definidas, ajustar automáticamente la fecha/hora de fin
+          if (this.startDate && this.startTime) {
+            const newEndDateTime = this.calculateNewEndDateTime(this.startDate, this.startTime, mostRecentTask.duration);
+            this.endDate = newEndDateTime.date;
+            this.endTime = newEndDateTime.time;
+            // Validar las fechas después del ajuste
+            this.validateDates();
+          }
+        }
+        
+        // Si hay un proyecto en la tarea encontrada y coincide con el proyecto actual o no hay proyecto seleccionado
+        // No cambiamos el proyecto automáticamente para no interferir con la selección del usuario
+        
+        // Forzar actualización de la vista
+        this.cdr.detectChanges();
+      }
+    } catch (error) {
+      console.error('Error al buscar tareas por nombre:', error);
+      // No mostrar error al usuario, solo registrar en consola
+    }
   }
 } 
