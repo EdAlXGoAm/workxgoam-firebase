@@ -1,4 +1,4 @@
-import { Component, OnInit, HostListener, ElementRef, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, HostListener, ElementRef, ChangeDetectorRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
@@ -33,6 +33,9 @@ import { TimelineFocusService } from './services/timeline-focus.service';
   styleUrls: ['./task-tracker.component.css']
 })
 export class TaskTrackerComponent implements OnInit {
+  @ViewChild('newTaskModal') newTaskModal?: TaskModalComponent;
+  @ViewChild('editTaskModal') editTaskModal?: TaskModalComponent;
+  
   currentView: 'board' | 'timeline' = 'board';
   showNewTaskModal = false;
   searchQuery = '';
@@ -566,6 +569,15 @@ export class TaskTrackerComponent implements OnInit {
   async onTaskTypeCreated() {
     // Recargar los tipos de tarea después de crear uno nuevo
     await this.loadTaskTypes();
+    
+    // Recargar los tipos en el modal de tarea si está abierto
+    if (this.showNewTaskModal && this.newTaskModal) {
+      await this.newTaskModal.refreshTaskTypes();
+    }
+    if (this.showEditTaskModal && this.editTaskModal) {
+      await this.editTaskModal.refreshTaskTypes();
+    }
+    
     // Cerrar el modal de tipos después de crear un tipo
     this.closeNewTaskTypeModal();
   }

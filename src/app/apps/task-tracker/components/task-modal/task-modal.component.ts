@@ -222,7 +222,10 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
 
   async refreshTaskTypes() {
     await this.loadTaskTypes();
-    this.onProjectChange();
+    // Solo actualizar los tipos seleccionables si hay un proyecto seleccionado
+    if (this.task.project) {
+      this.selectableTaskTypes = this.taskTypes.filter(t => t.projectId === this.task.project);
+    }
   }
   
   onDateChange(field: 'start' | 'end' | 'deadline', date: string) {
