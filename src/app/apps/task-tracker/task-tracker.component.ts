@@ -1178,13 +1178,13 @@ export class TaskTrackerComponent implements OnInit {
     
     // Establecer tiempos por defecto directamente
     const now = new Date();
-    const msQuarter = 15 * 60 * 1000; // 15 minutos en milisegundos
+    const msHalfHour = 30 * 60 * 1000; // 30 minutos en milisegundos
     
-    // Hora de inicio: el próximo múltiplo de 15 minutos después de la hora actual
-    const startTime = new Date(Math.ceil(now.getTime() / msQuarter) * msQuarter);
+    // Hora de inicio: el próximo múltiplo de 30 minutos después de la hora actual
+    const startTime = new Date(Math.ceil(now.getTime() / msHalfHour) * msHalfHour);
     
-    // Hora de fin: 15 minutos después de la hora de inicio
-    const endTime = new Date(startTime.getTime() + msQuarter);
+    // Hora de fin: 30 minutos después de la hora de inicio
+    const endTime = new Date(startTime.getTime() + msHalfHour);
     
     // Formatear y establecer los valores
     this.newTask.start = this.formatDateTimeLocalForDefaults(startTime);
@@ -1268,13 +1268,13 @@ export class TaskTrackerComponent implements OnInit {
     
     // Establecer tiempos por defecto directamente
     const now = new Date();
-    const msQuarter = 15 * 60 * 1000; // 15 minutos en milisegundos
+    const msHalfHour = 30 * 60 * 1000; // 30 minutos en milisegundos
     
-    // Hora de inicio: el próximo múltiplo de 15 minutos después de la hora actual
-    const startTime = new Date(Math.ceil(now.getTime() / msQuarter) * msQuarter);
+    // Hora de inicio: el próximo múltiplo de 30 minutos después de la hora actual
+    const startTime = new Date(Math.ceil(now.getTime() / msHalfHour) * msHalfHour);
     
-    // Hora de fin: 15 minutos después de la hora de inicio
-    const endTime = new Date(startTime.getTime() + msQuarter);
+    // Hora de fin: 30 minutos después de la hora de inicio
+    const endTime = new Date(startTime.getTime() + msHalfHour);
     
     // Formatear y establecer los valores
     this.newTask.start = this.formatDateTimeLocalForDefaults(startTime);
