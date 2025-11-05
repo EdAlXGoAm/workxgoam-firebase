@@ -2,6 +2,13 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // AIXGoAmServer - Sistema Multi-Usuario
+    match /AIXGoAmServer_users/{userId} {
+      // Permite acceso completo a usuarios autenticados (incluyendo anónimos)
+      // Esto funciona con autenticación anónima habilitada en Firebase Auth
+      allow read, write: if request.auth != null;
+    }
+
     // Suscripciones → cada usuario solo sus propias
     match /subscriptions/{subscriptionId} {
       allow read:   if request.auth != null && request.auth.uid == resource.data.userId;
@@ -88,6 +95,14 @@ service cloud.firestore {
 
     // task-tracker_Ambientes
     match /task-tracker_environments/{environmentId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow update: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+
+    // task-tracker_Tipos de Tarea
+    match /task-tracker_task-types/{taskTypeId} {
       allow read: if request.auth != null && request.auth.uid == resource.data.userId;
       allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
       allow update: if request.auth != null && request.auth.uid == resource.data.userId;

@@ -4,9 +4,11 @@ import { FormsModule } from '@angular/forms';
 import { Task } from '../../models/task.model';
 import { Project } from '../../models/project.model';
 import { Environment } from '../../models/environment.model';
+import { TaskType } from '../../models/task-type.model';
 import { MuiTimePickerComponent } from '../mui-time-picker/mui-time-picker.component';
 import { PrioritySelectorComponent } from '../priority-selector/priority-selector.component';
 import { AndroidDatePickerComponent } from '../android-date-picker/android-date-picker.component';
+import { TaskTypeService } from '../../services/task-type.service';
 
 @Component({
   selector: 'app-task-modal',
@@ -26,6 +28,7 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   @Output() saveTaskEvent = new EventEmitter<Partial<Task>>();
   @Output() openEnvironmentModal = new EventEmitter<void>();
   @Output() openProjectModal = new EventEmitter<void>();
+  @Output() openTaskTypeModal = new EventEmitter<void>();
   @Output() openRemindersModal = new EventEmitter<void>();
   @Output() openCalculatorModal = new EventEmitter<{type: 'start' | 'end'}>();
   
@@ -42,6 +45,8 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   showDeadlineSection = false;
   dateError = '';
   selectableProjects: Project[] = [];
+  taskTypes: TaskType[] = [];
+  selectableTaskTypes: TaskType[] = [];
   
   // Modal de confirmación de duración
   showDurationConfirmModal = false;
@@ -61,7 +66,10 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
             '📅', '📌', '🔑', '📚', '💻', '📱', '🔋',
             '🏋️', '🚴', '🚗', '🍎', '🍕', '🛒', '☕', '🍷', '🎵', '🎮', '🎨', '✈️'];
 
-  constructor(private cdr: ChangeDetectorRef) {}
+  constructor(
+    private cdr: ChangeDetectorRef,
+    private taskTypeService: TaskTypeService
+  ) {}
 
   get formId(): string {
     return this.isEditing ? 'editTaskForm' : 'newTaskForm';
@@ -70,6 +78,7 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   ngOnInit() {
     this.initializeDateTimeFields();
     this.onEnvironmentChange();
+    this.onProjectChange();
     this.checkIfDeadlineExists();
     // Guardar los valores iniciales de fecha/hora de inicio
     this.previousStartDate = this.startDate;
@@ -89,9 +98,13 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     this.enableBodyScroll();
   }
   
-  ngOnChanges() {
+  ngOnChanges(changes: any) {
     if (this.showModal) {
       this.disableBodyScroll();
+      // Recargar tipos cuando se abre el modal
+      if (changes.showModal && changes.showModal.currentValue && this.task.project) {
+        this.onProjectChange();
+      }
     } else {
       this.enableBodyScroll();
     }
@@ -179,7 +192,37 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     }
     if (!this.selectableProjects.find(p => p.id === this.task.project)) {
       this.task.project = '';
+      this.task.type = undefined;
     }
+    this.onProjectChange();
+  }
+
+  async onProjectChange() {
+    if (this.task.project) {
+      await this.loadTaskTypes();
+      this.selectableTaskTypes = this.taskTypes.filter(t => t.projectId === this.task.project);
+    } else {
+      this.selectableTaskTypes = [];
+      this.task.type = undefined;
+    }
+    // Si el tipo actual no está en los tipos seleccionables, limpiarlo
+    if (this.task.type && !this.selectableTaskTypes.find(t => t.id === this.task.type)) {
+      this.task.type = undefined;
+    }
+  }
+
+  async loadTaskTypes() {
+    try {
+      this.taskTypes = await this.taskTypeService.getTaskTypes();
+    } catch (error) {
+      console.error('Error cargando tipos de tarea:', error);
+      this.taskTypes = [];
+    }
+  }
+
+  async refreshTaskTypes() {
+    await this.loadTaskTypes();
+    this.onProjectChange();
   }
   
   onDateChange(field: 'start' | 'end' | 'deadline', date: string) {

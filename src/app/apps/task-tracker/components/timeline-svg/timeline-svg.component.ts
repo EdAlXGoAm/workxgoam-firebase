@@ -2,6 +2,7 @@ import { Component, Input, Output, EventEmitter, OnInit, HostListener, ViewChild
 import { CommonModule } from '@angular/common';
 import { Task } from '../../models/task.model';
 import { Environment } from '../../models/environment.model';
+import { TaskType } from '../../models/task-type.model';
 
 @Component({
   selector: 'app-timeline-svg',
@@ -52,6 +53,9 @@ import { Environment } from '../../models/environment.model';
            class="tooltip-container absolute top-16 left-1/2 transform -translate-x-1/2 z-50 bg-gray-900 text-white px-4 py-3 rounded-lg shadow-xl max-w-md">
         <div class="flex items-center space-x-2">
           <span class="text-lg">{{ tooltipTask.emoji }}</span>
+          <div *ngIf="getTaskTypeColor(tooltipTask)" 
+               class="w-3 h-3 rounded-full border-2 border-white shadow-sm flex-shrink-0" 
+               [style.background-color]="getTaskTypeColor(tooltipTask)"></div>
           <div class="flex-1">
             <div class="font-semibold text-sm">{{ tooltipTask.name }}</div>
             <div *ngIf="tooltipTask.description" class="text-xs text-gray-300 mt-1">{{ tooltipTask.description }}</div>
@@ -97,7 +101,17 @@ import { Environment } from '../../models/environment.model';
                     (click)="onTaskClick(task, $event)" 
                     (dblclick)="onTaskDoubleClick(task, $event)"
                     class="cursor-pointer" />
-              <text [attr.x]="getTaskX(task, 0) + 6" y="45" [attr.font-size]="taskFontSize" fill="#111" alignment-baseline="middle"
+              <circle *ngIf="getTaskTypeColor(task)" 
+                      [attr.cx]="getTaskX(task, 0) + 8" 
+                      cy="35" 
+                      r="4" 
+                      [attr.fill]="getTaskTypeColor(task)"
+                      stroke="white" 
+                      stroke-width="1"
+                      (click)="onTaskClick(task, $event)" 
+                      (dblclick)="onTaskDoubleClick(task, $event)"
+                      class="cursor-pointer" />
+              <text [attr.x]="getTaskX(task, 0) + (getTaskTypeColor(task) ? 14 : 6)" y="45" [attr.font-size]="taskFontSize" fill="#111" alignment-baseline="middle"
                     (click)="onTaskClick(task, $event)" 
                     (dblclick)="onTaskDoubleClick(task, $event)"
                     class="cursor-pointer">
@@ -131,7 +145,17 @@ import { Environment } from '../../models/environment.model';
                     (click)="onTaskClick(task, $event)" 
                     (dblclick)="onTaskDoubleClick(task, $event)"
                     class="cursor-pointer" />
-              <text [attr.x]="getTaskX(task, 8) + 6" y="45" [attr.font-size]="taskFontSize" fill="#111" alignment-baseline="middle"
+              <circle *ngIf="getTaskTypeColor(task)" 
+                      [attr.cx]="getTaskX(task, 8) + 8" 
+                      cy="35" 
+                      r="4" 
+                      [attr.fill]="getTaskTypeColor(task)"
+                      stroke="white" 
+                      stroke-width="1"
+                      (click)="onTaskClick(task, $event)" 
+                      (dblclick)="onTaskDoubleClick(task, $event)"
+                      class="cursor-pointer" />
+              <text [attr.x]="getTaskX(task, 8) + (getTaskTypeColor(task) ? 14 : 6)" y="45" [attr.font-size]="taskFontSize" fill="#111" alignment-baseline="middle"
                     (click)="onTaskClick(task, $event)" 
                     (dblclick)="onTaskDoubleClick(task, $event)"
                     class="cursor-pointer">
@@ -165,7 +189,17 @@ import { Environment } from '../../models/environment.model';
                     (click)="onTaskClick(task, $event)" 
                     (dblclick)="onTaskDoubleClick(task, $event)"
                     class="cursor-pointer" />
-              <text [attr.x]="getTaskX(task, 16) + 6" y="45" [attr.font-size]="taskFontSize" fill="#111" alignment-baseline="middle"
+              <circle *ngIf="getTaskTypeColor(task)" 
+                      [attr.cx]="getTaskX(task, 16) + 8" 
+                      cy="35" 
+                      r="4" 
+                      [attr.fill]="getTaskTypeColor(task)"
+                      stroke="white" 
+                      stroke-width="1"
+                      (click)="onTaskClick(task, $event)" 
+                      (dblclick)="onTaskDoubleClick(task, $event)"
+                      class="cursor-pointer" />
+              <text [attr.x]="getTaskX(task, 16) + (getTaskTypeColor(task) ? 14 : 6)" y="45" [attr.font-size]="taskFontSize" fill="#111" alignment-baseline="middle"
                     (click)="onTaskClick(task, $event)" 
                     (dblclick)="onTaskDoubleClick(task, $event)"
                     class="cursor-pointer">
@@ -298,6 +332,7 @@ import { Environment } from '../../models/environment.model';
 export class TimelineSvgComponent implements OnInit, AfterViewInit, OnDestroy {
   @Input() tasks: Task[] = [];
   @Input() environments: Environment[] = [];
+  @Input() taskTypes: TaskType[] = [];
 
   // 🎯 Output para notificar al componente padre cuando se quiere editar una tarea
   @Output() editTask = new EventEmitter<Task>();
@@ -946,5 +981,11 @@ export class TimelineSvgComponent implements OnInit, AfterViewInit, OnDestroy {
   onTaskDoubleClick(task: Task, event: MouseEvent): void {
     event.stopPropagation();
     this.editTask.emit(task);
+  }
+
+  getTaskTypeColor(task: Task): string | null {
+    if (!task.type || !this.taskTypes.length) return null;
+    const taskType = this.taskTypes.find(t => t.id === task.type);
+    return taskType?.color || null;
   }
 } 

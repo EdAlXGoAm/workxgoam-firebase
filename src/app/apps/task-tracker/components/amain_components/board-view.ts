@@ -5,6 +5,7 @@ import { TimelineSvgComponent } from '../timeline-svg/timeline-svg.component';
 import { Task } from '../../models/task.model';
 import { Project } from '../../models/project.model';
 import { Environment } from '../../models/environment.model';
+import { TaskType } from '../../models/task-type.model';
 
 @Component({
   selector: 'app-board-view',
@@ -26,7 +27,7 @@ import { Environment } from '../../models/environment.model';
 
       <div class="mb-6">
         <h3 class="text-lg font-semibold mb-2">Línea del Tiempo</h3>
-        <app-timeline-svg [tasks]="tasks" [environments]="environments" (editTask)="editTask.emit($event)"></app-timeline-svg>
+        <app-timeline-svg [tasks]="tasks" [environments]="environments" [taskTypes]="taskTypes" (editTask)="editTask.emit($event)"></app-timeline-svg>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -98,6 +99,9 @@ import { Environment } from '../../models/environment.model';
                         <div class="flex items-center gap-2">
                           <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-xs"></i>
                           <span class="text-base">{{ task.emoji || '📋' }}</span>
+                          <div *ngIf="getTaskTypeColor(task)" 
+                               class="w-3 h-3 rounded-full border-2 border-white shadow-sm flex-shrink-0" 
+                               [style.background-color]="getTaskTypeColor(task)"></div>
                           <span class="truncate flex-1">{{task.name}}</span>
                           <span class="text-xs text-gray-500 ml-2 whitespace-nowrap">{{ formatTime12(task.start) }}</span>
                         </div>
@@ -123,13 +127,18 @@ import { Environment } from '../../models/environment.model';
                         <div class="flex items-center justify-between mb-2">
                           <div class="flex items-center gap-1">
                             <span class="text-lg">{{ task.emoji || '📋' }}</span>
+                            <div *ngIf="getTaskTypeColor(task)" 
+                                 class="w-3 h-3 rounded-full border-2 border-white shadow-sm flex-shrink-0" 
+                                 [style.background-color]="getTaskTypeColor(task)"></div>
                             <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-sm" title="Tarea oculta"></i>
                           </div>
                           <span class="text-xs px-2 py-1 rounded" [class]="'priority-' + task.priority">
                             {{task.priority}}
                           </span>
                         </div>
-                        <h4 class="font-medium">{{task.name}}</h4>
+                        <h4 class="font-medium flex items-center gap-2">
+                          <span>{{task.name}}</span>
+                        </h4>
                         <p class="text-sm text-gray-600 mt-1">{{task.description}}</p>
                         <div class="mt-2 text-xs text-gray-500">
                           <div>Inicio: {{formatDate(task.start)}}</div>
@@ -165,6 +174,9 @@ import { Environment } from '../../models/environment.model';
                     <div class="flex items-center justify-between mb-2">
                       <div class="flex items-center gap-1">
                         <span class="text-lg">{{task.emoji}}</span>
+                        <div *ngIf="getTaskTypeColor(task)" 
+                             class="w-3 h-3 rounded-full border-2 border-white shadow-sm flex-shrink-0" 
+                             [style.background-color]="getTaskTypeColor(task)"></div>
                         <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-sm" title="Tarea oculta"></i>
                       </div>
                       <span class="text-xs px-2 py-1 rounded" [class]="'priority-' + task.priority">
@@ -258,6 +270,7 @@ export class BoardViewComponent {
   @Input() tasks: Task[] = [];
   @Input() projects: Project[] = [];
   @Input() environments: Environment[] = [];
+  @Input() taskTypes: TaskType[] = [];
   @Input() showHidden: boolean = false;
   @Input() environmentHiddenVisibility: { [envId: string]: 'hidden' | 'show-all' | 'show-24h' | 'date-range' } = {};
   @Input() environmentViewMode: { [envId: string]: 'cards' | 'list' } = {};
@@ -555,6 +568,12 @@ export class BoardViewComponent {
     const prio = task.priority;
     const hiddenIcon = (task as any).hidden ? '🙈 ' : '';
     return `${hiddenIcon}${task.emoji || ''} ${task.name}\nPrioridad: ${prio}\nInicio: ${start}\nFin: ${end}`.trim();
+  }
+
+  getTaskTypeColor(task: Task): string | null {
+    if (!task.type || !this.taskTypes.length) return null;
+    const taskType = this.taskTypes.find(t => t.id === task.type);
+    return taskType?.color || null;
   }
 }
 

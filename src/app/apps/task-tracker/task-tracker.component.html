@@ -48,6 +48,7 @@
         [tasks]="filteredTasks"
         [projects]="projects"
         [environments]="environments"
+        [taskTypes]="taskTypes"
         [showHidden]="showHidden"
         [environmentHiddenVisibility]="environmentHiddenVisibility"
         [environmentViewMode]="environmentViewMode"
@@ -64,7 +65,7 @@
       <!-- Timeline View -->
       <div *ngIf="currentView === 'timeline'" class="w-full bg-white rounded-lg shadow-md p-4">
         <h2 class="text-xl font-bold mb-4">Línea del Tiempo</h2>
-        <app-timeline-svg [tasks]="tasks" [environments]="environments" (editTask)="editTask($event)"></app-timeline-svg>
+        <app-timeline-svg [tasks]="tasks" [environments]="environments" [taskTypes]="taskTypes" (editTask)="editTask($event)"></app-timeline-svg>
       </div>
     </div>
   </main>
@@ -195,8 +196,10 @@
     (saveTaskEvent)="saveTask()"
     (openEnvironmentModal)="openNewEnvironmentModal()"
     (openProjectModal)="openNewProjectModal()"
+    (openTaskTypeModal)="openNewTaskTypeModal()"
     (openRemindersModal)="openRemindersModal('new')"
-    (openCalculatorModal)="openTimeCalculator($event.type, 'new')">
+    (openCalculatorModal)="openTimeCalculator($event.type, 'new')"
+    #newTaskModal>
   </app-task-modal>
 
   <!-- New Environment Modal -->
@@ -208,6 +211,15 @@
     (closeModal)="closeNewEnvironmentModal()"
     (saveEnvironment)="onSaveNewEnvironment($event)">
   </app-environment-modal>
+
+  <!-- New Task Type Modal -->
+  <app-task-type-modal
+    *ngIf="showNewTaskTypeModal"
+    [showModal]="showNewTaskTypeModal"
+    [projectId]="getCurrentProjectIdForTaskTypeModal()"
+    (closeModal)="closeNewTaskTypeModal()"
+    (taskTypeCreated)="onTaskTypeCreated()">
+  </app-task-type-modal>
 
   <!-- New Project Modal -->
   <div *ngIf="showNewProjectModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -375,6 +387,7 @@
     (saveTaskEvent)="saveEditedTask()"
     (openEnvironmentModal)="openNewEnvironmentModal()"
     (openProjectModal)="openNewProjectModal()"
+    (openTaskTypeModal)="openNewTaskTypeModal()"
     (openRemindersModal)="openRemindersModal('edit')"
     (openCalculatorModal)="openTimeCalculator($event.type, 'edit')">
   </app-task-modal>

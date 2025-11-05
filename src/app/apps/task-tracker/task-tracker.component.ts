@@ -20,11 +20,14 @@ import { EnvironmentModalComponent } from './components/environment-modal/enviro
 import { BoardViewComponent } from './components/amain_components/board-view';
 import { ChangeStatusModalComponent } from './components/change-status-modal/change-status-modal';
 import { DateRangeModalComponent } from './components/date-range-modal/date-range-modal.component';
+import { TaskTypeModalComponent } from './components/task-type-modal/task-type-modal.component';
+import { TaskTypeService } from './services/task-type.service';
+import { TaskType } from './models/task-type.model';
 
 @Component({
   selector: 'app-task-tracker',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, TimelineSvgComponent, CurrentTaskInfoComponent, TaskModalComponent, RemindersModalComponent, TaskTrackerHeaderComponent, EnvironmentModalComponent, BoardViewComponent, ChangeStatusModalComponent, DateRangeModalComponent],
+  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, TimelineSvgComponent, CurrentTaskInfoComponent, TaskModalComponent, RemindersModalComponent, TaskTrackerHeaderComponent, EnvironmentModalComponent, BoardViewComponent, ChangeStatusModalComponent, DateRangeModalComponent, TaskTypeModalComponent],
   templateUrl: './task-tracker.component.html',
   styleUrls: ['./task-tracker.component.css']
 })
@@ -37,9 +40,11 @@ export class TaskTrackerComponent implements OnInit {
   tasks: Task[] = [];
   projects: Project[] = [];
   environments: Environment[] = [];
+  taskTypes: TaskType[] = [];
   filteredTasks: Task[] = [];
   showNewEnvironmentModal = false;
   showNewProjectModal = false;
+  showNewTaskTypeModal = false;
   showManagementModal = false;
 
   // Nuevo: Estado para contraer environments vacíos
@@ -207,6 +212,7 @@ export class TaskTrackerComponent implements OnInit {
     private taskService: TaskService,
     private projectService: ProjectService,
     private environmentService: EnvironmentService,
+    private taskTypeService: TaskTypeService,
     private elementRef: ElementRef
   ) {}
 
@@ -226,7 +232,8 @@ export class TaskTrackerComponent implements OnInit {
       await this.loadUserData();
       await Promise.all([
         this.loadEnvironments(),
-        this.loadProjects()
+        this.loadProjects(),
+        this.loadTaskTypes()
       ]);
       await this.loadTasks();
     } catch (error) {
@@ -298,6 +305,15 @@ export class TaskTrackerComponent implements OnInit {
       id: doc.id,
       ...doc.data()
     } as Environment));
+  }
+
+  private async loadTaskTypes() {
+    try {
+      this.taskTypes = await this.taskTypeService.getTaskTypes();
+    } catch (error) {
+      console.error('Error al cargar tipos de tarea:', error);
+      this.taskTypes = [];
+    }
   }
 
   switchView(view: 'board' | 'timeline') {
@@ -505,6 +521,42 @@ export class TaskTrackerComponent implements OnInit {
 
   closeNewProjectModal() {
     this.showNewProjectModal = false;
+  }
+
+  openNewTaskTypeModal() {
+    // Verificar que haya un proyecto seleccionado en la tarea actual
+    const currentProjectId = this.showNewTaskModal && this.newTask?.project 
+      ? this.newTask.project 
+      : this.showEditTaskModal && this.selectedTask?.project 
+        ? this.selectedTask.project 
+        : '';
+    
+    if (!currentProjectId) {
+      alert('Por favor, selecciona un proyecto primero');
+      return;
+    }
+    
+    // El projectId se pasa al modal a través del binding en el HTML
+    this.showNewTaskTypeModal = true;
+  }
+
+  getCurrentProjectIdForTaskTypeModal(): string {
+    return this.showNewTaskModal && this.newTask?.project 
+      ? this.newTask.project 
+      : this.showEditTaskModal && this.selectedTask?.project 
+        ? this.selectedTask.project 
+        : '';
+  }
+
+  closeNewTaskTypeModal() {
+    this.showNewTaskTypeModal = false;
+  }
+
+  async onTaskTypeCreated() {
+    // Recargar los tipos de tarea después de crear uno nuevo
+    await this.loadTaskTypes();
+    // Cerrar el modal de tipos después de crear un tipo
+    this.closeNewTaskTypeModal();
   }
 
   openManagementModal() {
