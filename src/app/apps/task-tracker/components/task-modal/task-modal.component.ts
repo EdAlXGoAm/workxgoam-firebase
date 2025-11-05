@@ -8,13 +8,14 @@ import { TaskType } from '../../models/task-type.model';
 import { MuiTimePickerComponent } from '../mui-time-picker/mui-time-picker.component';
 import { PrioritySelectorComponent } from '../priority-selector/priority-selector.component';
 import { AndroidDatePickerComponent } from '../android-date-picker/android-date-picker.component';
+import { CustomSelectComponent, SelectOption } from '../custom-select/custom-select.component';
 import { TaskTypeService } from '../../services/task-type.service';
 import { TaskService } from '../../services/task.service';
 
 @Component({
   selector: 'app-task-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule, MuiTimePickerComponent, PrioritySelectorComponent, AndroidDatePickerComponent],
+  imports: [CommonModule, FormsModule, MuiTimePickerComponent, PrioritySelectorComponent, AndroidDatePickerComponent, CustomSelectComponent],
   templateUrl: './task-modal.component.html',
   styleUrls: ['./task-modal.component.css']
 })
@@ -54,6 +55,12 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   recentTasks: Task[] = [];
   showRecentTasksSelector = false;
   selectedRecentTaskIndex: string = '';
+  recentTasksOptions: SelectOption[] = [];
+  
+  // Opciones para selectores personalizados
+  environmentOptions: SelectOption[] = [];
+  projectOptions: SelectOption[] = [];
+  taskTypeOptions: SelectOption[] = [];
   
   // Modal de confirmación de duración
   showDurationConfirmModal = false;
@@ -98,6 +105,7 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   
   ngOnInit() {
     this.initializeDateTimeFields();
+    this.buildEnvironmentOptions();
     this.onEnvironmentChange();
     this.onProjectChange();
     this.checkIfDeadlineExists();
@@ -264,6 +272,7 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     } else {
       this.selectableProjects = [];
     }
+    this.buildProjectOptions(); // Actualizar opciones de proyecto
     if (!this.selectableProjects.find(p => p.id === this.task.project)) {
       this.task.project = '';
       this.task.type = undefined;
@@ -275,12 +284,14 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     if (this.task.project) {
       await this.loadTaskTypes();
       this.selectableTaskTypes = this.taskTypes.filter(t => t.projectId === this.task.project);
+      this.buildTaskTypeOptions(); // Actualizar opciones de tipo de tarea
       // Cargar tareas recientes cuando se selecciona un proyecto (solo si no estamos editando)
       if (!this.isEditing) {
         this.loadRecentTasks();
       }
     } else {
       this.selectableTaskTypes = [];
+      this.buildTaskTypeOptions(); // Actualizar opciones de tipo de tarea
       this.task.type = undefined;
       this.recentTasks = [];
       this.showRecentTasksSelector = false;
@@ -319,6 +330,7 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     try {
       this.recentTasks = await this.taskService.getRecentTasksByProject(this.task.project, 20);
       this.showRecentTasksSelector = this.recentTasks.length > 0;
+      this.recentTasksOptions = this.buildRecentTasksOptions();
     } catch (error) {
       console.error('Error al cargar tareas recientes:', error);
       this.recentTasks = [];
@@ -326,12 +338,77 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     }
   }
 
-  onRecentTaskSelect(selectedIndex: string) {
+  // Construir opciones para selectores personalizados
+  buildEnvironmentOptions(): void {
+    this.environmentOptions = this.environments.map(env => ({
+      value: env.id || '',
+      label: env.name
+    }));
+  }
+  
+  buildProjectOptions(): void {
+    this.projectOptions = this.selectableProjects.map(proj => ({
+      value: proj.id || '',
+      label: proj.name
+    }));
+  }
+  
+  buildTaskTypeOptions(): void {
+    this.taskTypeOptions = [
+      { value: '', label: 'Sin tipo' },
+      ...this.selectableTaskTypes.map(type => ({
+        value: type.id || '',
+        label: type.name
+      }))
+    ];
+  }
+  
+  buildRecentTasksOptions(): SelectOption[] {
+    return this.recentTasks.map((task, index) => ({
+      value: index,
+      label: `${task.emoji || '📝'} ${task.name}`,
+      subtitle: this.formatReminderDateTime(task.updatedAt || task.createdAt)
+    }));
+  }
+  
+  // Métodos para manejar selecciones desde selectores personalizados (móvil)
+  onEnvironmentSelectCustom(option: SelectOption): void {
+    this.task.environment = String(option.value);
+    this.onEnvironmentChange();
+  }
+  
+  onProjectSelectCustom(option: SelectOption): void {
+    this.task.project = String(option.value);
+    this.onProjectChange();
+  }
+  
+  onTaskTypeSelectCustom(option: SelectOption): void {
+    const value = option.value;
+    this.task.type = value === '' ? undefined : String(value);
+  }
+  
+  // Método para manejar la selección desde el selector nativo (desktop)
+  onRecentTaskSelectNative(selectedIndex: string) {
     const index = parseInt(selectedIndex, 10);
     if (isNaN(index) || index < 0 || index >= this.recentTasks.length) {
       return;
     }
     
+    this.applyRecentTaskData(index);
+  }
+  
+  // Método para manejar la selección desde el selector personalizado (móvil)
+  onRecentTaskSelect(option: SelectOption) {
+    const index = typeof option.value === 'number' ? option.value : parseInt(String(option.value), 10);
+    if (isNaN(index) || index < 0 || index >= this.recentTasks.length) {
+      return;
+    }
+    
+    this.applyRecentTaskData(index);
+  }
+  
+  // Método común para aplicar los datos de la tarea reciente seleccionada
+  private applyRecentTaskData(index: number) {
     const selectedTask = this.recentTasks[index];
     if (!selectedTask) {
       return;

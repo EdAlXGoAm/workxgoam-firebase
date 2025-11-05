@@ -7,11 +7,12 @@ import { EnvironmentService } from '../../services/environment.service';
 import { Task } from '../../models/task.model';
 import { Project } from '../../models/project.model';
 import { Environment } from '../../models/environment.model';
+import { CustomSelectComponent, SelectOption } from '../custom-select/custom-select.component';
 
 @Component({
   selector: 'app-management-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, CustomSelectComponent],
   templateUrl: './management-modal.component.html',
   styleUrls: ['./management-modal.component.css']
 })
@@ -33,6 +34,9 @@ export class ManagementModalComponent implements OnInit {
   isEditingProject: boolean = false;
   showAddProjectModal: boolean = false;
   showEditProjectModal: boolean = false;
+  
+  // Opciones para selectores personalizados
+  environmentOptions: SelectOption[] = [];
 
   // Colores sugeridos para entornos
   suggestedColors: string[] = [
@@ -102,12 +106,14 @@ export class ManagementModalComponent implements OnInit {
     this.currentProject = {};
     this.isEditingProject = false;
     this.showAddProjectModal = true;
+    this.buildEnvironmentOptions();
   }
 
   openEditProjectModal(proj: Project): void {
     this.currentProject = { ...proj };
     this.isEditingProject = true;
     this.showEditProjectModal = true;
+    this.buildEnvironmentOptions();
   }
 
   closeProjectModal(): void {
@@ -128,6 +134,18 @@ export class ManagementModalComponent implements OnInit {
   getEnvironmentColor(environmentId: string): string {
     const env = this.environments.find(e => e.id === environmentId);
     return env?.color || '#6B7280';
+  }
+  
+  // Métodos para selector personalizado
+  buildEnvironmentOptions(): void {
+    this.environmentOptions = this.environments.map(env => ({
+      value: env.id || '',
+      label: env.name
+    }));
+  }
+  
+  onEnvironmentSelectCustom(option: SelectOption): void {
+    this.currentProject.environment = String(option.value);
   }
 
   selectSuggestedColor(color: string): void {

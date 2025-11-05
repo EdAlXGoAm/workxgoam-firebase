@@ -24,11 +24,12 @@ import { TaskTypeModalComponent } from './components/task-type-modal/task-type-m
 import { TaskTypeService } from './services/task-type.service';
 import { TaskType } from './models/task-type.model';
 import { TimelineFocusService } from './services/timeline-focus.service';
+import { CustomSelectComponent, SelectOption } from './components/custom-select/custom-select.component';
 
 @Component({
   selector: 'app-task-tracker',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, TimelineSvgComponent, CurrentTaskInfoComponent, TaskModalComponent, RemindersModalComponent, TaskTrackerHeaderComponent, EnvironmentModalComponent, BoardViewComponent, ChangeStatusModalComponent, DateRangeModalComponent, TaskTypeModalComponent],
+  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, TimelineSvgComponent, CurrentTaskInfoComponent, TaskModalComponent, RemindersModalComponent, TaskTrackerHeaderComponent, EnvironmentModalComponent, BoardViewComponent, ChangeStatusModalComponent, DateRangeModalComponent, TaskTypeModalComponent, CustomSelectComponent],
   templateUrl: './task-tracker.component.html',
   styleUrls: ['./task-tracker.component.css']
 })
@@ -118,6 +119,9 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     description: '',
     environment: ''
   };
+  
+  // Opciones para selectores personalizados
+  environmentOptionsForNewProject: SelectOption[] = [];
   showContextMenu = false;
   contextMenuPosition = { x: 0, y: 0 };
   selectedTask: Task | null = null;
@@ -657,11 +661,24 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
       this.newProject.environment = this.selectedTask.environment;
     }
     
+    this.buildEnvironmentOptionsForNewProject();
     this.showNewProjectModal = true;
   }
 
   closeNewProjectModal() {
     this.showNewProjectModal = false;
+  }
+  
+  // Métodos para selector personalizado de nuevo proyecto
+  buildEnvironmentOptionsForNewProject(): void {
+    this.environmentOptionsForNewProject = this.orderedEnvironments.map(env => ({
+      value: env.id || '',
+      label: env.name
+    }));
+  }
+  
+  onEnvironmentSelectCustomForNewProject(option: SelectOption): void {
+    this.newProject.environment = String(option.value);
   }
 
   openNewTaskTypeModal() {

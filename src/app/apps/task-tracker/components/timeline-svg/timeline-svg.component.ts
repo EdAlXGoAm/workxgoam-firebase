@@ -26,8 +26,9 @@ interface RenderableItem {
   template: `
     <div #containerRef class="timeline-container w-full overflow-x-auto relative">
       <!-- Controles de Navegación de Fechas -->
-      <div class="date-navigation mb-4 flex items-center justify-between bg-white rounded-lg p-3 shadow-sm border">
-        <div class="flex items-center space-x-2">
+      <div class="date-navigation mb-4 flex flex-col md:flex-row items-center justify-between bg-white rounded-lg p-3 shadow-sm border gap-3">
+        <!-- Primera fila en móvil: Navegador de días -->
+        <div class="flex items-center space-x-2 w-full md:w-auto justify-center md:justify-start">
           <button (click)="goToPreviousDay()" 
                   class="nav-btn flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
                   title="Día anterior">
@@ -45,8 +46,9 @@ interface RenderableItem {
           </button>
         </div>
         
-        <div class="flex items-center space-x-3">
-          <div class="w-48">
+        <!-- Segunda fila en móvil: Selector y botón Hoy -->
+        <div class="flex items-center space-x-3 w-full md:w-auto justify-center md:justify-end">
+          <div class="w-48 flex-shrink-0">
             <app-android-date-picker
               [ngModel]="getDateInputValue()"
               (dateChange)="onDateChange($event)"
@@ -61,7 +63,7 @@ interface RenderableItem {
                   [class.text-indigo-700]="isToday()"
                   [class.bg-gray-100]="!isToday()"
                   [class.text-gray-700]="!isToday()"
-                  class="nav-btn px-3 py-1 rounded-md text-sm font-medium hover:bg-indigo-50 transition-colors"
+                  class="nav-btn px-3 py-1 rounded-md text-sm font-medium hover:bg-indigo-50 transition-colors flex-shrink-0"
                   title="Ir a hoy">
             Hoy
           </button>
