@@ -64,8 +64,25 @@
 
       <!-- Timeline View -->
       <div *ngIf="currentView === 'timeline'" class="w-full bg-white rounded-lg shadow-md p-4">
-        <h2 class="text-xl font-bold mb-4">Línea del Tiempo</h2>
-        <app-timeline-svg [tasks]="tasks" [environments]="environments" [taskTypes]="taskTypes" (editTask)="editTask($event)"></app-timeline-svg>
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-bold">Línea del Tiempo</h2>
+          <div *ngIf="focusedEnvironment.id" class="flex items-center gap-2 px-3 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-sm">
+            <i class="fas fa-bullseye"></i>
+            <span>Enfocado: {{ getEnvironmentName(focusedEnvironment.id) }}</span>
+            <button (click)="toggleFocusEnvironment(focusedEnvironment.id!)" 
+                    class="ml-2 text-indigo-600 hover:text-indigo-800" 
+                    title="Desenfocar ambiente">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+        <app-timeline-svg 
+          [tasks]="tasks" 
+          [environments]="environments" 
+          [taskTypes]="taskTypes" 
+          [projects]="projects" 
+          (editTask)="editTask($event)">
+        </app-timeline-svg>
       </div>
     </div>
   </main>
@@ -356,6 +373,14 @@
       <i class="fas" [ngClass]="getEnvironmentViewMode(selectedEnvironment!.id) === 'cards' ? 'fa-list' : 'fa-th-large'"></i>
       <span>{{ getEnvironmentViewMode(selectedEnvironment!.id) === 'cards' ? 'Ver lista' : 'Ver tarjetas' }}</span>
     </div>
+    <hr class="my-1 border-gray-200">
+    <!-- Enfocar ambiente en línea de tiempo -->
+         <div class="context-menu-item" 
+              [class.context-menu-item-active]="focusedEnvironment.id === selectedEnvironment!.id"
+              (click)="toggleFocusEnvironment(selectedEnvironment!.id)">
+           <i class="fas" [ngClass]="focusedEnvironment.id === selectedEnvironment!.id ? 'fa-crosshairs' : 'fa-bullseye'"></i>
+           <span>{{ focusedEnvironment.id === selectedEnvironment!.id ? 'Desenfocar ambiente' : 'Enfocar ambiente' }}</span>
+         </div>
     <hr class="my-1 border-gray-200">
     <div class="context-menu-item context-menu-item-danger" (click)="deleteEnvironment(selectedEnvironment!)">
       <i class="fas fa-trash"></i>

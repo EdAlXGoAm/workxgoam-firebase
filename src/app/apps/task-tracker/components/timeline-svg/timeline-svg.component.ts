@@ -1,8 +1,11 @@
-import { Component, Input, Output, EventEmitter, OnInit, HostListener, ViewChild, ElementRef, AfterViewInit, OnDestroy } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, HostListener, ViewChild, ElementRef, AfterViewInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Task } from '../../models/task.model';
 import { Environment } from '../../models/environment.model';
 import { TaskType } from '../../models/task-type.model';
+import { Project } from '../../models/project.model';
+import { TimelineFocusService } from '../../services/timeline-focus.service';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-timeline-svg',
@@ -57,7 +60,7 @@ import { TaskType } from '../../models/task-type.model';
                class="w-3 h-3 rounded-full border-2 border-white shadow-sm flex-shrink-0" 
                [style.background-color]="getTaskTypeColor(tooltipTask)"></div>
           <div class="flex-1">
-            <div class="font-semibold text-sm">{{ tooltipTask.name }}</div>
+            <div class="font-semibold text-sm">{{ getTaskDisplayName(tooltipTask) }}</div>
             <div *ngIf="tooltipTask.description" class="text-xs text-gray-300 mt-1">{{ tooltipTask.description }}</div>
             <div class="text-xs text-gray-400 mt-1">
               {{ formatTaskTime(tooltipTask.start) }} - {{ formatTaskTime(tooltipTask.end) }}
@@ -333,6 +336,15 @@ export class TimelineSvgComponent implements OnInit, AfterViewInit, OnDestroy {
   @Input() tasks: Task[] = [];
   @Input() environments: Environment[] = [];
   @Input() taskTypes: TaskType[] = [];
+  @Input() projects: Project[] = [];
+  
+  focusedEnvironmentId: string | null = null;
+  private focusSubscription?: Subscription;
+
+  constructor(
+    private cdr: ChangeDetectorRef,
+    private timelineFocusService: TimelineFocusService
+  ) {}
 
   // 🎯 Output para notificar al componente padre cuando se quiere editar una tarea
   @Output() editTask = new EventEmitter<Task>();
@@ -391,8 +403,20 @@ export class TimelineSvgComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnInit() {
+    // Suscribirse al servicio para recibir cambios en el ambiente enfocado
+    this.focusedEnvironmentId = this.timelineFocusService.getCurrentFocusedEnvironmentId();
+    this.focusSubscription = this.timelineFocusService.getFocusedEnvironmentId().subscribe(envId => {
+      const changed = this.focusedEnvironmentId !== envId;
+      this.focusedEnvironmentId = envId;
+      if (changed) {
+        this.cdr.markForCheck();
+        this.cdr.detectChanges();
+      }
+    });
+    
     this.updateSvgDimensions();
   }
+
 
   ngAfterViewInit() {
     this.initializeResizeObserver();
@@ -413,6 +437,10 @@ export class TimelineSvgComponent implements OnInit, AfterViewInit, OnDestroy {
     // Limpiar timeout del doble click
     if (this.clickTimeout) {
       clearTimeout(this.clickTimeout);
+    }
+    // Limpiar suscripción al servicio
+    if (this.focusSubscription) {
+      this.focusSubscription.unsubscribe();
     }
   }
 
@@ -517,7 +545,16 @@ export class TimelineSvgComponent implements OnInit, AfterViewInit, OnDestroy {
   getTaskText(task: Task, sectionStartHour: number): string {
     const taskWidth = this.getTaskWidth(task, sectionStartHour); // Usar la sección correcta
     const emoji = task.emoji || '📋';
-    const name = task.name || 'Sin título';
+    let name = task.name || 'Sin título';
+    
+    // Si hay un ambiente enfocado, modificar el formato del nombre
+    if (this.focusedEnvironmentId && task.project) {
+      const project = this.projects.find(p => p.id === task.project);
+      if (project) {
+        const projectInitials = this.getProjectInitials(project.name);
+        name = `${projectInitials}: ${name}`;
+      }
+    }
     
     // Ser MUCHO más generoso con el cálculo de caracteres disponibles
     const availableChars = Math.floor(taskWidth / (this.taskFontSize * 0.35)); // Factor más generoso aún
@@ -547,6 +584,15 @@ export class TimelineSvgComponent implements OnInit, AfterViewInit, OnDestroy {
       // Solo emoji
       return emoji;
     }
+  }
+
+  // Función helper para obtener las primeras 3 iniciales del proyecto (sin espacios)
+  getProjectInitials(projectName: string): string {
+    if (!projectName) return '';
+    // Eliminar espacios en blanco
+    const withoutSpaces = projectName.replace(/\s+/g, '');
+    // Tomar las primeras 3 letras
+    return withoutSpaces.substring(0, 3).toUpperCase();
   }
 
   // Devuelve la posición X para una hora dentro de una sección (0-23)
@@ -635,7 +681,13 @@ export class TimelineSvgComponent implements OnInit, AfterViewInit, OnDestroy {
     const sectionStartHour = sectionIndex * 8;
     const sectionEndHour = sectionStartHour + 8;
 
-    return this.tasks.filter(task => {
+    // Filtrar por ambiente enfocado si hay uno enfocado
+    let filteredTasks = this.tasks;
+    if (this.focusedEnvironmentId) {
+      filteredTasks = this.tasks.filter(task => task.environment === this.focusedEnvironmentId);
+    }
+
+    return filteredTasks.filter(task => {
       const taskStart = this.parseUTCToLocal(task.start);
       const taskEnd = this.parseUTCToLocal(task.end);
       
@@ -681,15 +733,23 @@ export class TimelineSvgComponent implements OnInit, AfterViewInit, OnDestroy {
   }
   
   getTaskColor(task: Task): string {
+    // Si hay un ambiente enfocado, usar el color del tipo de tarea
+    if (this.focusedEnvironmentId) {
+      const typeColor = this.getTaskTypeColor(task);
+      if (typeColor) {
+        return typeColor;
+      }
+    }
+    
+    // Si no hay enfoque o no hay tipo, usar el color del ambiente
     if (task.environment && this.environments.length > 0) {
       const environment = this.environments.find(env => env.id === task.environment);
       if (environment && environment.color) {
         return environment.color;
       }
     }
+    
     // Fallback a colores por prioridad si no hay environment o color
-    // O puedes optar por un gris por defecto directamente:
-    // return '#a3a3a3'; 
     switch (task.priority) {
       case 'low': return '#4ade80'; // Verde
       case 'medium': return '#60a5fa'; // Azul
@@ -904,8 +964,13 @@ export class TimelineSvgComponent implements OnInit, AfterViewInit, OnDestroy {
     const currentEnd = this.parseUTCToLocal(currentTask.end);
     const currentDate = currentEnd.toDateString();
     
-    // Filtrar tareas del mismo día que empiecen después de que termine la tarea actual
-    const tasksOnSameDay = this.tasks.filter(task => {
+    // Filtrar tareas: mismo día, después de la actual, y del mismo ambiente si hay uno enfocado
+    let tasksToSearch = this.tasks;
+    if (this.focusedEnvironmentId) {
+      tasksToSearch = this.tasks.filter(task => task.environment === this.focusedEnvironmentId);
+    }
+    
+    const tasksOnSameDay = tasksToSearch.filter(task => {
       const taskStart = this.parseUTCToLocal(task.start);
       const taskDate = taskStart.toDateString();
       return taskDate === currentDate && task.id !== currentTask.id;
@@ -987,5 +1052,21 @@ export class TimelineSvgComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!task.type || !this.taskTypes.length) return null;
     const taskType = this.taskTypes.find(t => t.id === task.type);
     return taskType?.color || null;
+  }
+
+  // Obtener el nombre de la tarea con formato según si hay ambiente enfocado
+  getTaskDisplayName(task: Task): string {
+    let name = task.name || 'Sin título';
+    
+    // Si hay un ambiente enfocado, agregar las iniciales del proyecto
+    if (this.focusedEnvironmentId && task.project) {
+      const project = this.projects.find(p => p.id === task.project);
+      if (project) {
+        const projectInitials = this.getProjectInitials(project.name);
+        name = `${projectInitials}: ${name}`;
+      }
+    }
+    
+    return name;
   }
 } 

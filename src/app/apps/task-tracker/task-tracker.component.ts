@@ -1,4 +1,4 @@
-import { Component, OnInit, HostListener, ElementRef } from '@angular/core';
+import { Component, OnInit, HostListener, ElementRef, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
@@ -23,6 +23,7 @@ import { DateRangeModalComponent } from './components/date-range-modal/date-rang
 import { TaskTypeModalComponent } from './components/task-type-modal/task-type-modal.component';
 import { TaskTypeService } from './services/task-type.service';
 import { TaskType } from './models/task-type.model';
+import { TimelineFocusService } from './services/timeline-focus.service';
 
 @Component({
   selector: 'app-task-tracker',
@@ -61,6 +62,14 @@ export class TaskTrackerComponent implements OnInit {
   environmentViewMode: { [envId: string]: 'cards' | 'list' } = {};
   // Orden de tareas por environment: 'asc' (más antigua primero) o 'desc' (más reciente primero)
   environmentSortOrder: { [envId: string]: 'asc' | 'desc' } = {};
+  // Ambiente enfocado en la línea de tiempo (null = sin enfoque)
+  // Usamos un objeto wrapper para que Angular detecte cambios por referencia
+  focusedEnvironment: { id: string | null } = { id: null };
+  
+  // Getter para compatibilidad con código existente
+  get focusedEnvironmentId(): string | null {
+    return this.focusedEnvironment.id;
+  }
 
   newTask: Partial<Task> = {
     name: '',
@@ -213,7 +222,9 @@ export class TaskTrackerComponent implements OnInit {
     private projectService: ProjectService,
     private environmentService: EnvironmentService,
     private taskTypeService: TaskTypeService,
-    private elementRef: ElementRef
+    private timelineFocusService: TimelineFocusService,
+    private elementRef: ElementRef,
+    private cdr: ChangeDetectorRef
   ) {}
 
   async ngOnInit() {
@@ -1365,12 +1376,6 @@ export class TaskTrackerComponent implements OnInit {
     return this.getSelectedOrphanedTasksIds().length === 0;
   }
 
-  getEnvironmentName(envId: string): string | undefined {
-    const env = this.environments.find(e => e.id === envId);
-    return env?.name;
-  }
-
-
   createProjectForEnvironment(environmentId: string) {
     // Preseleccionar el ambiente en el nuevo proyecto
     this.newProject.environment = environmentId;
@@ -2101,6 +2106,30 @@ export class TaskTrackerComponent implements OnInit {
   getEnvironmentSortOrderLabel(envId: string): string {
     const order = this.getEnvironmentSortOrder(envId);
     return order === 'asc' ? 'Más reciente' : 'Más antigua';
+  }
+
+  toggleFocusEnvironment(envId: string): void {
+    let newFocusedId: string | null;
+    if (this.focusedEnvironment.id === envId) {
+      // Desenfocar si ya está enfocado
+      newFocusedId = null;
+      this.focusedEnvironment = { id: null };
+    } else {
+      // Enfocar el ambiente seleccionado
+      newFocusedId = envId;
+      this.focusedEnvironment = { id: envId };
+    }
+    
+    // Notificar al servicio para que el componente timeline lo reciba
+    this.timelineFocusService.setFocusedEnvironmentId(newFocusedId);
+    
+    this.cdr.detectChanges();
+    this.closeEnvironmentContextMenu();
+  }
+
+  getEnvironmentName(envId: string): string {
+    const env = this.environments.find(e => e.id === envId);
+    return env?.name || 'Desconocido';
   }
 
   private loadEnvironmentViewModes(): void {
