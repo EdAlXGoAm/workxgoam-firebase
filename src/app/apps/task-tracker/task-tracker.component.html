@@ -17,25 +17,28 @@
 
     <!-- View Selector -->
     <div class="bg-white rounded-lg shadow-md p-4 mb-6">
-      <div class="flex flex-wrap justify-between items-center">
-        <div class="flex space-x-2 mb-4 md:mb-0">
-          <button (click)="switchView('board')" [class.bg-indigo-600]="currentView === 'board'" [class.text-white]="currentView === 'board'" [class.bg-white]="currentView !== 'board'" [class.text-gray-700]="currentView !== 'board'" class="px-4 py-2 rounded-lg font-medium hover:bg-gray-100">
-            <i class="fas fa-columns mr-2"></i>Tablero
+      <div class="flex flex-wrap justify-between items-center gap-2">
+        <div class="flex space-x-1.5 md:space-x-2">
+          <button (click)="switchView('board')" [class.bg-indigo-600]="currentView === 'board'" [class.text-white]="currentView === 'board'" [class.bg-white]="currentView !== 'board'" [class.text-gray-700]="currentView !== 'board'" class="px-2 py-1.5 md:px-4 md:py-2 rounded-lg text-sm md:font-medium hover:bg-gray-100">
+            <i class="fas fa-columns md:mr-2"></i>
+            <span class="hidden sm:inline">Tablero</span>
           </button>
-          <button (click)="switchView('timeline')" [class.bg-indigo-600]="currentView === 'timeline'" [class.text-white]="currentView === 'timeline'" [class.bg-white]="currentView !== 'timeline'" [class.text-gray-700]="currentView !== 'timeline'" class="px-4 py-2 rounded-lg font-medium hover:bg-gray-100">
-            <i class="fas fa-stream mr-2"></i>Línea del Tiempo
+          <button (click)="switchView('timeline')" [class.bg-indigo-600]="currentView === 'timeline'" [class.text-white]="currentView === 'timeline'" [class.bg-white]="currentView !== 'timeline'" [class.text-gray-700]="currentView !== 'timeline'" class="px-2 py-1.5 md:px-4 md:py-2 rounded-lg text-sm md:font-medium hover:bg-gray-100">
+            <i class="fas fa-stream md:mr-2"></i>
+            <span class="hidden sm:inline">Línea del Tiempo</span>
           </button>
-          <button (click)="openManagementModal()" class="px-4 py-2 rounded-lg font-medium bg-gray-200 text-gray-700 hover:bg-gray-300">
-            <i class="fas fa-cog mr-2"></i>Gestionar
+          <button (click)="openManagementModal()" class="px-2 py-1.5 md:px-4 md:py-2 rounded-lg text-sm md:font-medium bg-gray-200 text-gray-700 hover:bg-gray-300">
+            <i class="fas fa-cog md:mr-2"></i>
+            <span class="hidden sm:inline">Gestionar</span>
           </button>
         </div>
-        <div class="flex items-center space-x-2">
+        <div class="flex items-center space-x-1.5 md:space-x-2">
           <div class="relative">
-            <input type="text" [(ngModel)]="searchQuery" (input)="filterTasks()" placeholder="Buscar tareas..." class="pl-10 pr-4 py-2 border rounded-lg w-full md:w-64">
-            <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+            <input type="text" [(ngModel)]="searchQuery" (input)="filterTasks()" placeholder="Buscar..." class="pl-8 pr-2 py-1.5 md:pl-10 md:pr-4 md:py-2 border rounded-lg w-32 sm:w-48 md:w-64 text-sm">
+            <i class="fas fa-search absolute left-2.5 top-2 md:left-3 md:top-3 text-gray-400 text-xs md:text-base"></i>
           </div>
-          <button (click)="toggleShowHidden()" class="p-2 hover:text-indigo-600" [class.text-indigo-600]="showHidden">
-            <i class="fas fa-filter"></i>
+          <button (click)="toggleShowHidden()" class="p-1.5 md:p-2 hover:text-indigo-600" [class.text-indigo-600]="showHidden">
+            <i class="fas fa-filter text-sm md:text-base"></i>
           </button>
         </div>
       </div>

@@ -12,21 +12,24 @@ import { TaskType } from '../../models/task-type.model';
   standalone: true,
   imports: [CommonModule, FormsModule, TimelineSvgComponent],
   template: `
-    <div class="w-full bg-white rounded-lg shadow-md p-4">
-      <div class="flex justify-between items-center mb-4">
-        <h2 class="text-xl font-bold">Vista de Tablero</h2>
-        <div *ngIf="emptyEnvironmentsCount > 0" class="flex items-center space-x-2">
-          <span class="text-sm text-gray-600">{{emptyEnvironmentsCount}} ambiente(s) vacío(s)</span>
+    <div class="w-full bg-white rounded-lg shadow-md p-3 md:p-4">
+      <div class="flex flex-wrap justify-between items-center gap-2 mb-3 md:mb-4">
+        <h2 class="text-lg md:text-xl font-bold">Vista de Tablero</h2>
+        <div *ngIf="emptyEnvironmentsCount > 0" class="flex items-center gap-1.5 md:gap-2">
+          <span class="text-xs md:text-sm text-gray-600">
+            <span class="hidden sm:inline">{{emptyEnvironmentsCount}} ambiente(s) vacío(s)</span>
+            <span class="sm:hidden">{{emptyEnvironmentsCount}} vacío(s)</span>
+          </span>
           <button (click)="toggleAllEmptyEnvironments()" 
-                  class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg border transition-colors">
-            <i class="fas mr-1" [ngClass]="collapsedEmptyEnvironments ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
-            {{ collapsedEmptyEnvironments ? 'Expandir' : 'Contraer' }} vacíos
+                  class="px-2 py-1 md:px-3 text-xs md:text-sm bg-gray-100 hover:bg-gray-200 rounded-lg border transition-colors whitespace-nowrap">
+            <i class="fas text-xs md:mr-1" [ngClass]="collapsedEmptyEnvironments ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
+            <span class="sm:inline text-xs">{{ collapsedEmptyEnvironments ? ' Expandir' : ' Contraer' }} vacíos</span>
           </button>
         </div>
       </div>
 
-      <div class="mb-6">
-        <h3 class="text-lg font-semibold mb-2">Línea del Tiempo</h3>
+      <div class="mb-4 md:mb-6">
+        <h3 class="text-base md:text-lg font-semibold mb-2 text-center w-full">Línea del Tiempo</h3>
         <app-timeline-svg [tasks]="tasks" [environments]="environments" [taskTypes]="taskTypes" (editTask)="editTask.emit($event)" (deleteTask)="deleteTask.emit($event)"></app-timeline-svg>
       </div>
 
@@ -94,7 +97,7 @@ import { TaskType } from '../../models/task-type.model';
       </div>
 
       <div *ngIf="!isLoadingEnvironmentOrder" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div *ngFor="let env of orderedEnvironments" class="board-column">
+        <div *ngFor="let env of orderedEnvironments" class="board-column" [class.board-column-empty]="!environmentHasTasks(env.id)">
           <div class="environment-header p-4 pb-2">
             <div class="flex items-center justify-between">
               <h3 class="font-semibold p-2 rounded-md text-black flex-1"
@@ -270,7 +273,7 @@ import { TaskType } from '../../models/task-type.model';
                 </div>
               </div>
 
-              <div *ngIf="getProjectsByEnvironment(env.id).length === 0" class="text-center py-6">
+              <div *ngIf="getProjectsByEnvironment(env.id).length === 0" class="text-center py-2">
                 <p class="text-gray-500 text-sm mb-2">No hay proyectos en este ambiente</p>
                 <button 
                   (click)="createProject.emit(env.id)"
@@ -294,6 +297,9 @@ import { TaskType } from '../../models/task-type.model';
       flex-direction: column;
       overflow: hidden;
     }
+    .board-column-empty {
+      min-height: auto;
+    }
     .environment-header {
       flex-shrink: 0;
       position: sticky;
@@ -306,6 +312,9 @@ import { TaskType } from '../../models/task-type.model';
       flex: 1;
       overflow-y: auto;
       padding-bottom: 1rem;
+    }
+    .board-column-empty .environment-content {
+      padding-bottom: 0.5rem;
     }
     .environment-content::-webkit-scrollbar { width: 6px; }
     .environment-content::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 3px; }
