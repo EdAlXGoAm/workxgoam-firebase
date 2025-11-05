@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, forwardRef, HostListener, ElementRef } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, forwardRef, HostListener, ElementRef, ViewChild, TemplateRef, ViewContainerRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 
@@ -33,7 +33,7 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 
       <!-- Popup del date picker estilo Android -->
       <div *ngIf="isOpen" 
-           class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+           class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4"
            (mousedown)="onBackdropMouseDown($event)"
            (mouseup)="onBackdropMouseUp($event)">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
@@ -124,7 +124,7 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
     }
   `]
 })
-export class AndroidDatePickerComponent implements OnInit, ControlValueAccessor {
+export class AndroidDatePickerComponent implements OnInit, OnDestroy, ControlValueAccessor {
   @Input() label = 'Fecha';
   @Input() placeholder = 'Seleccionar fecha';
   @Input() required = false;
@@ -139,6 +139,8 @@ export class AndroidDatePickerComponent implements OnInit, ControlValueAccessor 
   private tempSelectedDate: Date | null = null;
   private originalDate: Date | null = null;
   private backdropMouseDownPos: { x: number, y: number } | null = null;
+  private modalElement: HTMLElement | null = null;
+  private modalContainer: HTMLElement | null = null;
   
   // ControlValueAccessor
   private onChange = (value: string) => {};
@@ -155,8 +157,16 @@ export class AndroidDatePickerComponent implements OnInit, ControlValueAccessor 
   // Detectar clicks fuera del componente
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: Event) {
-    if (this.isOpen && !this.elementRef.nativeElement.contains(event.target)) {
-      this.cancel();
+    if (this.isOpen) {
+      const target = event.target as HTMLElement;
+      // Verificar si el click fue dentro del modal (que ahora puede estar en el body)
+      const modal = this.modalElement || this.elementRef.nativeElement.querySelector('.fixed.inset-0');
+      if (modal && !modal.contains(target)) {
+        // Solo cerrar si el click fue fuera del modal y fuera del botón del componente
+        if (!this.elementRef.nativeElement.contains(target)) {
+          this.cancel();
+        }
+      }
     }
   }
 
@@ -195,6 +205,18 @@ export class AndroidDatePickerComponent implements OnInit, ControlValueAccessor 
     this.viewDate = this.selectedDate ? new Date(this.selectedDate) : new Date();
     this.generateCalendar();
     
+    // Mover el modal al body después de que Angular lo renderice
+    setTimeout(() => {
+      const modal = this.elementRef.nativeElement.querySelector('.fixed.inset-0');
+      if (modal && document.body) {
+        this.modalElement = modal;
+        // Guardar referencia al contenedor original
+        this.modalContainer = modal.parentElement;
+        // Mover al body
+        document.body.appendChild(modal);
+      }
+    }, 0);
+    
     // Bloquear scroll del body
     document.body.style.overflow = 'hidden';
   }
@@ -203,6 +225,14 @@ export class AndroidDatePickerComponent implements OnInit, ControlValueAccessor 
     this.isOpen = false;
     this.tempSelectedDate = this.originalDate;
     this.backdropMouseDownPos = null;
+    
+    // Devolver el modal al contenedor original si fue movido
+    if (this.modalElement && this.modalContainer) {
+      this.modalContainer.appendChild(this.modalElement);
+      this.modalElement = null;
+      this.modalContainer = null;
+    }
+    
     document.body.style.overflow = '';
   }
 
@@ -215,7 +245,33 @@ export class AndroidDatePickerComponent implements OnInit, ControlValueAccessor 
     }
     this.isOpen = false;
     this.backdropMouseDownPos = null;
+    
+    // Devolver el modal al contenedor original si fue movido
+    if (this.modalElement && this.modalContainer) {
+      this.modalContainer.appendChild(this.modalElement);
+      this.modalElement = null;
+      this.modalContainer = null;
+    }
+    
     document.body.style.overflow = '';
+  }
+  
+  ngOnDestroy() {
+    // Limpiar el modal si está en el body
+    if (this.modalElement && document.body.contains(this.modalElement)) {
+      if (this.modalContainer) {
+        this.modalContainer.appendChild(this.modalElement);
+      } else {
+        document.body.removeChild(this.modalElement);
+      }
+      this.modalElement = null;
+      this.modalContainer = null;
+    }
+    
+    // Asegurar que el scroll se desbloquee si el componente se destruye con el modal abierto
+    if (this.isOpen) {
+      document.body.style.overflow = '';
+    }
   }
 
   selectDate(day: CalendarDay) {

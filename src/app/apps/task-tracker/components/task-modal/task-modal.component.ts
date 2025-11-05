@@ -1075,6 +1075,24 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     );
   }
   
+  getTotalFragmentsDuration(): number {
+    if (!this.task.fragments || this.task.fragments.length === 0) {
+      return 0;
+    }
+    
+    let totalDuration = 0;
+    for (let i = 0; i < this.task.fragments.length; i++) {
+      totalDuration += this.calculateFragmentDuration(i);
+    }
+    
+    return totalDuration;
+  }
+  
+  formatTotalFragmentsDuration(): string {
+    const totalDuration = this.getTotalFragmentsDuration();
+    return this.formatDuration(totalDuration);
+  }
+  
   cancelFragmentDurationAdjustment() {
     if (this.pendingFragmentIndex === null) {
       return;

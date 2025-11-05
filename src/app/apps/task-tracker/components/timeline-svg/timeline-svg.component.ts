@@ -1,17 +1,28 @@
 import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges, HostListener, ViewChild, ElementRef, AfterViewInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Task } from '../../models/task.model';
 import { Environment } from '../../models/environment.model';
 import { TaskType } from '../../models/task-type.model';
 import { Project } from '../../models/project.model';
 import { TimelineFocusService } from '../../services/timeline-focus.service';
 import { ProjectService } from '../../services/project.service';
+import { AndroidDatePickerComponent } from '../android-date-picker/android-date-picker.component';
 import { Subscription } from 'rxjs';
+
+// Interfaz para elementos renderizables (tareas o fragmentos)
+interface RenderableItem {
+  type: 'task' | 'fragment';
+  task: Task;
+  fragmentIndex?: number;
+  start: string;
+  end: string;
+}
 
 @Component({
   selector: 'app-timeline-svg',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule, AndroidDatePickerComponent],
   template: `
     <div #containerRef class="timeline-container w-full overflow-x-auto relative">
       <!-- Controles de Navegación de Fechas -->
@@ -23,15 +34,9 @@ import { Subscription } from 'rxjs';
             <i class="fas fa-chevron-left text-sm text-gray-600"></i>
           </button>
           
-          <button (click)="goToToday()" 
-                  [class.bg-indigo-100]="isToday()"
-                  [class.text-indigo-700]="isToday()"
-                  [class.bg-gray-100]="!isToday()"
-                  [class.text-gray-700]="!isToday()"
-                  class="nav-btn px-3 py-1 rounded-md text-sm font-medium hover:bg-indigo-50 transition-colors"
-                  title="Ir a hoy">
-            Hoy
-          </button>
+          <div class="date-display text-sm font-semibold text-gray-700 px-2">
+            {{ formatSelectedDate() }}
+          </div>
           
           <button (click)="goToNextDay()" 
                   class="nav-btn flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
@@ -41,20 +46,31 @@ import { Subscription } from 'rxjs';
         </div>
         
         <div class="flex items-center space-x-3">
-          <div class="date-display text-sm font-semibold text-gray-700">
-            {{ formatSelectedDate() }}
+          <div class="w-48">
+            <app-android-date-picker
+              [ngModel]="getDateInputValue()"
+              (dateChange)="onDateChange($event)"
+              label="Seleccionar fecha"
+              placeholder="Seleccionar fecha"
+              class="date-picker">
+            </app-android-date-picker>
           </div>
           
-          <input type="date" 
-                 [value]="getDateInputValue()"
-                 (change)="onDateChange($event)"
-                 class="date-picker px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+          <button (click)="goToToday()" 
+                  [class.bg-indigo-100]="isToday()"
+                  [class.text-indigo-700]="isToday()"
+                  [class.bg-gray-100]="!isToday()"
+                  [class.text-gray-700]="!isToday()"
+                  class="nav-btn px-3 py-1 rounded-md text-sm font-medium hover:bg-indigo-50 transition-colors"
+                  title="Ir a hoy">
+            Hoy
+          </button>
         </div>
       </div>
 
       <!-- Tooltip para mostrar información completa de la tarea -->
       <div *ngIf="showTooltip && tooltipTask" 
-           class="tooltip-container absolute top-16 left-1/2 transform -translate-x-1/2 z-50 bg-gray-900 text-white px-4 py-3 rounded-lg shadow-xl max-w-md">
+           class="tooltip-container absolute -top-[5px] left-1/2 transform -translate-x-1/2 z-50 bg-gray-900 text-white px-4 py-3 rounded-lg shadow-xl max-w-md">
         <div class="flex items-center space-x-2">
           <span class="text-lg">{{ tooltipTask.emoji }}</span>
           <div *ngIf="getTaskTypeColor(tooltipTask)" 
@@ -65,6 +81,11 @@ import { Subscription } from 'rxjs';
             <div *ngIf="tooltipTask.description" class="text-xs text-gray-300 mt-1">{{ tooltipTask.description }}</div>
             <div class="text-xs text-gray-400 mt-1">
               {{ formatTaskTime(tooltipTask.start) }} - {{ formatTaskTime(tooltipTask.end) }}
+            </div>
+            <!-- Duración de la tarea -->
+            <div *ngIf="getTaskDuration(tooltipTask)" class="text-xs text-purple-300 mt-1 flex items-center space-x-1">
+              <i class="fas fa-hourglass-half text-xs"></i>
+              <span>Duración: {{ formatTaskDuration(getTaskDuration(tooltipTask)) }}</span>
             </div>
             <!-- Información del tiempo hasta la próxima tarea -->
             <div class="text-xs text-blue-300 mt-2 flex items-center space-x-1">
@@ -90,36 +111,36 @@ import { Subscription } from 'rxjs';
               <line [attr.x1]="getX(hour, 0)" y1="30" [attr.x2]="getX(hour, 0)" y2="50" stroke="#bbb" stroke-width="1" />
               <text [attr.x]="getX(hour, 0)" y="65" [attr.font-size]="hourFontSize" text-anchor="middle" fill="#666">{{ hour }}:00</text>
             </g>
-            <g *ngFor="let task of getTasksForSection(0)">
+            <g *ngFor="let item of getRenderableItemsForSection(0)">
               <!-- Borde negro exterior -->
-              <rect [attr.x]="getTaskX(task, 0)" y="20" [attr.width]="getTaskWidth(task, 0)" height="40"
-                    [attr.fill]="getTaskColor(task)" rx="6" ry="6" fill-opacity="0.8" 
+              <rect [attr.x]="getItemX(item, 0)" y="20" [attr.width]="getItemWidth(item, 0)" height="40"
+                    [attr.fill]="getTaskColor(item.task)" rx="6" ry="6" fill-opacity="0.8" 
                     stroke="rgba(0,0,0,0.6)" stroke-width="1.5" 
-                    (click)="onTaskClick(task, $event)" 
-                    (dblclick)="onTaskDoubleClick(task, $event)"
+                    (click)="onTaskClick(item.task, $event)" 
+                    (dblclick)="onTaskDoubleClick(item.task, $event)"
                     class="cursor-pointer" />
               <!-- Borde blanco interior -->
-              <rect [attr.x]="getTaskX(task, 0)" y="20" [attr.width]="getTaskWidth(task, 0)" height="40"
+              <rect [attr.x]="getItemX(item, 0)" y="20" [attr.width]="getItemWidth(item, 0)" height="40"
                     fill="none" rx="6" ry="6" 
                     stroke="rgba(255,255,255,0.8)" stroke-width="1" 
-                    (click)="onTaskClick(task, $event)" 
-                    (dblclick)="onTaskDoubleClick(task, $event)"
+                    (click)="onTaskClick(item.task, $event)" 
+                    (dblclick)="onTaskDoubleClick(item.task, $event)"
                     class="cursor-pointer" />
-              <circle *ngIf="getTaskTypeColor(task)" 
-                      [attr.cx]="getTaskX(task, 0) + 8" 
+              <circle *ngIf="getTaskTypeColor(item.task)" 
+                      [attr.cx]="getItemX(item, 0) + 8" 
                       cy="35" 
                       r="4" 
-                      [attr.fill]="getTaskTypeColor(task)"
+                      [attr.fill]="getTaskTypeColor(item.task)"
                       stroke="white" 
                       stroke-width="1"
-                      (click)="onTaskClick(task, $event)" 
-                      (dblclick)="onTaskDoubleClick(task, $event)"
+                      (click)="onTaskClick(item.task, $event)" 
+                      (dblclick)="onTaskDoubleClick(item.task, $event)"
                       class="cursor-pointer" />
-              <text [attr.x]="getTaskX(task, 0) + (getTaskTypeColor(task) ? 14 : 6)" y="45" [attr.font-size]="taskFontSize" fill="#111" alignment-baseline="middle"
-                    (click)="onTaskClick(task, $event)" 
-                    (dblclick)="onTaskDoubleClick(task, $event)"
+              <text [attr.x]="getItemX(item, 0) + (getTaskTypeColor(item.task) ? 14 : 6)" y="45" [attr.font-size]="taskFontSize" fill="#111" alignment-baseline="middle"
+                    (click)="onTaskClick(item.task, $event)" 
+                    (dblclick)="onTaskDoubleClick(item.task, $event)"
                     class="cursor-pointer">
-                {{ getTaskText(task, 0) }}
+                {{ getItemText(item, 0) }}
               </text>
             </g>
             <line *ngIf="isNowInSection(0)" [attr.x1]="getNowX(0)" y1="10" [attr.x2]="getNowX(0)" y2="70" stroke="#f87171" stroke-width="2" stroke-dasharray="4 2" />
@@ -134,36 +155,36 @@ import { Subscription } from 'rxjs';
               <line [attr.x1]="getX(hour, 8)" y1="30" [attr.x2]="getX(hour, 8)" y2="50" stroke="#bbb" stroke-width="1" />
               <text [attr.x]="getX(hour, 8)" y="65" [attr.font-size]="hourFontSize" text-anchor="middle" fill="#666">{{ hour }}:00</text>
             </g>
-            <g *ngFor="let task of getTasksForSection(1)">
+            <g *ngFor="let item of getRenderableItemsForSection(1)">
               <!-- Borde negro exterior -->
-              <rect [attr.x]="getTaskX(task, 8)" y="20" [attr.width]="getTaskWidth(task, 8)" height="40"
-                    [attr.fill]="getTaskColor(task)" rx="6" ry="6" fill-opacity="0.8" 
+              <rect [attr.x]="getItemX(item, 8)" y="20" [attr.width]="getItemWidth(item, 8)" height="40"
+                    [attr.fill]="getTaskColor(item.task)" rx="6" ry="6" fill-opacity="0.8" 
                     stroke="rgba(0,0,0,0.6)" stroke-width="1.5" 
-                    (click)="onTaskClick(task, $event)" 
-                    (dblclick)="onTaskDoubleClick(task, $event)"
+                    (click)="onTaskClick(item.task, $event)" 
+                    (dblclick)="onTaskDoubleClick(item.task, $event)"
                     class="cursor-pointer" />
               <!-- Borde blanco interior -->
-              <rect [attr.x]="getTaskX(task, 8)" y="20" [attr.width]="getTaskWidth(task, 8)" height="40"
+              <rect [attr.x]="getItemX(item, 8)" y="20" [attr.width]="getItemWidth(item, 8)" height="40"
                     fill="none" rx="6" ry="6" 
                     stroke="rgba(255,255,255,0.8)" stroke-width="1" 
-                    (click)="onTaskClick(task, $event)" 
-                    (dblclick)="onTaskDoubleClick(task, $event)"
+                    (click)="onTaskClick(item.task, $event)" 
+                    (dblclick)="onTaskDoubleClick(item.task, $event)"
                     class="cursor-pointer" />
-              <circle *ngIf="getTaskTypeColor(task)" 
-                      [attr.cx]="getTaskX(task, 8) + 8" 
+              <circle *ngIf="getTaskTypeColor(item.task)" 
+                      [attr.cx]="getItemX(item, 8) + 8" 
                       cy="35" 
                       r="4" 
-                      [attr.fill]="getTaskTypeColor(task)"
+                      [attr.fill]="getTaskTypeColor(item.task)"
                       stroke="white" 
                       stroke-width="1"
-                      (click)="onTaskClick(task, $event)" 
-                      (dblclick)="onTaskDoubleClick(task, $event)"
+                      (click)="onTaskClick(item.task, $event)" 
+                      (dblclick)="onTaskDoubleClick(item.task, $event)"
                       class="cursor-pointer" />
-              <text [attr.x]="getTaskX(task, 8) + (getTaskTypeColor(task) ? 14 : 6)" y="45" [attr.font-size]="taskFontSize" fill="#111" alignment-baseline="middle"
-                    (click)="onTaskClick(task, $event)" 
-                    (dblclick)="onTaskDoubleClick(task, $event)"
+              <text [attr.x]="getItemX(item, 8) + (getTaskTypeColor(item.task) ? 14 : 6)" y="45" [attr.font-size]="taskFontSize" fill="#111" alignment-baseline="middle"
+                    (click)="onTaskClick(item.task, $event)" 
+                    (dblclick)="onTaskDoubleClick(item.task, $event)"
                     class="cursor-pointer">
-                {{ getTaskText(task, 8) }}
+                {{ getItemText(item, 8) }}
               </text>
             </g>
             <line *ngIf="isNowInSection(1)" [attr.x1]="getNowX(8)" y1="10" [attr.x2]="getNowX(8)" y2="70" stroke="#f87171" stroke-width="2" stroke-dasharray="4 2" />
@@ -178,36 +199,36 @@ import { Subscription } from 'rxjs';
               <line [attr.x1]="getX(hour, 16)" y1="30" [attr.x2]="getX(hour, 16)" y2="50" stroke="#bbb" stroke-width="1" />
               <text [attr.x]="getX(hour, 16)" y="65" [attr.font-size]="hourFontSize" text-anchor="middle" fill="#666">{{ hour }}:00</text>
             </g>
-            <g *ngFor="let task of getTasksForSection(2)">
+            <g *ngFor="let item of getRenderableItemsForSection(2)">
               <!-- Borde negro exterior -->
-              <rect [attr.x]="getTaskX(task, 16)" y="20" [attr.width]="getTaskWidth(task, 16)" height="40"
-                    [attr.fill]="getTaskColor(task)" rx="6" ry="6" fill-opacity="0.8" 
+              <rect [attr.x]="getItemX(item, 16)" y="20" [attr.width]="getItemWidth(item, 16)" height="40"
+                    [attr.fill]="getTaskColor(item.task)" rx="6" ry="6" fill-opacity="0.8" 
                     stroke="rgba(0,0,0,0.6)" stroke-width="1.5" 
-                    (click)="onTaskClick(task, $event)" 
-                    (dblclick)="onTaskDoubleClick(task, $event)"
+                    (click)="onTaskClick(item.task, $event)" 
+                    (dblclick)="onTaskDoubleClick(item.task, $event)"
                     class="cursor-pointer" />
               <!-- Borde blanco interior -->
-              <rect [attr.x]="getTaskX(task, 16)" y="20" [attr.width]="getTaskWidth(task, 16)" height="40"
+              <rect [attr.x]="getItemX(item, 16)" y="20" [attr.width]="getItemWidth(item, 16)" height="40"
                     fill="none" rx="6" ry="6" 
                     stroke="rgba(255,255,255,0.8)" stroke-width="1" 
-                    (click)="onTaskClick(task, $event)" 
-                    (dblclick)="onTaskDoubleClick(task, $event)"
+                    (click)="onTaskClick(item.task, $event)" 
+                    (dblclick)="onTaskDoubleClick(item.task, $event)"
                     class="cursor-pointer" />
-              <circle *ngIf="getTaskTypeColor(task)" 
-                      [attr.cx]="getTaskX(task, 16) + 8" 
+              <circle *ngIf="getTaskTypeColor(item.task)" 
+                      [attr.cx]="getItemX(item, 16) + 8" 
                       cy="35" 
                       r="4" 
-                      [attr.fill]="getTaskTypeColor(task)"
+                      [attr.fill]="getTaskTypeColor(item.task)"
                       stroke="white" 
                       stroke-width="1"
-                      (click)="onTaskClick(task, $event)" 
-                      (dblclick)="onTaskDoubleClick(task, $event)"
+                      (click)="onTaskClick(item.task, $event)" 
+                      (dblclick)="onTaskDoubleClick(item.task, $event)"
                       class="cursor-pointer" />
-              <text [attr.x]="getTaskX(task, 16) + (getTaskTypeColor(task) ? 14 : 6)" y="45" [attr.font-size]="taskFontSize" fill="#111" alignment-baseline="middle"
-                    (click)="onTaskClick(task, $event)" 
-                    (dblclick)="onTaskDoubleClick(task, $event)"
+              <text [attr.x]="getItemX(item, 16) + (getTaskTypeColor(item.task) ? 14 : 6)" y="45" [attr.font-size]="taskFontSize" fill="#111" alignment-baseline="middle"
+                    (click)="onTaskClick(item.task, $event)" 
+                    (dblclick)="onTaskDoubleClick(item.task, $event)"
                     class="cursor-pointer">
-                {{ getTaskText(task, 16) }}
+                {{ getItemText(item, 16) }}
               </text>
             </g>
             <line *ngIf="isNowInSection(2)" [attr.x1]="getNowX(16)" y1="10" [attr.x2]="getNowX(16)" y2="70" stroke="#f87171" stroke-width="2" stroke-dasharray="4 2" />
@@ -801,6 +822,210 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     });
   }
   
+  // Obtener elementos renderizables (tareas y fragmentos) para una sección
+  getRenderableItemsForSection(sectionIndex: 0 | 1 | 2): RenderableItem[] {
+    const sectionStartHour = sectionIndex * 8;
+    const sectionEndHour = sectionStartHour + 8;
+    const items: RenderableItem[] = [];
+
+    // Filtrar por ambiente enfocado si hay uno enfocado
+    let filteredTasks = this.tasks;
+    if (this.focusedEnvironmentId) {
+      filteredTasks = this.tasks.filter(task => task.environment === this.focusedEnvironmentId);
+    }
+
+    // Crear fechas del día seleccionado
+    const selectedDayStart = new Date(this.selectedDate);
+    selectedDayStart.setHours(0, 0, 0, 0);
+    
+    const selectedDayEnd = new Date(this.selectedDate);
+    selectedDayEnd.setHours(23, 59, 59, 999);
+
+    for (const task of filteredTasks) {
+      // Si la tarea tiene fragmentos, renderizar solo los fragmentos (no la tarea principal)
+      if (task.fragments && task.fragments.length > 0) {
+        for (let i = 0; i < task.fragments.length; i++) {
+          const fragment = task.fragments[i];
+          if (fragment.start && fragment.end) {
+            const fragmentStart = this.parseUTCToLocal(fragment.start);
+            const fragmentEnd = this.parseUTCToLocal(fragment.end);
+            
+            // Verificar si el fragmento se superpone con el día seleccionado
+            const fragmentOverlapsSelectedDay = fragmentStart <= selectedDayEnd && fragmentEnd >= selectedDayStart;
+            
+            if (!fragmentOverlapsSelectedDay) {
+              continue;
+            }
+            
+            // Calcular horas del fragmento en el día seleccionado
+            let fragmentStartHour, fragmentEndHour;
+            
+            if (fragmentStart < selectedDayStart) {
+              fragmentStartHour = 0;
+            } else {
+              fragmentStartHour = fragmentStart.getHours() + fragmentStart.getMinutes() / 60;
+            }
+            
+            if (fragmentEnd > selectedDayEnd) {
+              fragmentEndHour = 24;
+            } else {
+              fragmentEndHour = fragmentEnd.getHours() + fragmentEnd.getMinutes() / 60;
+            }
+            
+            // Verificar si el fragmento se superpone con la sección
+            if (fragmentStartHour < sectionEndHour && fragmentEndHour > sectionStartHour) {
+              items.push({
+                type: 'fragment',
+                task: task,
+                fragmentIndex: i,
+                start: fragment.start,
+                end: fragment.end
+              });
+            }
+          }
+        }
+      } else {
+        // Si no hay fragmentos, renderizar la tarea principal normalmente
+        const taskStart = this.parseUTCToLocal(task.start);
+        const taskEnd = this.parseUTCToLocal(task.end);
+        
+        const taskOverlapsSelectedDay = taskStart <= selectedDayEnd && taskEnd >= selectedDayStart;
+        
+        if (!taskOverlapsSelectedDay) {
+          continue;
+        }
+        
+        let taskStartHour, taskEndHour;
+        
+        if (taskStart < selectedDayStart) {
+          taskStartHour = 0;
+        } else {
+          taskStartHour = taskStart.getHours() + taskStart.getMinutes() / 60;
+        }
+        
+        if (taskEnd > selectedDayEnd) {
+          taskEndHour = 24;
+        } else {
+          taskEndHour = taskEnd.getHours() + taskEnd.getMinutes() / 60;
+        }
+        
+        if (taskStartHour < sectionEndHour && taskEndHour > sectionStartHour) {
+          items.push({
+            type: 'task',
+            task: task,
+            start: task.start,
+            end: task.end
+          });
+        }
+      }
+    }
+
+    return items;
+  }
+  
+  // Obtener posición X para un elemento renderizable
+  getItemX(item: RenderableItem, sectionStartHour: number): number {
+    const itemStart = this.parseUTCToLocal(item.start);
+    
+    const selectedDayStart = new Date(this.selectedDate);
+    selectedDayStart.setHours(0, 0, 0, 0);
+    
+    let effectiveStartHour;
+    
+    if (itemStart < selectedDayStart) {
+      effectiveStartHour = 0;
+    } else {
+      effectiveStartHour = itemStart.getHours() + itemStart.getMinutes() / 60;
+    }
+    
+    const visiblePortionStartHourInDay = Math.max(effectiveStartHour, sectionStartHour);
+    const offsetFromSectionStart = visiblePortionStartHourInDay - sectionStartHour;
+    const effectiveWidth = this.svgWidth - this.hourOffsetStart - this.hourOffsetEnd;
+    
+    return this.hourOffsetStart + (offsetFromSectionStart / 8) * effectiveWidth;
+  }
+  
+  // Obtener ancho para un elemento renderizable
+  getItemWidth(item: RenderableItem, sectionStartHour: number): number {
+    const start = this.parseUTCToLocal(item.start);
+    const end = this.parseUTCToLocal(item.end);
+    
+    const selectedDayStart = new Date(this.selectedDate);
+    selectedDayStart.setHours(0, 0, 0, 0);
+    
+    const selectedDayEnd = new Date(this.selectedDate);
+    selectedDayEnd.setHours(23, 59, 59, 999);
+    
+    let itemStartHour, itemEndHour;
+    
+    if (start < selectedDayStart) {
+      itemStartHour = 0;
+    } else {
+      itemStartHour = start.getHours() + start.getMinutes() / 60;
+    }
+    
+    if (end > selectedDayEnd) {
+      itemEndHour = 24;
+    } else {
+      itemEndHour = end.getHours() + end.getMinutes() / 60;
+    }
+    
+    itemStartHour = Math.max(itemStartHour, sectionStartHour);
+    itemEndHour = Math.min(itemEndHour, sectionStartHour + 8);
+    
+    const durationInSection = itemEndHour - itemStartHour;
+    
+    if (durationInSection <= 0) return 0;
+    
+    const effectiveWidth = this.svgWidth - this.hourOffsetStart - this.hourOffsetEnd;
+    
+    return Math.max(8, (durationInSection / 8) * effectiveWidth);
+  }
+  
+  // Obtener texto para un elemento renderizable
+  getItemText(item: RenderableItem, sectionStartHour: number): string {
+    const itemWidth = this.getItemWidth(item, sectionStartHour);
+    const emoji = item.task.emoji || '📋';
+    let name = item.task.name || 'Sin título';
+    
+    // Si hay un ambiente enfocado, modificar el formato del nombre
+    if (this.focusedEnvironmentId && item.task.project) {
+      const projectsToUse = this.loadedProjects.length > 0 ? this.loadedProjects : this.projects;
+      const project = projectsToUse.find(p => p.id === item.task.project);
+      
+      if (project) {
+        const projectInitials = this.getProjectInitials(project.name);
+        name = `${projectInitials}: ${name}`;
+      }
+    }
+    
+    // Si es un fragmento, agregar indicador visual
+    if (item.type === 'fragment' && item.fragmentIndex !== undefined) {
+      name = `${name} [F${item.fragmentIndex + 1}]`;
+    }
+    
+    const availableChars = Math.floor(itemWidth / (this.taskFontSize * 0.35));
+    
+    if (itemWidth < 20) {
+      return emoji;
+    }
+    
+    const emojiSpace = 2;
+    const ellipsisSpace = 3;
+    const availableForName = Math.max(availableChars - emojiSpace, 1);
+    
+    if (availableForName >= name.length) {
+      return `${emoji} ${name}`;
+    } else if (availableForName >= 3) {
+      const truncatedLength = Math.max(availableForName - ellipsisSpace, 1);
+      return `${emoji} ${name.substring(0, truncatedLength)}...`;
+    } else if (availableForName >= 1) {
+      return `${emoji} ${name.charAt(0)}`;
+    } else {
+      return emoji;
+    }
+  }
+  
   getTaskColor(task: Task): string {
     // Si hay un ambiente enfocado, usar el color del tipo de tarea
     if (this.focusedEnvironmentId) {
@@ -935,11 +1160,10 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     return `${year}-${month}-${day}`;
   }
 
-  onDateChange(event: Event) {
-    const input = event.target as HTMLInputElement;
-    if (input.value) {
+  onDateChange(dateString: string) {
+    if (dateString) {
       // Crear fecha en zona horaria local para evitar desfases
-      const [year, month, day] = input.value.split('-').map(Number);
+      const [year, month, day] = dateString.split('-').map(Number);
       this.selectedDate = new Date(year, month - 1, day); // month - 1 porque los meses en JS son 0-indexados
       this.updateSvgDimensions();
     }
@@ -1001,6 +1225,14 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
   // 💡 Métodos para el sistema de tooltip
   onTaskClick(task: Task, event: MouseEvent): void {
     event.stopPropagation();
+    
+    // Si el tooltip ya está visible para la misma tarea, ocultarlo
+    if (this.showTooltip && this.tooltipTask && this.tooltipTask.id === task.id) {
+      this.hideTooltip();
+      return;
+    }
+    
+    // Si el tooltip está visible para otra tarea o no está visible, mostrarlo
     this.showTaskTooltip(task);
   }
 
@@ -1114,6 +1346,8 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
 
   onTaskDoubleClick(task: Task, event: MouseEvent): void {
     event.stopPropagation();
+    // Ocultar el tooltip cuando se hace doble click para editar
+    this.hideTooltip();
     this.editTask.emit(task);
   }
 
@@ -1139,5 +1373,55 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     }
     
     return name;
+  }
+  
+  // Calcular la duración de una tarea (suma de fragmentos si existen, sino usar duration o calcular)
+  getTaskDuration(task: Task): number | null {
+    // Si hay fragmentos, sumar la duración de todos
+    if (task.fragments && task.fragments.length > 0) {
+      let totalDuration = 0;
+      for (const fragment of task.fragments) {
+        if (fragment.start && fragment.end) {
+          const start = this.parseUTCToLocal(fragment.start);
+          const end = this.parseUTCToLocal(fragment.end);
+          const diffMs = end.getTime() - start.getTime();
+          const diffHours = diffMs / (1000 * 60 * 60);
+          totalDuration += Math.max(0, diffHours);
+        }
+      }
+      return totalDuration > 0 ? totalDuration : null;
+    }
+    
+    // Si no hay fragmentos pero hay duration definida, usarla
+    if (task.duration && task.duration > 0) {
+      return task.duration;
+    }
+    
+    // Si no hay fragmentos ni duration, calcular desde start y end
+    if (task.start && task.end) {
+      const start = this.parseUTCToLocal(task.start);
+      const end = this.parseUTCToLocal(task.end);
+      const diffMs = end.getTime() - start.getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+      return Math.max(0, diffHours);
+    }
+    
+    return null;
+  }
+  
+  // Formatear la duración de una tarea
+  formatTaskDuration(hours: number | null): string {
+    if (!hours || hours === 0) return '0 horas';
+    
+    const wholeHours = Math.floor(hours);
+    const minutes = Math.round((hours - wholeHours) * 60);
+    
+    if (minutes === 0) {
+      return `${wholeHours} hora${wholeHours !== 1 ? 's' : ''}`;
+    } else if (wholeHours === 0) {
+      return `${minutes} minutos`;
+    } else {
+      return `${wholeHours} hora${wholeHours !== 1 ? 's' : ''} y ${minutes} minutos`;
+    }
   }
 } 
