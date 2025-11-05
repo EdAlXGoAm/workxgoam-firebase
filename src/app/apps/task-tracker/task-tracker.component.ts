@@ -297,52 +297,73 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
   }
 
   private setupScrollSave(): void {
+    console.log('🎬 CONFIGURANDO listener de scroll...');
     // Guardar posición del scroll cuando el usuario hace scroll (con throttling)
     this.scrollHandler = () => {
+      console.log('📜 Evento scroll detectado, posición actual:', window.pageYOffset);
       if (this.scrollSaveTimeout) {
         clearTimeout(this.scrollSaveTimeout);
       }
       this.scrollSaveTimeout = setTimeout(() => {
+        console.log('⏰ Timeout completado, guardando scroll...');
         this.saveScrollPosition();
       }, 250); // Guardar después de 250ms sin scroll
     };
     window.addEventListener('scroll', this.scrollHandler, { passive: true });
+    console.log('✅ Listener de scroll agregado');
 
     // Guardar posición del scroll antes de que la página se recargue
     this.beforeUnloadHandler = () => {
+      console.log('🔄 beforeunload detectado, guardando scroll...');
       this.saveScrollPosition();
     };
     window.addEventListener('beforeunload', this.beforeUnloadHandler);
+    console.log('✅ Listener de beforeunload agregado');
   }
 
   private saveScrollPosition(): void {
     try {
       const scrollPosition = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+      console.log('🔵 GUARDANDO posición de scroll:', scrollPosition);
       localStorage.setItem('taskTracker_scrollPosition', JSON.stringify(scrollPosition));
+      console.log('✅ Scroll guardado en localStorage');
     } catch (error) {
-      console.error('Error al guardar la posición del scroll:', error);
+      console.error('❌ Error al guardar la posición del scroll:', error);
     }
   }
 
   private restoreScrollPosition(): void {
     try {
+      console.log('🔍 INTENTANDO restaurar posición de scroll...');
       const savedPosition = localStorage.getItem('taskTracker_scrollPosition');
+      console.log('📦 Valor guardado en localStorage:', savedPosition);
+      
       if (savedPosition) {
         const scrollPosition = JSON.parse(savedPosition);
+        console.log('📊 Posición parseada:', scrollPosition, 'Tipo:', typeof scrollPosition);
+        
         if (typeof scrollPosition === 'number' && scrollPosition > 0) {
+          console.log('✅ Posición válida, aplicando scroll a:', scrollPosition);
           // Usar setTimeout para asegurar que el DOM esté completamente renderizado
           setTimeout(() => {
+            console.log('⏱️ Ejecutando scrollTo después del timeout...');
             window.scrollTo({
               top: scrollPosition,
               behavior: 'auto' // Sin animación para que sea instantáneo
             });
+            console.log('✅ Scroll aplicado, posición actual:', window.pageYOffset);
             // Limpiar la posición guardada después de restaurarla
             localStorage.removeItem('taskTracker_scrollPosition');
+            console.log('🗑️ Posición limpiada de localStorage');
           }, 100);
+        } else {
+          console.log('⚠️ Posición inválida o cero');
         }
+      } else {
+        console.log('ℹ️ No hay posición guardada en localStorage');
       }
     } catch (error) {
-      console.error('Error al restaurar la posición del scroll:', error);
+      console.error('❌ Error al restaurar la posición del scroll:', error);
     }
   }
 
@@ -1308,6 +1329,21 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
       }
     }
     this.closeContextMenu();
+  }
+
+  // Método para eliminar tarea desde el timeline
+  async deleteTaskFromTimeline(task: Task) {
+    console.log('🗑️ Eliminar tarea desde timeline:', task.name);
+    if (confirm(`¿Estás seguro de que quieres eliminar la tarea "${task.name}"?`)) {
+      try {
+        await this.taskService.deleteTask(task.id);
+        await this.loadTasks();
+        console.log('✅ Tarea eliminada correctamente');
+      } catch (error) {
+        console.error('❌ Error al eliminar la tarea:', error);
+        alert('Error al eliminar la tarea. Por favor, intenta de nuevo.');
+      }
+    }
   }
 
   async toggleHidden(task: Task) {

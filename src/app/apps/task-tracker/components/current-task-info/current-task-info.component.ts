@@ -13,7 +13,10 @@ import { Environment } from '../../models/environment.model';
     <div class="floating-bubble" 
          [class.has-task]="currentTask"
          [class.no-task]="!currentTask"
-         (click)="toggleModal()"
+         [class.dragging]="isDragging"
+         [style.top.%]="bubbleTopPosition"
+         (mousedown)="onBubbleMouseDown($event)"
+         (touchstart)="onBubbleTouchStart($event)"
          [title]="getBubbleTooltip()">
       <div class="bubble-content">
         <div class="bubble-icon">
@@ -26,56 +29,60 @@ import { Environment } from '../../models/environment.model';
           {{ getBubbleLabel() }}
         </div>
       </div>
+      <div class="drag-indicator">⋮⋮</div>
     </div>
 
     <!-- Modal (cuando se hace click en la burbuja) -->
     <div *ngIf="isModalOpen" class="modal-backdrop" (click)="closeModal()">
       <div class="modal-content" (click)="$event.stopPropagation()">
-        <div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl p-6 text-white shadow-lg">
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-2xl font-bold flex items-center">
-              <i class="fas fa-play-circle mr-3"></i>
-              Tarea Actual
+        <div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl p-4 md:p-6 text-white shadow-lg">
+          <!-- Header más compacto en móvil -->
+          <div class="flex items-center justify-between mb-3 md:mb-4">
+            <h2 class="text-lg md:text-2xl font-bold flex items-center gap-2">
+              <i class="fas fa-play-circle text-base md:text-xl"></i>
+              <span class="hidden sm:inline">Tarea Actual</span>
+              <span class="sm:hidden">Actual</span>
             </h2>
-            <button (click)="closeModal()" class="text-white hover:text-gray-200 transition-colors">
-              <i class="fas fa-times text-2xl"></i>
+            <button (click)="closeModal()" class="text-white hover:text-gray-200 transition-colors p-2 -mr-2">
+              <i class="fas fa-times text-xl md:text-2xl"></i>
             </button>
           </div>
           
-          <div class="text-sm opacity-90 mb-4">
+          <!-- Fecha/hora más compacta en móvil -->
+          <div class="text-xs md:text-sm opacity-90 mb-3 md:mb-4">
             {{ getCurrentDateTime() }}
           </div>
 
-          <div *ngIf="currentTask; else noCurrentTask" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div *ngIf="currentTask; else noCurrentTask" class="grid grid-cols-1 gap-4 md:gap-6">
             <!-- Información de la tarea actual -->
-            <div class="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-              <div class="flex items-center mb-3">
-                <span class="text-2xl mr-2">{{ currentTask.emoji }}</span>
-                <div>
-                  <h3 class="text-lg font-semibold">{{ currentTask.name }}</h3>
-                  <p class="text-sm opacity-90">{{ getProjectName(currentTask.project) }}</p>
+            <div class="bg-white/10 rounded-lg p-3 md:p-4 backdrop-blur-sm">
+              <div class="flex items-start gap-2 mb-3">
+                <span class="text-xl md:text-2xl flex-shrink-0">{{ currentTask.emoji }}</span>
+                <div class="flex-1 min-w-0">
+                  <h3 class="text-base md:text-lg font-semibold truncate">{{ currentTask.name }}</h3>
+                  <p class="text-xs md:text-sm opacity-90 truncate">{{ getProjectName(currentTask.project) }}</p>
                 </div>
               </div>
               
-              <div class="space-y-2 text-sm">
-                <div class="flex justify-between">
-                  <span>Tiempo transcurrido:</span>
-                  <span class="font-mono">{{ getElapsedTime() }}</span>
+              <div class="space-y-2 text-xs md:text-sm">
+                <div class="flex justify-between items-center">
+                  <span class="text-xs md:text-sm">Transcurrido:</span>
+                  <span class="font-mono font-bold text-sm md:text-base">{{ getElapsedTime() }}</span>
                 </div>
-                <div class="flex justify-between">
-                  <span>Tiempo restante:</span>
-                  <span class="font-mono">{{ getRemainingTime() }}</span>
+                <div class="flex justify-between items-center">
+                  <span class="text-xs md:text-sm">Restante:</span>
+                  <span class="font-mono font-bold text-sm md:text-base">{{ getRemainingTime() }}</span>
                 </div>
-                <div class="flex justify-between">
-                  <span>Prioridad:</span>
-                  <span class="px-2 py-1 rounded text-xs" [class]="getPriorityClass(currentTask.priority)">
+                <div class="flex justify-between items-center">
+                  <span class="text-xs md:text-sm">Prioridad:</span>
+                  <span class="px-2 py-0.5 md:py-1 rounded text-xs font-medium" [class]="getPriorityClass(currentTask.priority)">
                     {{ currentTask.priority }}
                   </span>
                 </div>
               </div>
 
               <!-- Barra de progreso -->
-              <div class="mt-4">
+              <div class="mt-3 md:mt-4">
                 <div class="bg-white/20 rounded-full h-2">
                   <div class="bg-white rounded-full h-2 transition-all duration-300" 
                        [style.width.%]="getProgressPercentage()"></div>
@@ -85,51 +92,52 @@ import { Environment } from '../../models/environment.model';
             </div>
 
             <!-- Información de la siguiente tarea -->
-            <div class="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-              <h4 class="text-lg font-semibold mb-3 flex items-center">
-                <i class="fas fa-clock mr-2"></i>
-                Siguiente Tarea
+            <div class="bg-white/10 rounded-lg p-3 md:p-4 backdrop-blur-sm">
+              <h4 class="text-base md:text-lg font-semibold mb-2 md:mb-3 flex items-center gap-2">
+                <i class="fas fa-clock text-sm md:text-base"></i>
+                <span class="hidden sm:inline">Siguiente Tarea</span>
+                <span class="sm:hidden">Siguiente</span>
               </h4>
               
               <div *ngIf="nextTask; else noNextTask">
-                <div class="flex items-center mb-3">
-                  <span class="text-2xl mr-2">{{ nextTask.emoji }}</span>
-                  <div>
-                    <h5 class="font-medium">{{ nextTask.name }}</h5>
-                    <p class="text-sm opacity-90">{{ getProjectName(nextTask.project) }}</p>
+                <div class="flex items-start gap-2 mb-3">
+                  <span class="text-xl md:text-2xl flex-shrink-0">{{ nextTask.emoji }}</span>
+                  <div class="flex-1 min-w-0">
+                    <h5 class="font-medium text-sm md:text-base truncate">{{ nextTask.name }}</h5>
+                    <p class="text-xs md:text-sm opacity-90 truncate">{{ getProjectName(nextTask.project) }}</p>
                   </div>
                 </div>
                 
-                <div class="space-y-2 text-sm">
-                  <div class="flex justify-between">
-                    <span>Comienza en:</span>
-                    <span class="font-mono">{{ getTimeUntilNext() }}</span>
+                <div class="space-y-2 text-xs md:text-sm">
+                  <div class="flex justify-between items-center">
+                    <span class="text-xs md:text-sm">Comienza en:</span>
+                    <span class="font-mono font-bold text-sm md:text-base">{{ getTimeUntilNext() }}</span>
                   </div>
-                  <div class="flex justify-between">
-                    <span>Duración estimada:</span>
-                    <span class="font-mono">{{ getTaskRealDuration(nextTask) }}</span>
+                  <div class="flex justify-between items-center">
+                    <span class="text-xs md:text-sm">Duración:</span>
+                    <span class="font-mono text-sm md:text-base">{{ getTaskRealDuration(nextTask) }}</span>
                   </div>
-                  <div class="flex justify-between">
-                    <span>Horario:</span>
-                    <span class="font-mono">{{ formatTime(nextTask.start) }} - {{ formatTime(nextTask.end) }}</span>
+                  <div class="flex justify-between items-center">
+                    <span class="text-xs md:text-sm">Horario:</span>
+                    <span class="font-mono text-xs md:text-sm">{{ formatTime(nextTask.start) }} - {{ formatTime(nextTask.end) }}</span>
                   </div>
                 </div>
               </div>
               
               <ng-template #noNextTask>
-                <div class="text-center py-4 opacity-75">
-                  <i class="fas fa-check-circle text-3xl mb-2"></i>
-                  <p>No hay más tareas programadas</p>
+                <div class="text-center py-3 md:py-4 opacity-75">
+                  <i class="fas fa-check-circle text-2xl md:text-3xl mb-2"></i>
+                  <p class="text-xs md:text-sm">No hay más tareas programadas</p>
                 </div>
               </ng-template>
             </div>
           </div>
 
           <ng-template #noCurrentTask>
-            <div class="text-center py-8">
-              <i class="fas fa-pause-circle text-4xl mb-4 opacity-60"></i>
-              <h3 class="text-xl font-semibold mb-2">No hay tarea activa</h3>
-              <p class="opacity-90">
+            <div class="text-center py-6 md:py-8">
+              <i class="fas fa-pause-circle text-3xl md:text-4xl mb-3 md:mb-4 opacity-60"></i>
+              <h3 class="text-base md:text-xl font-semibold mb-2">No hay tarea activa</h3>
+              <p class="opacity-90 text-xs md:text-sm px-4">
                 <span *ngIf="nextTask">
                   La siguiente tarea "<strong>{{ nextTask.name }}</strong>" comienza {{ getTimeUntilNext() }}
                 </span>
@@ -159,13 +167,25 @@ import { Environment } from '../../models/environment.model';
       height: 80px;
       border-radius: 50%;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      cursor: pointer;
+      cursor: move;
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       z-index: 1000;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 0 rgba(59, 130, 246, 0.5);
       animation: pulse 2s infinite;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+    
+    .floating-bubble.dragging {
+      cursor: grabbing;
+      transform: translateY(-50%) scale(1.1);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25), 0 0 0 0 rgba(59, 130, 246, 0.5);
+      animation: none;
+      transition: none;
     }
     
     .floating-bubble.has-task {
@@ -197,6 +217,24 @@ import { Environment } from '../../models/environment.model';
       justify-content: center;
       color: white;
       text-align: center;
+      pointer-events: none;
+      flex: 1;
+    }
+    
+    .drag-indicator {
+      position: absolute;
+      top: 5px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 12px;
+      line-height: 8px;
+      letter-spacing: -2px;
+      pointer-events: none;
+    }
+    
+    .floating-bubble:hover .drag-indicator {
+      color: rgba(255, 255, 255, 0.9);
     }
     
     .bubble-icon {
@@ -226,13 +264,13 @@ import { Environment } from '../../models/environment.model';
       left: 0;
       right: 0;
       bottom: 0;
-      background-color: rgba(0, 0, 0, 0.5);
+      background-color: rgba(0, 0, 0, 0.6);
       display: flex;
       align-items: center;
       justify-content: center;
       z-index: 2000;
       animation: fadeIn 0.2s ease-out;
-      padding: 20px;
+      padding: 12px;
     }
     
     .modal-content {
@@ -241,6 +279,21 @@ import { Environment } from '../../models/environment.model';
       max-height: 90vh;
       overflow-y: auto;
       animation: slideUp 0.3s ease-out;
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Optimizaciones para móviles */
+    @media (max-width: 640px) {
+      .modal-backdrop {
+        padding: 8px;
+        align-items: flex-start;
+        padding-top: 40px;
+      }
+      
+      .modal-content {
+        max-height: calc(100vh - 48px);
+        width: calc(100vw - 16px);
+      }
     }
     
     @keyframes fadeIn {
@@ -290,8 +343,15 @@ export class CurrentTaskInfoComponent implements OnInit, OnDestroy, OnChanges {
   nextTask: Task | null = null;
   isModalOpen: boolean = false;
   private intervalId: any;
+  
+  // Propiedades para drag and drop
+  bubbleTopPosition: number = 50; // Porcentaje del viewport (50% = centrado)
+  isDragging: boolean = false;
+  private dragStartY: number = 0;
+  private dragStartTop: number = 0;
 
   ngOnInit() {
+    this.loadBubblePosition();
     this.updateTaskInfo();
     // Actualizar cada 30 segundos para mejor responsividad
     this.intervalId = setInterval(() => {
@@ -536,7 +596,9 @@ export class CurrentTaskInfoComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   toggleModal(): void {
+    console.log('🔄 toggleModal llamado, estado actual:', this.isModalOpen);
     this.isModalOpen = !this.isModalOpen;
+    console.log('✅ Modal ahora está:', this.isModalOpen ? 'ABIERTO' : 'CERRADO');
     // Prevenir scroll del body cuando el modal está abierto
     if (this.isModalOpen) {
       document.body.style.overflow = 'hidden';
@@ -548,5 +610,144 @@ export class CurrentTaskInfoComponent implements OnInit, OnDestroy, OnChanges {
   closeModal(): void {
     this.isModalOpen = false;
     document.body.style.overflow = '';
+  }
+
+  // Métodos para drag and drop de la burbuja
+  onBubbleMouseDown(event: MouseEvent): void {
+    console.log('🖱️ MouseDown en burbuja');
+    // NO prevenir default aún, esperamos a ver si hay movimiento
+    this.dragStartY = event.clientY;
+    this.dragStartTop = this.bubbleTopPosition;
+    let hasMoved = false;
+    
+    const mouseMoveHandler = (e: MouseEvent) => {
+      const deltaY = Math.abs(e.clientY - this.dragStartY);
+      
+      // Solo iniciar drag si se movió más de 15 pixeles (aumentado para menos sensibilidad)
+      if (!hasMoved && deltaY > 15) {
+        console.log('✊ Movimiento detectado, iniciando drag (delta:', deltaY, 'px)');
+        hasMoved = true;
+        this.isDragging = true;
+        event.preventDefault();
+      }
+      
+      if (hasMoved) {
+        this.onDragMove(e.clientY);
+      }
+    };
+    
+    const mouseUpHandler = () => {
+      console.log('🖱️ MouseUp, hasMoved:', hasMoved);
+      if (hasMoved) {
+        this.endDrag();
+      } else {
+        // Fue un click, abrir modal
+        console.log('👆 Click detectado, abriendo modal');
+        this.toggleModal();
+      }
+      document.removeEventListener('mousemove', mouseMoveHandler);
+      document.removeEventListener('mouseup', mouseUpHandler);
+    };
+    
+    document.addEventListener('mousemove', mouseMoveHandler);
+    document.addEventListener('mouseup', mouseUpHandler);
+  }
+
+  onBubbleTouchStart(event: TouchEvent): void {
+    if (event.touches.length !== 1) return;
+    
+    console.log('👆 TouchStart en burbuja');
+    const touch = event.touches[0];
+    this.dragStartY = touch.clientY;
+    this.dragStartTop = this.bubbleTopPosition;
+    let hasMoved = false;
+    
+    const touchMoveHandler = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        const deltaY = Math.abs(e.touches[0].clientY - this.dragStartY);
+        
+        // Solo iniciar drag si se movió más de 20 pixeles (más en touch para compensar imprecisión)
+        if (!hasMoved && deltaY > 20) {
+          console.log('✊ Movimiento touch detectado, iniciando drag (delta:', deltaY, 'px)');
+          hasMoved = true;
+          this.isDragging = true;
+          e.preventDefault();
+        }
+        
+        if (hasMoved) {
+          this.onDragMove(e.touches[0].clientY);
+        }
+      }
+    };
+    
+    const touchEndHandler = () => {
+      console.log('👆 TouchEnd, hasMoved:', hasMoved);
+      if (hasMoved) {
+        this.endDrag();
+      } else {
+        // Fue un tap, abrir modal
+        console.log('👆 Tap detectado, abriendo modal');
+        this.toggleModal();
+      }
+      document.removeEventListener('touchmove', touchMoveHandler);
+      document.removeEventListener('touchend', touchEndHandler);
+    };
+    
+    document.addEventListener('touchmove', touchMoveHandler, { passive: false });
+    document.addEventListener('touchend', touchEndHandler);
+  }
+
+  private startDrag(clientY: number): void {
+    this.isDragging = true;
+    this.dragStartY = clientY;
+    this.dragStartTop = this.bubbleTopPosition;
+  }
+
+  private onDragMove(clientY: number): void {
+    if (!this.isDragging) return;
+    
+    const deltaY = clientY - this.dragStartY;
+    const viewportHeight = window.innerHeight;
+    const deltaPercent = (deltaY / viewportHeight) * 100;
+    
+    let newTop = this.dragStartTop + deltaPercent;
+    
+    // Limitar entre 5% y 95% para que no se salga del viewport
+    newTop = Math.max(5, Math.min(95, newTop));
+    
+    console.log('📍 Moviendo burbuja a:', newTop.toFixed(1) + '%');
+    this.bubbleTopPosition = newTop;
+  }
+
+  private endDrag(): void {
+    if (this.isDragging) {
+      console.log('🏁 Finalizando drag');
+      this.isDragging = false;
+      this.saveBubblePosition();
+    }
+  }
+
+  private saveBubblePosition(): void {
+    try {
+      localStorage.setItem('currentTaskInfo_bubblePosition', JSON.stringify(this.bubbleTopPosition));
+      console.log('Posición de burbuja guardada:', this.bubbleTopPosition);
+    } catch (error) {
+      console.error('Error al guardar la posición de la burbuja:', error);
+    }
+  }
+
+  private loadBubblePosition(): void {
+    try {
+      const saved = localStorage.getItem('currentTaskInfo_bubblePosition');
+      if (saved) {
+        const position = JSON.parse(saved);
+        if (typeof position === 'number' && position >= 5 && position <= 95) {
+          this.bubbleTopPosition = position;
+          console.log('Posición de burbuja cargada:', this.bubbleTopPosition);
+        }
+      }
+    } catch (error) {
+      console.error('Error al cargar la posición de la burbuja:', error);
+    }
   }
 } 

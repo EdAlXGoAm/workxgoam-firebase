@@ -27,7 +27,7 @@ import { TaskType } from '../../models/task-type.model';
 
       <div class="mb-6">
         <h3 class="text-lg font-semibold mb-2">Línea del Tiempo</h3>
-        <app-timeline-svg [tasks]="tasks" [environments]="environments" [taskTypes]="taskTypes" (editTask)="editTask.emit($event)"></app-timeline-svg>
+        <app-timeline-svg [tasks]="tasks" [environments]="environments" [taskTypes]="taskTypes" (editTask)="editTask.emit($event)" (deleteTask)="deleteTask.emit($event)"></app-timeline-svg>
       </div>
 
       <!-- Sincronización Compacta -->
@@ -362,6 +362,7 @@ export class BoardViewComponent {
   @Input() orderSyncMessageType: 'success' | 'error' | 'info' = 'info';
 
   @Output() editTask = new EventEmitter<Task>();
+  @Output() deleteTask = new EventEmitter<Task>();
   @Output() taskContextMenu = new EventEmitter<{ mouseEvent: MouseEvent; task: Task }>();
   @Output() taskQuickContextMenu = new EventEmitter<{ mouseEvent: MouseEvent; task: Task }>();
   @Output() environmentContextMenu = new EventEmitter<{ mouseEvent: MouseEvent; environment: Environment }>();

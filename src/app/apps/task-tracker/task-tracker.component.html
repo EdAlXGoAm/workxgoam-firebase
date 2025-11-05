@@ -60,6 +60,7 @@
         [orderSyncMessage]="orderSyncMessage"
         [orderSyncMessageType]="orderSyncMessageType"
         (editTask)="editTask($event)"
+        (deleteTask)="deleteTaskFromTimeline($event)"
         (moveEnvironmentUp)="moveEnvironmentUp($event)"
         (moveEnvironmentDown)="moveEnvironmentDown($event)"
         (taskContextMenu)="onTaskContextMenu($event.mouseEvent, $event.task)"
@@ -91,7 +92,8 @@
           [environments]="environments" 
           [taskTypes]="taskTypes" 
           [projects]="projects" 
-          (editTask)="editTask($event)">
+          (editTask)="editTask($event)"
+          (deleteTask)="deleteTaskFromTimeline($event)">
         </app-timeline-svg>
       </div>
     </div>

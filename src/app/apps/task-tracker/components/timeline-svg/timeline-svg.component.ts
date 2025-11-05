@@ -118,6 +118,10 @@ interface RenderableItem {
                     stroke="rgba(0,0,0,0.6)" stroke-width="1.5" 
                     (click)="onTaskClick(item.task, $event)" 
                     (dblclick)="onTaskDoubleClick(item.task, $event)"
+                    (contextmenu)="onTaskContextMenu(item.task, $event)"
+                    (touchstart)="onTaskTouchStart(item.task, $event)"
+                    (touchmove)="onTaskTouchMove($event)"
+                    (touchend)="onTaskTouchEnd($event)"
                     class="cursor-pointer" />
               <!-- Borde blanco interior -->
               <rect [attr.x]="getItemX(item, 0)" y="20" [attr.width]="getItemWidth(item, 0)" height="40"
@@ -125,6 +129,10 @@ interface RenderableItem {
                     stroke="rgba(255,255,255,0.8)" stroke-width="1" 
                     (click)="onTaskClick(item.task, $event)" 
                     (dblclick)="onTaskDoubleClick(item.task, $event)"
+                    (contextmenu)="onTaskContextMenu(item.task, $event)"
+                    (touchstart)="onTaskTouchStart(item.task, $event)"
+                    (touchmove)="onTaskTouchMove($event)"
+                    (touchend)="onTaskTouchEnd($event)"
                     class="cursor-pointer" />
               <circle *ngIf="getTaskTypeColor(item.task)" 
                       [attr.cx]="getItemX(item, 0) + 8" 
@@ -135,10 +143,18 @@ interface RenderableItem {
                       stroke-width="1"
                       (click)="onTaskClick(item.task, $event)" 
                       (dblclick)="onTaskDoubleClick(item.task, $event)"
+                      (contextmenu)="onTaskContextMenu(item.task, $event)"
+                      (touchstart)="onTaskTouchStart(item.task, $event)"
+                      (touchmove)="onTaskTouchMove($event)"
+                      (touchend)="onTaskTouchEnd($event)"
                       class="cursor-pointer" />
               <text [attr.x]="getItemX(item, 0) + (getTaskTypeColor(item.task) ? 14 : 6)" y="45" [attr.font-size]="taskFontSize" fill="#111" alignment-baseline="middle"
                     (click)="onTaskClick(item.task, $event)" 
                     (dblclick)="onTaskDoubleClick(item.task, $event)"
+                    (contextmenu)="onTaskContextMenu(item.task, $event)"
+                    (touchstart)="onTaskTouchStart(item.task, $event)"
+                    (touchmove)="onTaskTouchMove($event)"
+                    (touchend)="onTaskTouchEnd($event)"
                     class="cursor-pointer">
                 {{ getItemText(item, 0) }}
               </text>
@@ -162,6 +178,10 @@ interface RenderableItem {
                     stroke="rgba(0,0,0,0.6)" stroke-width="1.5" 
                     (click)="onTaskClick(item.task, $event)" 
                     (dblclick)="onTaskDoubleClick(item.task, $event)"
+                    (contextmenu)="onTaskContextMenu(item.task, $event)"
+                    (touchstart)="onTaskTouchStart(item.task, $event)"
+                    (touchmove)="onTaskTouchMove($event)"
+                    (touchend)="onTaskTouchEnd($event)"
                     class="cursor-pointer" />
               <!-- Borde blanco interior -->
               <rect [attr.x]="getItemX(item, 8)" y="20" [attr.width]="getItemWidth(item, 8)" height="40"
@@ -169,6 +189,10 @@ interface RenderableItem {
                     stroke="rgba(255,255,255,0.8)" stroke-width="1" 
                     (click)="onTaskClick(item.task, $event)" 
                     (dblclick)="onTaskDoubleClick(item.task, $event)"
+                    (contextmenu)="onTaskContextMenu(item.task, $event)"
+                    (touchstart)="onTaskTouchStart(item.task, $event)"
+                    (touchmove)="onTaskTouchMove($event)"
+                    (touchend)="onTaskTouchEnd($event)"
                     class="cursor-pointer" />
               <circle *ngIf="getTaskTypeColor(item.task)" 
                       [attr.cx]="getItemX(item, 8) + 8" 
@@ -179,10 +203,18 @@ interface RenderableItem {
                       stroke-width="1"
                       (click)="onTaskClick(item.task, $event)" 
                       (dblclick)="onTaskDoubleClick(item.task, $event)"
+                      (contextmenu)="onTaskContextMenu(item.task, $event)"
+                      (touchstart)="onTaskTouchStart(item.task, $event)"
+                      (touchmove)="onTaskTouchMove($event)"
+                      (touchend)="onTaskTouchEnd($event)"
                       class="cursor-pointer" />
               <text [attr.x]="getItemX(item, 8) + (getTaskTypeColor(item.task) ? 14 : 6)" y="45" [attr.font-size]="taskFontSize" fill="#111" alignment-baseline="middle"
                     (click)="onTaskClick(item.task, $event)" 
                     (dblclick)="onTaskDoubleClick(item.task, $event)"
+                    (contextmenu)="onTaskContextMenu(item.task, $event)"
+                    (touchstart)="onTaskTouchStart(item.task, $event)"
+                    (touchmove)="onTaskTouchMove($event)"
+                    (touchend)="onTaskTouchEnd($event)"
                     class="cursor-pointer">
                 {{ getItemText(item, 8) }}
               </text>
@@ -206,6 +238,10 @@ interface RenderableItem {
                     stroke="rgba(0,0,0,0.6)" stroke-width="1.5" 
                     (click)="onTaskClick(item.task, $event)" 
                     (dblclick)="onTaskDoubleClick(item.task, $event)"
+                    (contextmenu)="onTaskContextMenu(item.task, $event)"
+                    (touchstart)="onTaskTouchStart(item.task, $event)"
+                    (touchmove)="onTaskTouchMove($event)"
+                    (touchend)="onTaskTouchEnd($event)"
                     class="cursor-pointer" />
               <!-- Borde blanco interior -->
               <rect [attr.x]="getItemX(item, 16)" y="20" [attr.width]="getItemWidth(item, 16)" height="40"
@@ -213,6 +249,10 @@ interface RenderableItem {
                     stroke="rgba(255,255,255,0.8)" stroke-width="1" 
                     (click)="onTaskClick(item.task, $event)" 
                     (dblclick)="onTaskDoubleClick(item.task, $event)"
+                    (contextmenu)="onTaskContextMenu(item.task, $event)"
+                    (touchstart)="onTaskTouchStart(item.task, $event)"
+                    (touchmove)="onTaskTouchMove($event)"
+                    (touchend)="onTaskTouchEnd($event)"
                     class="cursor-pointer" />
               <circle *ngIf="getTaskTypeColor(item.task)" 
                       [attr.cx]="getItemX(item, 16) + 8" 
@@ -223,10 +263,18 @@ interface RenderableItem {
                       stroke-width="1"
                       (click)="onTaskClick(item.task, $event)" 
                       (dblclick)="onTaskDoubleClick(item.task, $event)"
+                      (contextmenu)="onTaskContextMenu(item.task, $event)"
+                      (touchstart)="onTaskTouchStart(item.task, $event)"
+                      (touchmove)="onTaskTouchMove($event)"
+                      (touchend)="onTaskTouchEnd($event)"
                       class="cursor-pointer" />
               <text [attr.x]="getItemX(item, 16) + (getTaskTypeColor(item.task) ? 14 : 6)" y="45" [attr.font-size]="taskFontSize" fill="#111" alignment-baseline="middle"
                     (click)="onTaskClick(item.task, $event)" 
                     (dblclick)="onTaskDoubleClick(item.task, $event)"
+                    (contextmenu)="onTaskContextMenu(item.task, $event)"
+                    (touchstart)="onTaskTouchStart(item.task, $event)"
+                    (touchmove)="onTaskTouchMove($event)"
+                    (touchend)="onTaskTouchEnd($event)"
                     class="cursor-pointer">
                 {{ getItemText(item, 16) }}
               </text>
@@ -234,6 +282,23 @@ interface RenderableItem {
             <line *ngIf="isNowInSection(2)" [attr.x1]="getNowX(16)" y1="10" [attr.x2]="getNowX(16)" y2="70" stroke="#f87171" stroke-width="2" stroke-dasharray="4 2" />
           </g>
         </svg>
+      </div>
+
+      <!-- Menú contextual -->
+      <div *ngIf="showContextMenu && contextMenuTask" 
+           class="context-menu"
+           [style.left.px]="contextMenuX"
+           [style.top.px]="contextMenuY"
+           (click)="$event.stopPropagation()">
+        <div class="context-menu-header">
+          <span class="text-lg mr-2">{{ contextMenuTask.emoji }}</span>
+          <span class="font-semibold text-sm truncate">{{ contextMenuTask.name }}</span>
+        </div>
+        <div class="context-menu-divider"></div>
+        <button class="context-menu-item delete" (click)="deleteTaskFromContextMenu()">
+          <i class="fas fa-trash-alt mr-2"></i>
+          Eliminar tarea
+        </button>
       </div>
     </div>
   `,
@@ -391,6 +456,109 @@ interface RenderableItem {
         flex-shrink: 0;
       }
     }
+
+    /* Estilos del menú contextual */
+    .context-menu {
+      position: fixed;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
+      z-index: 10000;
+      min-width: 200px;
+      max-width: 280px;
+      overflow: hidden;
+      animation: contextMenuFadeIn 0.15s ease-out;
+    }
+
+    @keyframes contextMenuFadeIn {
+      from {
+        opacity: 0;
+        transform: scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .context-menu-header {
+      padding: 12px 16px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      display: flex;
+      align-items: center;
+      font-size: 14px;
+      max-width: 100%;
+    }
+
+    .context-menu-header .truncate {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+
+    .context-menu-divider {
+      height: 1px;
+      background: #e5e7eb;
+    }
+
+    .context-menu-item {
+      width: 100%;
+      padding: 12px 16px;
+      text-align: left;
+      border: none;
+      background: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      font-size: 14px;
+      color: #374151;
+      transition: background-color 0.15s ease;
+    }
+
+    .context-menu-item:hover {
+      background: #f3f4f6;
+    }
+
+    .context-menu-item:active {
+      background: #e5e7eb;
+    }
+
+    .context-menu-item.delete {
+      color: #ef4444;
+    }
+
+    .context-menu-item.delete:hover {
+      background: #fef2f2;
+    }
+
+    .context-menu-item.delete:active {
+      background: #fee2e2;
+    }
+
+    .context-menu-item i {
+      width: 20px;
+      text-align: center;
+    }
+
+    /* Responsive para móviles */
+    @media (max-width: 640px) {
+      .context-menu {
+        min-width: 180px;
+        max-width: calc(100vw - 32px);
+      }
+
+      .context-menu-header {
+        padding: 10px 14px;
+        font-size: 13px;
+      }
+
+      .context-menu-item {
+        padding: 10px 14px;
+        font-size: 13px;
+      }
+    }
   `]
 })
 export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, OnDestroy {
@@ -413,6 +581,9 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
 
   // 🎯 Output para notificar al componente padre cuando se quiere editar una tarea
   @Output() editTask = new EventEmitter<Task>();
+  
+  // 🗑️ Output para notificar al componente padre cuando se quiere eliminar una tarea
+  @Output() deleteTask = new EventEmitter<Task>();
 
   @ViewChild('containerRef') containerRef!: ElementRef<HTMLDivElement>;
 
@@ -428,6 +599,17 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
   private clickTimeout: any = null;
   private clickCount = 0;
   private lastClickedTask: Task | null = null;
+  
+  // 📱 SISTEMA DE MENÚ CONTEXTUAL (Click derecho / Long press)
+  showContextMenu: boolean = false;
+  contextMenuTask: Task | null = null;
+  contextMenuX: number = 0;
+  contextMenuY: number = 0;
+  private longPressTimeout: any = null;
+  private longPressStartX: number = 0;
+  private longPressStartY: number = 0;
+  private readonly LONG_PRESS_DURATION = 500; // 500ms para activar long press
+  private readonly LONG_PRESS_MOVE_THRESHOLD = 10; // 10px de movimiento permitido
 
   // Propiedades de dimensiones responsive
   svgWidth = 600; // Ancho inicial por defecto
@@ -515,35 +697,9 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     }, 100);
   }
 
-  ngOnDestroy() {
-    if (this.resizeObserver) {
-      this.resizeObserver.disconnect();
-    }
-    // Limpiar timeout del tooltip
-    if (this.tooltipTimeout) {
-      clearTimeout(this.tooltipTimeout);
-    }
-    // Limpiar timeout del doble click
-    if (this.clickTimeout) {
-      clearTimeout(this.clickTimeout);
-    }
-    // Limpiar suscripción al servicio
-    if (this.focusSubscription) {
-      this.focusSubscription.unsubscribe();
-    }
-  }
-
   @HostListener('window:resize', ['$event'])
   onResize(event: any) {
     this.updateSvgDimensions();
-  }
-
-  @HostListener('document:click', ['$event'])
-  onDocumentClick(event: MouseEvent) {
-    // Cerrar tooltip si se hace click fuera del timeline
-    if (this.showTooltip) {
-      this.hideTooltip();
-    }
   }
 
   private initializeResizeObserver() {
@@ -1422,6 +1578,128 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
       return `${minutes} minutos`;
     } else {
       return `${wholeHours} hora${wholeHours !== 1 ? 's' : ''} y ${minutes} minutos`;
+    }
+  }
+
+  // 📱 MÉTODOS PARA MENÚ CONTEXTUAL
+  
+  // Click derecho (desktop)
+  onTaskContextMenu(task: Task, event: MouseEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    console.log('🖱️ Click derecho en tarea:', task.name);
+    this.showTaskContextMenu(task, event.clientX, event.clientY);
+  }
+
+  // Touch start para long press (móvil)
+  onTaskTouchStart(task: Task, event: TouchEvent): void {
+    if (event.touches.length !== 1) return;
+    
+    const touch = event.touches[0];
+    this.longPressStartX = touch.clientX;
+    this.longPressStartY = touch.clientY;
+    
+    console.log('👆 Touch start en tarea:', task.name);
+    
+    // Iniciar timer para long press
+    this.longPressTimeout = setTimeout(() => {
+      console.log('⏱️ Long press detectado en tarea:', task.name);
+      this.showTaskContextMenu(task, touch.clientX, touch.clientY);
+      // Vibración opcional en dispositivos móviles
+      if ('vibrate' in navigator) {
+        navigator.vibrate(50);
+      }
+    }, this.LONG_PRESS_DURATION);
+  }
+
+  // Touch move - cancelar long press si se mueve mucho
+  onTaskTouchMove(event: TouchEvent): void {
+    if (!this.longPressTimeout) return;
+    
+    if (event.touches.length === 1) {
+      const touch = event.touches[0];
+      const deltaX = Math.abs(touch.clientX - this.longPressStartX);
+      const deltaY = Math.abs(touch.clientY - this.longPressStartY);
+      
+      // Si se movió más del threshold, cancelar long press
+      if (deltaX > this.LONG_PRESS_MOVE_THRESHOLD || deltaY > this.LONG_PRESS_MOVE_THRESHOLD) {
+        console.log('↔️ Movimiento detectado, cancelando long press (deltaX:', deltaX, 'deltaY:', deltaY, ')');
+        this.cancelLongPress();
+      }
+    }
+  }
+
+  // Touch end - cancelar long press si no se completó
+  onTaskTouchEnd(event: TouchEvent): void {
+    this.cancelLongPress();
+  }
+
+  // Cancelar long press
+  private cancelLongPress(): void {
+    if (this.longPressTimeout) {
+      clearTimeout(this.longPressTimeout);
+      this.longPressTimeout = null;
+    }
+  }
+
+  // Mostrar menú contextual
+  showTaskContextMenu(task: Task, x: number, y: number): void {
+    // Ocultar tooltip si está visible
+    this.hideTooltip();
+    
+    this.contextMenuTask = task;
+    this.contextMenuX = x;
+    this.contextMenuY = y;
+    this.showContextMenu = true;
+    
+    console.log('📋 Menú contextual abierto para:', task.name);
+  }
+
+  // Cerrar menú contextual
+  closeContextMenu(): void {
+    this.showContextMenu = false;
+    this.contextMenuTask = null;
+    console.log('✖️ Menú contextual cerrado');
+  }
+
+  // Eliminar tarea desde el menú contextual
+  deleteTaskFromContextMenu(): void {
+    if (this.contextMenuTask) {
+      console.log('🗑️ Eliminando tarea:', this.contextMenuTask.name);
+      this.deleteTask.emit(this.contextMenuTask);
+      this.closeContextMenu();
+    }
+  }
+
+  // Listener global para cerrar el menú y tooltip al hacer click fuera
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    // Cerrar menú contextual si está abierto
+    if (this.showContextMenu) {
+      this.closeContextMenu();
+    }
+    // Cerrar tooltip si está abierto
+    if (this.showTooltip) {
+      this.hideTooltip();
+    }
+  }
+
+  // Limpiar timeouts y listeners en destroy
+  ngOnDestroy(): void {
+    if (this.tooltipTimeout) {
+      clearTimeout(this.tooltipTimeout);
+    }
+    if (this.clickTimeout) {
+      clearTimeout(this.clickTimeout);
+    }
+    if (this.longPressTimeout) {
+      clearTimeout(this.longPressTimeout);
+    }
+    if (this.focusSubscription) {
+      this.focusSubscription.unsubscribe();
+    }
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
     }
   }
 } 
