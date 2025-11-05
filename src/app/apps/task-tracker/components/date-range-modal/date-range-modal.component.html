@@ -1,0 +1,125 @@
+<div *ngIf="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+    <div class="p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold">Mostrar por Fecha</h3>
+        <button (click)="closeModal()" class="text-gray-500 hover:text-gray-700">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      
+      <div class="space-y-6">
+        <!-- Switch entre día y rango -->
+        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+          <span class="text-sm font-medium text-gray-700">Modo de selección:</span>
+          <div class="flex items-center space-x-3">
+            <button
+              type="button"
+              (click)="mode = 'day'; onModeChange()"
+              [class.bg-indigo-600]="mode === 'day'"
+              [class.text-white]="mode === 'day'"
+              [class.bg-white]="mode !== 'day'"
+              [class.text-gray-700]="mode !== 'day'"
+              class="px-4 py-2 rounded-lg font-medium text-sm border border-gray-300 transition-colors">
+              <i class="fas fa-calendar-day mr-2"></i>Elegir día
+            </button>
+            <button
+              type="button"
+              (click)="mode = 'range'; onModeChange()"
+              [class.bg-indigo-600]="mode === 'range'"
+              [class.text-white]="mode === 'range'"
+              [class.bg-white]="mode !== 'range'"
+              [class.text-gray-700]="mode !== 'range'"
+              class="px-4 py-2 rounded-lg font-medium text-sm border border-gray-300 transition-colors">
+              <i class="fas fa-calendar-week mr-2"></i>Elegir rango
+            </button>
+          </div>
+        </div>
+        
+        <!-- Selector de día único -->
+        <div *ngIf="mode === 'day'" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              <i class="fas fa-calendar-alt mr-2"></i>Seleccionar día
+            </label>
+            <app-android-date-picker
+              [(ngModel)]="singleDate"
+              name="singleDate"
+              label="Fecha"
+              placeholder="Seleccionar fecha"
+              [required]="true">
+            </app-android-date-picker>
+          </div>
+        </div>
+        
+        <!-- Selectores de rango -->
+        <div *ngIf="mode === 'range'" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              <i class="fas fa-play-circle mr-2 text-blue-600"></i>Fecha de inicio
+            </label>
+            <app-android-date-picker
+              [(ngModel)]="startDate"
+              name="startDate"
+              label="Fecha de inicio"
+              placeholder="Seleccionar fecha de inicio"
+              [required]="true">
+            </app-android-date-picker>
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              <i class="fas fa-stop-circle mr-2 text-green-600"></i>Fecha de fin
+            </label>
+            <app-android-date-picker
+              [(ngModel)]="endDate"
+              name="endDate"
+              label="Fecha de fin"
+              placeholder="Seleccionar fecha de fin"
+              [required]="true">
+            </app-android-date-picker>
+          </div>
+        </div>
+        
+        <!-- Información adicional -->
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <div class="flex items-start">
+            <i class="fas fa-info-circle text-blue-600 mr-2 mt-0.5"></i>
+            <div class="text-sm text-blue-800">
+              <p *ngIf="mode === 'day'" class="font-medium mb-1">Modo: Día único</p>
+              <p *ngIf="mode === 'day'">Se mostrarán todas las tareas del día seleccionado, incluyendo las ocultas.</p>
+              
+              <p *ngIf="mode === 'range'" class="font-medium mb-1">Modo: Rango de fechas</p>
+              <p *ngIf="mode === 'range'">Se mostrarán todas las tareas entre las fechas seleccionadas, incluyendo las ocultas.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Botones de acción -->
+      <div class="flex justify-between items-center mt-6 pt-4 border-t border-gray-200">
+        <button
+          type="button"
+          (click)="clearFilter()"
+          class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900">
+          <i class="fas fa-times mr-2"></i>Limpiar filtro
+        </button>
+        <div class="flex space-x-3">
+          <button
+            type="button"
+            (click)="closeModal()"
+            class="px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50">
+            Cancelar
+          </button>
+          <button
+            type="button"
+            (click)="applyFilter()"
+            class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700">
+            <i class="fas fa-check mr-2"></i>Aplicar filtro
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+

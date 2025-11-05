@@ -259,7 +259,7 @@ export class BoardViewComponent {
   @Input() projects: Project[] = [];
   @Input() environments: Environment[] = [];
   @Input() showHidden: boolean = false;
-  @Input() environmentHiddenVisibility: { [envId: string]: 'hidden' | 'show-all' | 'show-24h' } = {};
+  @Input() environmentHiddenVisibility: { [envId: string]: 'hidden' | 'show-all' | 'show-24h' | 'date-range' } = {};
   @Input() environmentViewMode: { [envId: string]: 'cards' | 'list' } = {};
 
   @Output() editTask = new EventEmitter<Task>();
@@ -304,7 +304,7 @@ export class BoardViewComponent {
     return this.environmentViewMode[envId] || 'cards';
   }
 
-  private resolveEnvironmentHiddenVisibility(envId: string): 'show-all' | 'show-24h' | 'hidden' {
+  private resolveEnvironmentHiddenVisibility(envId: string): 'show-all' | 'show-24h' | 'hidden' | 'date-range' {
     if (this.showHidden) return 'show-all';
     return this.environmentHiddenVisibility[envId] || 'hidden';
   }
@@ -323,6 +323,10 @@ export class BoardViewComponent {
               const now = new Date();
               const hoursDiff = (now.getTime() - taskDate.getTime()) / (1000 * 60 * 60);
               return hoursDiff <= 24;
+            case 'date-range':
+              // El filtrado por fecha se hace en el componente padre antes de pasar las tareas
+              // Aquí solo permitimos mostrar tareas ocultas si están en modo date-range
+              return true;
             default: return false;
           }
         }
@@ -351,6 +355,10 @@ export class BoardViewComponent {
               const now = new Date();
               const hoursDiff = (now.getTime() - taskDate.getTime()) / (1000 * 60 * 60);
               return hoursDiff <= 24;
+            case 'date-range':
+              // El filtrado por fecha se hace en el componente padre antes de pasar las tareas
+              // Aquí solo permitimos mostrar tareas ocultas si están en modo date-range
+              return true;
             default: return false;
           }
         }
@@ -376,6 +384,10 @@ export class BoardViewComponent {
             const now = new Date();
             const hoursDiff = (now.getTime() - taskDate.getTime()) / (1000 * 60 * 60);
             return hoursDiff <= 24;
+          case 'date-range':
+            // El filtrado por fecha se hace en el componente padre antes de pasar las tareas
+            // Aquí solo permitimos mostrar tareas ocultas si están en modo date-range
+            return true;
           default: return false;
         }
       }

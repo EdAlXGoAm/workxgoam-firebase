@@ -325,6 +325,12 @@
       <i class="fas fa-eye-slash"></i>
       <span>Ocultar ocultos</span>
     </div>
+    <div class="context-menu-item" 
+         [class.context-menu-item-active]="getEnvironmentHiddenVisibility(selectedEnvironment!.id) === 'date-range'"
+         (click)="openDateRangeModal(selectedEnvironment!.id)">
+      <i class="fas fa-calendar-alt"></i>
+      <span>Mostrar por fecha</span>
+    </div>
     <hr class="my-1 border-gray-200">
     <!-- Alternar vista de proyectos/tareas dentro del ambiente -->
     <div class="context-menu-item" (click)="toggleEnvironmentViewMode(selectedEnvironment!.id)">
@@ -464,5 +470,17 @@
     (closeModalEvent)="closeRemindersModal()"
     (remindersChanged)="remindersModalContext === 'new' ? (newTask.reminders = $event) : (selectedTask ? selectedTask.reminders = $event : null)">
   </app-reminders-modal>
+
+  <!-- Modal de Rango de Fechas -->
+  <app-date-range-modal
+    *ngIf="showDateRangeModal"
+    [showModal]="showDateRangeModal"
+    [initialMode]="getDateRangeForModal()?.mode || 'day'"
+    [initialDate]="getDateRangeForModal()?.singleDate || ''"
+    [initialStartDate]="getDateRangeForModal()?.startDate || ''"
+    [initialEndDate]="getDateRangeForModal()?.endDate || ''"
+    (closeModalEvent)="closeDateRangeModal()"
+    (dateRangeSelected)="onDateRangeSelected($event)">
+  </app-date-range-modal>
 </div>
 

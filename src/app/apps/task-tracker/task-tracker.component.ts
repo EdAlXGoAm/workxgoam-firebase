@@ -19,11 +19,12 @@ import { TaskTrackerHeaderComponent } from './components/amain_components/task-t
 import { EnvironmentModalComponent } from './components/environment-modal/environment-modal.component';
 import { BoardViewComponent } from './components/amain_components/board-view';
 import { ChangeStatusModalComponent } from './components/change-status-modal/change-status-modal';
+import { DateRangeModalComponent } from './components/date-range-modal/date-range-modal.component';
 
 @Component({
   selector: 'app-task-tracker',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, TimelineSvgComponent, CurrentTaskInfoComponent, TaskModalComponent, RemindersModalComponent, TaskTrackerHeaderComponent, EnvironmentModalComponent, BoardViewComponent, ChangeStatusModalComponent],
+  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, TimelineSvgComponent, CurrentTaskInfoComponent, TaskModalComponent, RemindersModalComponent, TaskTrackerHeaderComponent, EnvironmentModalComponent, BoardViewComponent, ChangeStatusModalComponent, DateRangeModalComponent],
   templateUrl: './task-tracker.component.html',
   styleUrls: ['./task-tracker.component.css']
 })
@@ -48,7 +49,9 @@ export class TaskTrackerComponent implements OnInit {
   collapsedProjects: { [projectId: string]: boolean } = {};
 
   // Control de visibilidad de tareas ocultas por environment
-  environmentHiddenVisibility: { [envId: string]: 'hidden' | 'show-all' | 'show-24h' } = {}; // Control de visibilidad individual por environment
+  environmentHiddenVisibility: { [envId: string]: 'hidden' | 'show-all' | 'show-24h' | 'date-range' } = {}; // Control de visibilidad individual por environment
+  // Rangos de fechas por environment para el filtro de fecha
+  environmentDateRanges: { [envId: string]: { mode: 'day' | 'range', startDate?: string, endDate?: string, singleDate?: string } } = {};
   // Modo de vista por environment: 'cards' o 'list'
   environmentViewMode: { [envId: string]: 'cards' | 'list' } = {};
 
@@ -95,6 +98,10 @@ export class TaskTrackerComponent implements OnInit {
   showEnvironmentContextMenu = false;
   environmentContextMenuPosition = { x: 0, y: 0 };
   selectedEnvironment: Environment | null = null;
+  
+  // Modal de rango de fechas
+  showDateRangeModal = false;
+  dateRangeModalEnvironmentId: string = '';
 
   // Variables para menú contextual de proyectos
   showProjectContextMenu = false;
@@ -573,11 +580,43 @@ export class TaskTrackerComponent implements OnInit {
 
   getTasksByEnvironment(environmentId: string): Task[] {
     const visibility = this.getEnvironmentHiddenVisibility(environmentId);
+    const dateRange = this.environmentDateRanges[environmentId];
     
     return this.filteredTasks
       .filter(task => {
         // Filtrar por environment
         if (task.environment !== environmentId) return false;
+        
+        // Aplicar filtro por fecha si está activo
+        if (visibility === 'date-range' && dateRange) {
+          const taskStartDate = new Date(task.start + (task.start.includes('Z') ? '' : 'Z'));
+          taskStartDate.setHours(0, 0, 0, 0);
+          
+          if (dateRange.mode === 'day' && dateRange.singleDate) {
+            // Filtrar por día único
+            const filterDate = new Date(dateRange.singleDate);
+            filterDate.setHours(0, 0, 0, 0);
+            const taskDateOnly = new Date(taskStartDate);
+            taskDateOnly.setHours(0, 0, 0, 0);
+            
+            if (taskDateOnly.getTime() !== filterDate.getTime()) {
+              return false;
+            }
+          } else if (dateRange.mode === 'range' && dateRange.startDate && dateRange.endDate) {
+            // Filtrar por rango de fechas
+            const startDate = new Date(dateRange.startDate);
+            startDate.setHours(0, 0, 0, 0);
+            const endDate = new Date(dateRange.endDate);
+            endDate.setHours(23, 59, 59, 999);
+            
+            if (taskStartDate < startDate || taskStartDate > endDate) {
+              return false;
+            }
+          } else {
+            // Si no hay fecha seleccionada, no mostrar nada
+            return false;
+          }
+        }
         
         // Aplicar filtro de visibilidad según la configuración del environment
         if (task.hidden) {
@@ -592,6 +631,9 @@ export class TaskTrackerComponent implements OnInit {
               const now = new Date();
               const hoursDiff = (now.getTime() - taskDate.getTime()) / (1000 * 60 * 60);
               return hoursDiff <= 24;
+            case 'date-range':
+              // En modo date-range, las tareas ocultas también se muestran si están en el rango
+              return true;
             default:
               return false;
           }
@@ -612,11 +654,43 @@ export class TaskTrackerComponent implements OnInit {
     const project = this.projects.find(p => p.id === projectId);
     const environmentId = project?.environment || '';
     const visibility = this.getEnvironmentHiddenVisibility(environmentId);
+    const dateRange = this.environmentDateRanges[environmentId];
     
     return this.filteredTasks
       .filter(task => {
         // Filtrar por proyecto
         if (task.project !== projectId) return false;
+        
+        // Aplicar filtro por fecha si está activo
+        if (visibility === 'date-range' && dateRange) {
+          const taskStartDate = new Date(task.start + (task.start.includes('Z') ? '' : 'Z'));
+          taskStartDate.setHours(0, 0, 0, 0);
+          
+          if (dateRange.mode === 'day' && dateRange.singleDate) {
+            // Filtrar por día único
+            const filterDate = new Date(dateRange.singleDate);
+            filterDate.setHours(0, 0, 0, 0);
+            const taskDateOnly = new Date(taskStartDate);
+            taskDateOnly.setHours(0, 0, 0, 0);
+            
+            if (taskDateOnly.getTime() !== filterDate.getTime()) {
+              return false;
+            }
+          } else if (dateRange.mode === 'range' && dateRange.startDate && dateRange.endDate) {
+            // Filtrar por rango de fechas
+            const startDate = new Date(dateRange.startDate);
+            startDate.setHours(0, 0, 0, 0);
+            const endDate = new Date(dateRange.endDate);
+            endDate.setHours(23, 59, 59, 999);
+            
+            if (taskStartDate < startDate || taskStartDate > endDate) {
+              return false;
+            }
+          } else {
+            // Si no hay fecha seleccionada, no mostrar nada
+            return false;
+          }
+        }
         
         // Aplicar filtro de visibilidad según la configuración del environment padre
         if (task.hidden) {
@@ -631,6 +705,9 @@ export class TaskTrackerComponent implements OnInit {
               const now = new Date();
               const hoursDiff = (now.getTime() - taskDate.getTime()) / (1000 * 60 * 60);
               return hoursDiff <= 24;
+            case 'date-range':
+              // En modo date-range, las tareas ocultas también se muestran si están en el rango
+              return true;
             default:
               return false;
           }
@@ -1829,7 +1906,7 @@ export class TaskTrackerComponent implements OnInit {
   }
 
 
-  getEnvironmentHiddenVisibility(envId: string): 'show-all' | 'show-24h' | 'hidden' {
+  getEnvironmentHiddenVisibility(envId: string): 'show-all' | 'show-24h' | 'hidden' | 'date-range' {
     // Si el filtro global está activado, siempre mostrar todas las tareas ocultas
     if (this.showHidden) {
       return 'show-all';
@@ -1843,11 +1920,49 @@ export class TaskTrackerComponent implements OnInit {
     return 'hidden';
   }
 
-  setEnvironmentHiddenVisibility(envId: string, visibility: 'show-all' | 'show-24h' | 'hidden'): void {
+  setEnvironmentHiddenVisibility(envId: string, visibility: 'show-all' | 'show-24h' | 'hidden' | 'date-range'): void {
     this.environmentHiddenVisibility[envId] = visibility;
     this.closeEnvironmentContextMenu();
     // Refrescar la vista aplicando los filtros
     this.processTasks();
+  }
+  
+  openDateRangeModal(environmentId: string): void {
+    this.dateRangeModalEnvironmentId = environmentId;
+    this.showDateRangeModal = true;
+    this.closeEnvironmentContextMenu();
+  }
+  
+  closeDateRangeModal(): void {
+    this.showDateRangeModal = false;
+    this.dateRangeModalEnvironmentId = '';
+  }
+  
+  onDateRangeSelected(range: { mode: 'day' | 'range', startDate?: string, endDate?: string, singleDate?: string }): void {
+    if (!this.dateRangeModalEnvironmentId) {
+      this.closeDateRangeModal();
+      return;
+    }
+    
+    // Si se limpia el filtro (singleDate vacío en modo day)
+    if (range.mode === 'day' && !range.singleDate) {
+      // Cambiar visibilidad a 'hidden' y eliminar el rango
+      this.environmentHiddenVisibility[this.dateRangeModalEnvironmentId] = 'hidden';
+      delete this.environmentDateRanges[this.dateRangeModalEnvironmentId];
+    } else {
+      // Establecer el modo de visibilidad a 'date-range' y guardar el rango
+      this.environmentHiddenVisibility[this.dateRangeModalEnvironmentId] = 'date-range';
+      this.environmentDateRanges[this.dateRangeModalEnvironmentId] = range;
+    }
+    this.processTasks();
+    this.closeDateRangeModal();
+  }
+  
+  getDateRangeForModal(): { mode: 'day' | 'range', startDate?: string, endDate?: string, singleDate?: string } | null {
+    if (!this.dateRangeModalEnvironmentId) {
+      return null;
+    }
+    return this.environmentDateRanges[this.dateRangeModalEnvironmentId] || null;
   }
 
   // Vista por environment: cards/list
