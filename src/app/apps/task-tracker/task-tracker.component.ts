@@ -11,7 +11,6 @@ import { Task } from './models/task.model';
 import { Project } from './models/project.model';
 import { Environment } from './models/environment.model';
 import { ManagementModalComponent } from './components/management-modal/management-modal.component';
-import { TimelineSvgComponent } from './components/timeline-svg/timeline-svg.component';
 import { CurrentTaskInfoComponent } from './components/current-task-info/current-task-info.component';
 import { TaskModalComponent } from './components/task-modal/task-modal.component';
 import { RemindersModalComponent } from './components/reminders-modal/reminders-modal.component';
@@ -30,7 +29,7 @@ import { CustomSelectComponent, SelectOption } from './components/custom-select/
 @Component({
   selector: 'app-task-tracker',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, TimelineSvgComponent, CurrentTaskInfoComponent, TaskModalComponent, RemindersModalComponent, TaskTrackerHeaderComponent, EnvironmentModalComponent, BoardViewComponent, WeekViewComponent, ChangeStatusModalComponent, DateRangeModalComponent, TaskTypeModalComponent, CustomSelectComponent],
+  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, CurrentTaskInfoComponent, TaskModalComponent, RemindersModalComponent, TaskTrackerHeaderComponent, EnvironmentModalComponent, BoardViewComponent, WeekViewComponent, ChangeStatusModalComponent, DateRangeModalComponent, TaskTypeModalComponent, CustomSelectComponent],
   templateUrl: './task-tracker.component.html',
   styleUrls: ['./task-tracker.component.css']
 })
