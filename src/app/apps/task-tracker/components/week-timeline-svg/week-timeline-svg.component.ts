@@ -1,0 +1,1216 @@
+import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges, HostListener, ViewChild, ElementRef, AfterViewInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Task } from '../../models/task.model';
+import { Environment } from '../../models/environment.model';
+import { TaskType } from '../../models/task-type.model';
+import { Project } from '../../models/project.model';
+import { TimelineFocusService } from '../../services/timeline-focus.service';
+import { ProjectService } from '../../services/project.service';
+import { AndroidDatePickerComponent } from '../android-date-picker/android-date-picker.component';
+import { Subscription } from 'rxjs';
+
+// Interfaz para elementos renderizables (tareas o fragmentos)
+interface RenderableItem {
+  type: 'task' | 'fragment';
+  task: Task;
+  fragmentIndex?: number;
+  start: string;
+  end: string;
+}
+
+// Interfaz para representar un día de la semana
+interface WeekDay {
+  date: Date;
+  dayName: string;
+  dayNumber: number;
+  monthDay: number;
+}
+
+@Component({
+  selector: 'app-week-timeline-svg',
+  standalone: true,
+  imports: [CommonModule, FormsModule, AndroidDatePickerComponent],
+  template: `
+    <div #containerRef class="week-timeline-container w-full overflow-x-auto relative">
+      <!-- Controles de Navegación de Semana -->
+      <div class="week-navigation mb-4 flex flex-col md:flex-row items-center justify-between bg-white rounded-lg p-3 shadow-sm border gap-3">
+        <!-- Primera fila: Navegador de semanas -->
+        <div class="flex items-center space-x-2 w-full md:w-auto justify-center md:justify-start">
+          <button (click)="goToPreviousWeek()" 
+                  class="nav-btn flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+                  title="Semana anterior">
+            <i class="fas fa-chevron-left text-sm text-gray-600"></i>
+          </button>
+          
+          <div class="week-display text-sm font-semibold text-gray-700 px-2 text-center">
+            {{ formatWeekRange() }}
+          </div>
+          
+          <button (click)="goToNextWeek()" 
+                  class="nav-btn flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+                  title="Semana siguiente">
+            <i class="fas fa-chevron-right text-sm text-gray-600"></i>
+          </button>
+        </div>
+        
+        <!-- Segunda fila: Selector y botón Esta Semana -->
+        <div class="flex items-center space-x-3 w-full md:w-auto justify-center md:justify-end">
+          <div class="w-48 flex-shrink-0">
+            <app-android-date-picker
+              [ngModel]="getWeekInputValue()"
+              (dateChange)="onWeekDateChange($event)"
+              label="Seleccionar semana"
+              placeholder="Seleccionar semana"
+              class="date-picker">
+            </app-android-date-picker>
+          </div>
+          
+          <button (click)="goToCurrentWeek()" 
+                  [class.bg-indigo-100]="isCurrentWeek()"
+                  [class.text-indigo-700]="isCurrentWeek()"
+                  [class.bg-gray-100]="!isCurrentWeek()"
+                  [class.text-gray-700]="!isCurrentWeek()"
+                  class="nav-btn px-3 py-1 rounded-md text-sm font-medium hover:bg-indigo-50 transition-colors flex-shrink-0"
+                  title="Ir a esta semana">
+            Esta Semana
+          </button>
+        </div>
+      </div>
+
+      <!-- Tooltip para mostrar información completa de la tarea -->
+      <div *ngIf="showTooltip && tooltipTask" 
+           class="tooltip-container absolute top-[150px] left-1/2 transform -translate-x-1/2 z-50 bg-gray-900 text-white px-6 py-5 rounded-xl shadow-2xl max-w-2xl min-w-[400px]">
+        <div class="flex items-start space-x-4">
+          <span class="text-3xl flex-shrink-0">{{ tooltipTask.emoji }}</span>
+          <div *ngIf="getTaskTypeColor(tooltipTask)" 
+               class="w-5 h-5 rounded-full border-2 border-white shadow-sm flex-shrink-0 mt-1" 
+               [style.background-color]="getTaskTypeColor(tooltipTask)"></div>
+          <div class="flex-1">
+            <div class="font-bold text-lg mb-2">{{ getTaskDisplayName(tooltipTask) }}</div>
+            <div *ngIf="tooltipTask.description" class="text-sm text-gray-200 mt-2 mb-3 leading-relaxed">{{ tooltipTask.description }}</div>
+            <div class="flex flex-wrap gap-4 mt-3">
+              <div class="text-sm text-gray-300 flex items-center space-x-2">
+                <i class="fas fa-clock text-xs"></i>
+                <span>{{ formatTaskTime(tooltipTask.start) }} - {{ formatTaskTime(tooltipTask.end) }}</span>
+              </div>
+              <div *ngIf="getTaskDuration(tooltipTask)" class="text-sm text-purple-300 flex items-center space-x-2">
+                <i class="fas fa-hourglass-half text-xs"></i>
+                <span>Duración: {{ formatTaskDuration(getTaskDuration(tooltipTask)) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Flecha del tooltip apuntando hacia arriba -->
+        <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-12 border-r-12 border-b-12 border-l-transparent border-r-transparent border-b-gray-900"></div>
+      </div>
+
+      <!-- Contenedor centrado para el SVG -->
+      <div class="svg-container flex justify-center overflow-x-auto">
+        <svg [attr.width]="svgWidth" [attr.height]="svgHeight" [attr.viewBox]="'0 0 ' + svgWidth + ' ' + svgHeight" 
+             class="week-timeline-svg" [style.min-width.px]="minSvgWidth">
+          
+          <!-- Encabezado con nombres de días -->
+          <g transform="translate(0, 0)">
+            <rect x="0" y="0" [attr.width]="svgWidth" height="60" fill="#f9fafb" rx="6" ry="6"/>
+            <line x1="0" y1="60" [attr.x2]="svgWidth" y2="60" stroke="#888" stroke-width="2" />
+            
+            <!-- Nombres de los días -->
+            <g *ngFor="let day of weekDays; let i = index">
+              <rect [attr.x]="getDayColumnX(i)" y="0" [attr.width]="dayColumnWidth" height="60" 
+                    [attr.fill]="isTodayColumn(i) ? '#e0e7ff' : '#f9fafb'" 
+                    rx="4" ry="4"/>
+              <text [attr.x]="getDayColumnX(i) + dayColumnWidth / 2" y="20" 
+                    [attr.font-size]="dayNameFontSize" 
+                    fill="#333" 
+                    font-weight="bold" 
+                    text-anchor="middle">
+                {{ day.dayName }}
+              </text>
+              <text [attr.x]="getDayColumnX(i) + dayColumnWidth / 2" y="40" 
+                    [attr.font-size]="dayNumberFontSize" 
+                    fill="#666" 
+                    text-anchor="middle">
+                {{ day.monthDay }}
+              </text>
+            </g>
+          </g>
+
+          <!-- Columnas de días con divisiones de horas -->
+          <g *ngFor="let day of weekDays; let dayIndex = index" [attr.transform]="'translate(' + getDayColumnX(dayIndex) + ', 60)'">
+            <!-- Fondo de la columna -->
+            <rect x="0" y="0" [attr.width]="dayColumnWidth" [attr.height]="hoursAreaHeight" 
+                  [attr.fill]="isTodayColumn(dayIndex) ? '#f0f4ff' : '#ffffff'" 
+                  rx="4" ry="4" 
+                  stroke="#e5e7eb" 
+                  stroke-width="1"/>
+            
+            <!-- Líneas de horas y etiquetas -->
+            <g *ngFor="let hour of hours">
+              <line x1="0" y1="0" 
+                    [attr.x2]="dayColumnWidth" 
+                    [attr.y2]="0" 
+                    stroke="#e5e7eb" 
+                    stroke-width="1"
+                    [attr.transform]="'translate(0, ' + getHourY(hour) + ')'"/>
+              
+              <!-- Etiqueta de hora solo en la primera columna o cada 2 horas -->
+              <text *ngIf="dayIndex === 0 || hour % 2 === 0"
+                    x="4" 
+                    [attr.y]="getHourY(hour) + 4" 
+                    [attr.font-size]="hourFontSize" 
+                    fill="#666" 
+                    text-anchor="start"
+                    [attr.transform]="'translate(0, ' + getHourY(hour) + ')'">
+                {{ formatHour(hour) }}
+              </text>
+            </g>
+            
+            <!-- Tareas para este día -->
+            <g *ngFor="let item of getRenderableItemsForDay(dayIndex)">
+              <!-- Borde negro exterior -->
+              <rect [attr.x]="getTaskX(item, dayIndex)" 
+                    [attr.y]="getTaskY(item, dayIndex)" 
+                    [attr.width]="getTaskWidth(item, dayIndex)" 
+                    [attr.height]="getTaskHeight(item, dayIndex)"
+                    [attr.fill]="getTaskColor(item.task)" 
+                    rx="4" ry="4" 
+                    fill-opacity="0.8" 
+                    stroke="rgba(0,0,0,0.6)" 
+                    stroke-width="1.5" 
+                    (click)="onTaskClick(item.task, $event)" 
+                    (dblclick)="onTaskDoubleClick(item.task, $event)"
+                    (contextmenu)="onTaskContextMenu(item.task, $event)"
+                    (touchstart)="onTaskTouchStart(item.task, $event)"
+                    (touchmove)="onTaskTouchMove($event)"
+                    (touchend)="onTaskTouchEnd($event)"
+                    class="cursor-pointer" />
+              
+              <!-- Borde blanco interior -->
+              <rect [attr.x]="getTaskX(item, dayIndex)" 
+                    [attr.y]="getTaskY(item, dayIndex)" 
+                    [attr.width]="getTaskWidth(item, dayIndex)" 
+                    [attr.height]="getTaskHeight(item, dayIndex)"
+                    fill="none" 
+                    rx="4" ry="4" 
+                    stroke="rgba(255,255,255,0.8)" 
+                    stroke-width="1" 
+                    (click)="onTaskClick(item.task, $event)" 
+                    (dblclick)="onTaskDoubleClick(item.task, $event)"
+                    (contextmenu)="onTaskContextMenu(item.task, $event)"
+                    (touchstart)="onTaskTouchStart(item.task, $event)"
+                    (touchmove)="onTaskTouchMove($event)"
+                    (touchend)="onTaskTouchEnd($event)"
+                    class="cursor-pointer" />
+              
+              <!-- Indicador de tipo de tarea -->
+              <circle *ngIf="getTaskTypeColor(item.task)" 
+                      [attr.cx]="getTaskX(item, dayIndex) + 6" 
+                      [attr.cy]="getTaskY(item, dayIndex) + 6" 
+                      r="4" 
+                      [attr.fill]="getTaskTypeColor(item.task)"
+                      stroke="white" 
+                      stroke-width="1"
+                      (click)="onTaskClick(item.task, $event)" 
+                      (dblclick)="onTaskDoubleClick(item.task, $event)"
+                      (contextmenu)="onTaskContextMenu(item.task, $event)"
+                      (touchstart)="onTaskTouchStart(item.task, $event)"
+                      (touchmove)="onTaskTouchMove($event)"
+                      (touchend)="onTaskTouchEnd($event)"
+                      class="cursor-pointer" />
+              
+              <!-- Texto de la tarea -->
+              <text [attr.x]="getTaskX(item, dayIndex) + (getTaskTypeColor(item.task) ? 12 : 6)" 
+                    [attr.y]="getTaskY(item, dayIndex) + 12" 
+                    [attr.font-size]="taskFontSize" 
+                    fill="#111" 
+                    alignment-baseline="middle"
+                    (click)="onTaskClick(item.task, $event)" 
+                    (dblclick)="onTaskDoubleClick(item.task, $event)"
+                    (contextmenu)="onTaskContextMenu(item.task, $event)"
+                    (touchstart)="onTaskTouchStart(item.task, $event)"
+                    (touchmove)="onTaskTouchMove($event)"
+                    (touchend)="onTaskTouchEnd($event)"
+                    class="cursor-pointer">
+                {{ getTaskText(item, dayIndex) }}
+              </text>
+            </g>
+            
+            <!-- Línea de tiempo actual (si es el día de hoy) -->
+            <line *ngIf="isTodayColumn(dayIndex) && isCurrentHour()" 
+                  x1="0" 
+                  [attr.x2]="dayColumnWidth" 
+                  [attr.y1]="getCurrentHourY()" 
+                  [attr.y2]="getCurrentHourY()" 
+                  stroke="#f87171" 
+                  stroke-width="2" 
+                  stroke-dasharray="4 2" />
+          </g>
+        </svg>
+      </div>
+
+      <!-- Menú contextual -->
+      <div *ngIf="showContextMenu && contextMenuTask" 
+           class="context-menu"
+           [style.left.px]="contextMenuX"
+           [style.top.px]="contextMenuY"
+           (click)="$event.stopPropagation()">
+        <div class="context-menu-header">
+          <span class="text-lg mr-2">{{ contextMenuTask.emoji }}</span>
+          <span class="font-semibold text-sm truncate">{{ contextMenuTask.name }}</span>
+        </div>
+        <div class="context-menu-divider"></div>
+        <button class="context-menu-item delete" (click)="deleteTaskFromContextMenu()">
+          <i class="fas fa-trash-alt mr-2"></i>
+          Eliminar tarea
+        </button>
+      </div>
+    </div>
+  `,
+  styles: [`
+    .week-timeline-container {
+      padding: 8px;
+      background: #f9fafb;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      position: relative;
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+    }
+    
+    .week-timeline-svg {
+      display: block;
+      background: #f9fafb;
+      border-radius: 12px;
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+    }
+    
+    .week-timeline-svg text,
+    .week-timeline-svg rect,
+    .week-timeline-svg circle {
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+    }
+
+    .week-navigation {
+      backdrop-filter: blur(10px);
+    }
+    
+    .nav-btn {
+      user-select: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .nav-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .nav-btn:active {
+      transform: translateY(0);
+    }
+    
+    .week-display {
+      min-width: 200px;
+      text-align: center;
+      user-select: text !important;
+      -webkit-user-select: text !important;
+      -moz-user-select: text !important;
+      -ms-user-select: text !important;
+    }
+    
+    .date-picker {
+      min-width: 120px;
+      user-select: text !important;
+      -webkit-user-select: text !important;
+      -moz-user-select: text !important;
+      -ms-user-select: text !important;
+    }
+    
+    .week-timeline-container::-webkit-scrollbar {
+      height: 6px;
+    }
+    
+    .week-timeline-container::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 3px;
+    }
+    
+    .week-timeline-container::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 3px;
+    }
+    
+    .week-timeline-container::-webkit-scrollbar-thumb:hover {
+      background: #a8a8a8;
+    }
+    
+    .week-timeline-container {
+      scrollbar-width: thin;
+      scrollbar-color: #c1c1c1 #f1f1f1;
+    }
+
+    .tooltip-container {
+      animation: fadeIn 0.3s ease-in-out;
+      pointer-events: none;
+      z-index: 1000;
+      border: 2px solid rgba(255, 255, 255, 0.1);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+
+    .cursor-pointer {
+      cursor: pointer;
+    }
+
+    .cursor-pointer:hover {
+      opacity: 0.9;
+      filter: brightness(1.1);
+    }
+
+    .svg-container {
+      width: 100%;
+    }
+    
+    @media (min-width: 1280px) {
+      .svg-container {
+        display: flex;
+        justify-content: center;
+      }
+      
+      .week-timeline-svg {
+        flex-shrink: 0;
+      }
+    }
+
+    .context-menu {
+      position: fixed;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
+      z-index: 10000;
+      min-width: 200px;
+      max-width: 280px;
+      overflow: hidden;
+      animation: contextMenuFadeIn 0.15s ease-out;
+    }
+
+    @keyframes contextMenuFadeIn {
+      from {
+        opacity: 0;
+        transform: scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .context-menu-header {
+      padding: 12px 16px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      display: flex;
+      align-items: center;
+      font-size: 14px;
+      max-width: 100%;
+    }
+
+    .context-menu-header .truncate {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+
+    .context-menu-divider {
+      height: 1px;
+      background: #e5e7eb;
+    }
+
+    .context-menu-item {
+      width: 100%;
+      padding: 12px 16px;
+      text-align: left;
+      border: none;
+      background: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      font-size: 14px;
+      color: #374151;
+      transition: background-color 0.15s ease;
+    }
+
+    .context-menu-item:hover {
+      background: #f3f4f6;
+    }
+
+    .context-menu-item.delete {
+      color: #ef4444;
+    }
+
+    .context-menu-item.delete:hover {
+      background: #fef2f2;
+    }
+
+    .context-menu-item i {
+      width: 20px;
+      text-align: center;
+    }
+
+    @media (max-width: 640px) {
+      .context-menu {
+        min-width: 180px;
+        max-width: calc(100vw - 32px);
+      }
+    }
+  `]
+})
+export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, OnDestroy {
+  @Input() tasks: Task[] = [];
+  @Input() environments: Environment[] = [];
+  @Input() taskTypes: TaskType[] = [];
+  @Input() projects: Project[] = [];
+  
+  private loadedProjects: Project[] = [];
+  
+  focusedEnvironmentId: string | null = null;
+  private focusSubscription?: Subscription;
+
+  constructor(
+    private cdr: ChangeDetectorRef,
+    private timelineFocusService: TimelineFocusService,
+    private projectService: ProjectService
+  ) {}
+
+  @Output() editTask = new EventEmitter<Task>();
+  @Output() deleteTask = new EventEmitter<Task>();
+
+  @ViewChild('containerRef') containerRef!: ElementRef<HTMLDivElement>;
+
+  // 📅 NAVEGACIÓN DE SEMANA
+  currentWeekStart: Date = this.getWeekStart(new Date()); // Domingo de la semana actual
+  
+  // 💡 SISTEMA DE TOOLTIP
+  showTooltip: boolean = false;
+  tooltipTask: Task | null = null;
+  tooltipTimeout: any = null;
+
+  // 📱 SISTEMA DE MENÚ CONTEXTUAL
+  showContextMenu: boolean = false;
+  contextMenuTask: Task | null = null;
+  contextMenuX: number = 0;
+  contextMenuY: number = 0;
+  private longPressTimeout: any = null;
+  private longPressStartX: number = 0;
+  private longPressStartY: number = 0;
+  private isTouchActive: boolean = false; // Bandera para rastrear si el toque está activo
+  private readonly LONG_PRESS_DURATION = 500;
+  private readonly LONG_PRESS_MOVE_THRESHOLD = 10;
+
+  // Propiedades de dimensiones
+  svgWidth = 1400;
+  minSvgWidth = 800;
+  hoursAreaHeight = 1440; // 24 horas * 60 minutos = 1440px (1px por minuto)
+  svgHeight = 60 + this.hoursAreaHeight; // Encabezado + área de horas
+  
+  // Ancho de cada columna de día
+  dayColumnWidth = 180;
+  dayColumnPadding = 4;
+  
+  // Espaciado entre columnas
+  columnGap = 2;
+  
+  // Fuentes
+  dayNameFontSize = 14;
+  dayNumberFontSize = 12;
+  hourFontSize = 10;
+  taskFontSize = 11;
+  
+  // Array de horas (0-23)
+  hours: number[] = Array.from({length: 24}, (_, i) => i);
+  
+  // Días de la semana
+  weekDays: WeekDay[] = [];
+  
+  private resizeObserver?: ResizeObserver;
+  private containerPadding = 16;
+
+  // Obtener el domingo de la semana para una fecha dada
+  private getWeekStart(date: Date): Date {
+    const d = new Date(date);
+    const day = d.getDay(); // 0 = domingo, 1 = lunes, etc.
+    const diff = d.getDate() - day; // Diferencia hasta el domingo
+    const sunday = new Date(d.setDate(diff));
+    sunday.setHours(0, 0, 0, 0);
+    return sunday;
+  }
+
+  // Actualizar los días de la semana
+  private updateWeekDays(): void {
+    this.weekDays = [];
+    const weekStart = new Date(this.currentWeekStart);
+    
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(weekStart);
+      day.setDate(weekStart.getDate() + i);
+      
+      const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+      
+      this.weekDays.push({
+        date: new Date(day),
+        dayName: dayNames[i],
+        dayNumber: day.getDate(),
+        monthDay: day.getDate()
+      });
+    }
+  }
+
+  // Obtener posición X de una columna de día
+  getDayColumnX(dayIndex: number): number {
+    return dayIndex * (this.dayColumnWidth + this.columnGap);
+  }
+
+  // Obtener posición Y de una hora
+  getHourY(hour: number): number {
+    // Cada hora ocupa 60px (1440px / 24 horas)
+    return hour * 60;
+  }
+
+  // Verificar si una columna es el día de hoy
+  isTodayColumn(dayIndex: number): boolean {
+    const today = new Date();
+    const day = this.weekDays[dayIndex];
+    if (!day) return false;
+    
+    return day.date.toDateString() === today.toDateString();
+  }
+
+  // Verificar si es la hora actual
+  isCurrentHour(): boolean {
+    const today = new Date();
+    const currentWeekStart = this.getWeekStart(today);
+    const currentWeekEnd = new Date(currentWeekStart);
+    currentWeekEnd.setDate(currentWeekStart.getDate() + 7);
+    
+    return today >= currentWeekStart && today < currentWeekEnd;
+  }
+
+  // Obtener posición Y de la hora actual
+  getCurrentHourY(): number {
+    const now = new Date();
+    const hour = now.getHours();
+    const minutes = now.getMinutes();
+    return (hour * 60) + minutes;
+  }
+
+  // Formatear hora
+  formatHour(hour: number): string {
+    return `${hour.toString().padStart(2, '0')}:00`;
+  }
+
+  // Método utilitario para convertir fechas UTC a hora local
+  private parseUTCToLocal(dateTimeString: string): Date {
+    const utcString = dateTimeString + (dateTimeString.includes('Z') ? '' : 'Z');
+    return new Date(utcString);
+  }
+
+  async ngOnInit() {
+    try {
+      this.loadedProjects = await this.projectService.getProjects();
+    } catch (error) {
+      console.error('Error al cargar proyectos:', error);
+      this.loadedProjects = [];
+    }
+    
+    if (this.projects.length > 0) {
+      this.loadedProjects = this.projects;
+    }
+    
+    this.focusedEnvironmentId = this.timelineFocusService.getCurrentFocusedEnvironmentId();
+    this.focusSubscription = this.timelineFocusService.getFocusedEnvironmentId().subscribe(envId => {
+      const changed = this.focusedEnvironmentId !== envId;
+      this.focusedEnvironmentId = envId;
+      if (changed) {
+        this.cdr.markForCheck();
+        this.cdr.detectChanges();
+        this.updateSvgDimensions();
+      }
+    });
+    
+    this.updateWeekDays();
+    this.updateSvgDimensions();
+  }
+  
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['projects'] && this.projects.length > 0) {
+      this.loadedProjects = this.projects;
+      this.cdr.markForCheck();
+      this.cdr.detectChanges();
+      this.updateSvgDimensions();
+    }
+  }
+
+  ngAfterViewInit() {
+    this.initializeResizeObserver();
+    setTimeout(() => {
+      this.updateSvgDimensions();
+    }, 100);
+  }
+
+  @HostListener('window:resize', ['$event'])
+  onResize(event: any) {
+    this.updateSvgDimensions();
+  }
+
+  private initializeResizeObserver() {
+    if (typeof ResizeObserver !== 'undefined' && this.containerRef?.nativeElement) {
+      this.resizeObserver = new ResizeObserver(() => {
+        this.updateSvgDimensions();
+      });
+      this.resizeObserver.observe(this.containerRef.nativeElement);
+    }
+  }
+
+  private updateSvgDimensions() {
+    if (typeof window === 'undefined') {
+      this.svgWidth = Math.floor(1400);
+      return;
+    }
+
+    const screenWidth = window.innerWidth;
+    let containerWidth = screenWidth;
+
+    if (this.containerRef?.nativeElement) {
+      const rect = this.containerRef.nativeElement.getBoundingClientRect();
+      containerWidth = rect.width;
+    }
+
+    const availableWidth = Math.max(containerWidth - this.containerPadding, this.minSvgWidth);
+
+    // Calcular ancho mínimo necesario para 7 columnas
+    const minRequiredWidth = 7 * (this.dayColumnWidth + this.columnGap) - this.columnGap;
+    
+    if (screenWidth <= 640) {
+      // Móviles: columnas más estrechas
+      this.dayColumnWidth = Math.max(120, (availableWidth - 6 * this.columnGap) / 7);
+      this.dayNameFontSize = 11;
+      this.dayNumberFontSize = 10;
+      this.hourFontSize = 8;
+      this.taskFontSize = 9;
+    } else if (screenWidth <= 1024) {
+      // Tablets
+      this.dayColumnWidth = Math.max(140, (availableWidth - 6 * this.columnGap) / 7);
+      this.dayNameFontSize = 12;
+      this.dayNumberFontSize = 11;
+      this.hourFontSize = 9;
+      this.taskFontSize = 10;
+    } else {
+      // Desktop
+      this.dayColumnWidth = Math.max(180, Math.min(200, (availableWidth - 6 * this.columnGap) / 7));
+      this.dayNameFontSize = 14;
+      this.dayNumberFontSize = 12;
+      this.hourFontSize = 10;
+      this.taskFontSize = 11;
+    }
+
+    this.svgWidth = Math.max(minRequiredWidth, 7 * (this.dayColumnWidth + this.columnGap) - this.columnGap);
+  }
+
+  // Obtener elementos renderizables para un día específico
+  getRenderableItemsForDay(dayIndex: number): RenderableItem[] {
+    const day = this.weekDays[dayIndex];
+    if (!day) return [];
+
+    const dayStart = new Date(day.date);
+    dayStart.setHours(0, 0, 0, 0);
+    
+    const dayEnd = new Date(day.date);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    // Filtrar por ambiente enfocado si hay uno
+    let filteredTasks = this.tasks;
+    if (this.focusedEnvironmentId) {
+      filteredTasks = this.tasks.filter(task => task.environment === this.focusedEnvironmentId);
+    }
+
+    const items: RenderableItem[] = [];
+
+    for (const task of filteredTasks) {
+      const taskStart = this.parseUTCToLocal(task.start);
+      const taskEnd = this.parseUTCToLocal(task.end);
+
+      // Verificar si la tarea se superpone con este día
+      if (taskStart <= dayEnd && taskEnd >= dayStart) {
+        // Si tiene fragmentos, procesarlos
+        if (task.fragments && task.fragments.length > 0) {
+          for (let i = 0; i < task.fragments.length; i++) {
+            const fragment = task.fragments[i];
+            if (fragment.start && fragment.end) {
+              const fragmentStart = this.parseUTCToLocal(fragment.start);
+              const fragmentEnd = this.parseUTCToLocal(fragment.end);
+              
+              if (fragmentStart <= dayEnd && fragmentEnd >= dayStart) {
+                items.push({
+                  type: 'fragment',
+                  task: task,
+                  fragmentIndex: i,
+                  start: fragment.start,
+                  end: fragment.end
+                });
+              }
+            }
+          }
+        } else {
+          // Tarea principal
+          items.push({
+            type: 'task',
+            task: task,
+            start: task.start,
+            end: task.end
+          });
+        }
+      }
+    }
+
+    return items;
+  }
+
+  // Obtener posición X de una tarea dentro de su columna
+  getTaskX(item: RenderableItem, dayIndex: number): number {
+    return this.dayColumnPadding;
+  }
+
+  // Obtener posición Y de una tarea
+  getTaskY(item: RenderableItem, dayIndex: number): number {
+    const itemStart = this.parseUTCToLocal(item.start);
+    const day = this.weekDays[dayIndex];
+    if (!day) return 0;
+
+    const dayStart = new Date(day.date);
+    dayStart.setHours(0, 0, 0, 0);
+
+    // Si la tarea comienza antes del día, empezar desde el inicio del día
+    let effectiveStart: Date;
+    if (itemStart < dayStart) {
+      effectiveStart = new Date(dayStart);
+    } else {
+      effectiveStart = new Date(itemStart);
+    }
+
+    // Calcular minutos desde el inicio del día
+    const minutesFromDayStart = (effectiveStart.getHours() * 60) + effectiveStart.getMinutes();
+    
+    return minutesFromDayStart;
+  }
+
+  // Obtener ancho de una tarea
+  getTaskWidth(item: RenderableItem, dayIndex: number): number {
+    return this.dayColumnWidth - (this.dayColumnPadding * 2);
+  }
+
+  // Obtener altura de una tarea
+  getTaskHeight(item: RenderableItem, dayIndex: number): number {
+    const itemStart = this.parseUTCToLocal(item.start);
+    const itemEnd = this.parseUTCToLocal(item.end);
+    const day = this.weekDays[dayIndex];
+    if (!day) return 0;
+
+    const dayStart = new Date(day.date);
+    dayStart.setHours(0, 0, 0, 0);
+    
+    const dayEnd = new Date(day.date);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    // Ajustar inicio y fin para que estén dentro del día
+    let effectiveStart: Date;
+    let effectiveEnd: Date;
+
+    if (itemStart < dayStart) {
+      effectiveStart = new Date(dayStart);
+    } else {
+      effectiveStart = new Date(itemStart);
+    }
+
+    if (itemEnd > dayEnd) {
+      effectiveEnd = new Date(dayEnd);
+    } else {
+      effectiveEnd = new Date(itemEnd);
+    }
+
+    // Calcular diferencia en minutos
+    const startMinutes = (effectiveStart.getHours() * 60) + effectiveStart.getMinutes();
+    const endMinutes = (effectiveEnd.getHours() * 60) + effectiveEnd.getMinutes();
+    
+    const durationMinutes = Math.max(endMinutes - startMinutes, 15); // Mínimo 15 minutos
+    
+    return durationMinutes;
+  }
+
+  // Obtener texto de una tarea
+  getTaskText(item: RenderableItem, dayIndex: number): string {
+    const emoji = item.task.emoji || '📋';
+    let name = item.task.name || 'Sin título';
+    
+    if (this.focusedEnvironmentId && item.task.project) {
+      const projectsToUse = this.loadedProjects.length > 0 ? this.loadedProjects : this.projects;
+      const project = projectsToUse.find(p => p.id === item.task.project);
+      if (project) {
+        const projectInitials = this.getProjectInitials(project.name);
+        name = `${projectInitials}: ${name}`;
+      }
+    }
+    
+    if (item.type === 'fragment' && item.fragmentIndex !== undefined) {
+      name = `${name} [F${item.fragmentIndex + 1}]`;
+    }
+    
+    const taskWidth = this.getTaskWidth(item, dayIndex);
+    const availableChars = Math.floor(taskWidth / (this.taskFontSize * 0.5));
+    
+    if (availableChars >= name.length) {
+      return `${emoji} ${name}`;
+    } else if (availableChars >= 3) {
+      return `${emoji} ${name.substring(0, availableChars - 3)}...`;
+    } else {
+      return emoji;
+    }
+  }
+
+  getTaskColor(task: Task): string {
+    if (this.focusedEnvironmentId) {
+      const typeColor = this.getTaskTypeColor(task);
+      if (typeColor) {
+        return typeColor;
+      }
+    }
+    
+    if (task.environment && this.environments.length > 0) {
+      const environment = this.environments.find(env => env.id === task.environment);
+      if (environment && environment.color) {
+        return environment.color;
+      }
+    }
+    
+    switch (task.priority) {
+      case 'low': return '#4ade80';
+      case 'medium': return '#60a5fa';
+      case 'high': return '#f87171';
+      case 'critical': return '#f472b6';
+      default: return '#a3a3a3';
+    }
+  }
+
+  getTaskTypeColor(task: Task): string | null {
+    if (!task.type || !this.taskTypes.length) return null;
+    const taskType = this.taskTypes.find(t => t.id === task.type);
+    return taskType?.color || null;
+  }
+
+  getProjectInitials(projectName: string): string {
+    if (!projectName) return '';
+    const withoutSpaces = projectName.replace(/\s+/g, '');
+    return withoutSpaces.substring(0, 3).toUpperCase();
+  }
+
+  getTaskDisplayName(task: Task): string {
+    let name = task.name || 'Sin título';
+    
+    if (this.focusedEnvironmentId && task.project) {
+      const projectsToUse = this.loadedProjects.length > 0 ? this.loadedProjects : this.projects;
+      const project = projectsToUse.find(p => p.id === task.project);
+      if (project) {
+        const projectInitials = this.getProjectInitials(project.name);
+        name = `${projectInitials}: ${name}`;
+      }
+    }
+    
+    return name;
+  }
+
+  getTaskDuration(task: Task): number | null {
+    if (task.fragments && task.fragments.length > 0) {
+      let totalDuration = 0;
+      for (const fragment of task.fragments) {
+        if (fragment.start && fragment.end) {
+          const start = this.parseUTCToLocal(fragment.start);
+          const end = this.parseUTCToLocal(fragment.end);
+          const diffMs = end.getTime() - start.getTime();
+          const diffHours = diffMs / (1000 * 60 * 60);
+          totalDuration += Math.max(0, diffHours);
+        }
+      }
+      return totalDuration > 0 ? totalDuration : null;
+    }
+    
+    if (task.duration && task.duration > 0) {
+      return task.duration;
+    }
+    
+    if (task.start && task.end) {
+      const start = this.parseUTCToLocal(task.start);
+      const end = this.parseUTCToLocal(task.end);
+      const diffMs = end.getTime() - start.getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+      return Math.max(0, diffHours);
+    }
+    
+    return null;
+  }
+
+  formatTaskDuration(hours: number | null): string {
+    if (!hours || hours === 0) return '0 horas';
+    
+    const wholeHours = Math.floor(hours);
+    const minutes = Math.round((hours - wholeHours) * 60);
+    
+    if (minutes === 0) {
+      return `${wholeHours} hora${wholeHours !== 1 ? 's' : ''}`;
+    } else if (wholeHours === 0) {
+      return `${minutes} minutos`;
+    } else {
+      return `${wholeHours} hora${wholeHours !== 1 ? 's' : ''} y ${minutes} minutos`;
+    }
+  }
+
+  formatTaskTime(dateTimeString: string): string {
+    if (!dateTimeString) return '';
+    const date = this.parseUTCToLocal(dateTimeString);
+    return date.toLocaleTimeString('es-ES', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+  }
+
+  // Navegación de semana
+  goToPreviousWeek() {
+    const newDate = new Date(this.currentWeekStart);
+    newDate.setDate(newDate.getDate() - 7);
+    this.currentWeekStart = new Date(newDate);
+    this.updateWeekDays();
+    this.updateSvgDimensions();
+  }
+
+  goToNextWeek() {
+    const newDate = new Date(this.currentWeekStart);
+    newDate.setDate(newDate.getDate() + 7);
+    this.currentWeekStart = new Date(newDate);
+    this.updateWeekDays();
+    this.updateSvgDimensions();
+  }
+
+  goToCurrentWeek() {
+    this.currentWeekStart = this.getWeekStart(new Date());
+    this.updateWeekDays();
+    this.updateSvgDimensions();
+  }
+
+  formatWeekRange(): string {
+    const weekStart = new Date(this.currentWeekStart);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    
+    const startStr = weekStart.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+    const endStr = weekEnd.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+    
+    return `${startStr} - ${endStr}`;
+  }
+
+  getWeekInputValue(): string {
+    const year = this.currentWeekStart.getFullYear();
+    const month = String(this.currentWeekStart.getMonth() + 1).padStart(2, '0');
+    const day = String(this.currentWeekStart.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  onWeekDateChange(dateString: string) {
+    if (dateString) {
+      const [year, month, day] = dateString.split('-').map(Number);
+      const selectedDate = new Date(year, month - 1, day);
+      this.currentWeekStart = this.getWeekStart(selectedDate);
+      this.updateWeekDays();
+      this.updateSvgDimensions();
+    }
+  }
+
+  isCurrentWeek(): boolean {
+    const today = new Date();
+    const currentWeekStart = this.getWeekStart(today);
+    return this.currentWeekStart.toDateString() === currentWeekStart.toDateString();
+  }
+
+  // Sistema de tooltip
+  onTaskClick(task: Task, event: MouseEvent): void {
+    event.stopPropagation();
+    
+    // Cancelar cualquier long press pendiente cuando se hace click (toque normal)
+    // Esto evita que el menú contextual aparezca después de mostrar el tooltip
+    this.cancelLongPress();
+    
+    // Cerrar el menú contextual si está abierto
+    if (this.showContextMenu) {
+      this.closeContextMenu();
+    }
+    
+    if (this.showTooltip && this.tooltipTask && this.tooltipTask.id === task.id) {
+      this.hideTooltip();
+      return;
+    }
+    
+    this.showTaskTooltip(task);
+  }
+
+  showTaskTooltip(task: Task): void {
+    if (this.tooltipTimeout) {
+      clearTimeout(this.tooltipTimeout);
+    }
+
+    this.tooltipTask = task;
+    this.showTooltip = true;
+
+    this.tooltipTimeout = setTimeout(() => {
+      this.hideTooltip();
+    }, 4000);
+  }
+
+  hideTooltip(): void {
+    this.showTooltip = false;
+    this.tooltipTask = null;
+    if (this.tooltipTimeout) {
+      clearTimeout(this.tooltipTimeout);
+      this.tooltipTimeout = null;
+    }
+  }
+
+  onTaskDoubleClick(task: Task, event: MouseEvent): void {
+    event.stopPropagation();
+    this.hideTooltip();
+    this.editTask.emit(task);
+  }
+
+  // Menú contextual
+  onTaskContextMenu(task: Task, event: MouseEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.showTaskContextMenu(task, event.clientX, event.clientY);
+  }
+
+  onTaskTouchStart(task: Task, event: TouchEvent): void {
+    if (event.touches.length !== 1) return;
+    
+    // Cancelar cualquier long press previo que pueda estar pendiente
+    this.cancelLongPress();
+    
+    // Marcar que el toque está activo
+    this.isTouchActive = true;
+    
+    const touch = event.touches[0];
+    this.longPressStartX = touch.clientX;
+    this.longPressStartY = touch.clientY;
+    
+    // Guardar referencia a la tarea para el long press
+    const taskForLongPress = task;
+    
+    this.longPressTimeout = setTimeout(() => {
+      // Solo mostrar el menú si el toque aún está activo (el dedo sigue presionado)
+      if (this.longPressTimeout && this.isTouchActive) {
+        this.showTaskContextMenu(taskForLongPress, this.longPressStartX, this.longPressStartY);
+        if ('vibrate' in navigator) {
+          navigator.vibrate(50);
+        }
+        // Marcar que el toque ya no está activo después de mostrar el menú
+        this.isTouchActive = false;
+      }
+    }, this.LONG_PRESS_DURATION);
+  }
+
+  onTaskTouchMove(event: TouchEvent): void {
+    if (!this.longPressTimeout) return;
+    
+    if (event.touches.length === 1) {
+      const touch = event.touches[0];
+      const deltaX = Math.abs(touch.clientX - this.longPressStartX);
+      const deltaY = Math.abs(touch.clientY - this.longPressStartY);
+      
+      if (deltaX > this.LONG_PRESS_MOVE_THRESHOLD || deltaY > this.LONG_PRESS_MOVE_THRESHOLD) {
+        this.cancelLongPress();
+      }
+    }
+  }
+
+  onTaskTouchEnd(event: TouchEvent): void {
+    // Marcar que el toque ya no está activo
+    this.isTouchActive = false;
+    // Cancelar el long press timeout
+    this.cancelLongPress();
+  }
+
+  private cancelLongPress(): void {
+    if (this.longPressTimeout) {
+      clearTimeout(this.longPressTimeout);
+      this.longPressTimeout = null;
+    }
+    // También marcar que el toque ya no está activo cuando se cancela
+    this.isTouchActive = false;
+  }
+
+  showTaskContextMenu(task: Task, x: number, y: number): void {
+    this.hideTooltip();
+    
+    this.contextMenuTask = task;
+    this.contextMenuX = x;
+    this.contextMenuY = y;
+    this.showContextMenu = true;
+  }
+
+  closeContextMenu(): void {
+    this.showContextMenu = false;
+    this.contextMenuTask = null;
+  }
+
+  deleteTaskFromContextMenu(): void {
+    if (this.contextMenuTask) {
+      this.deleteTask.emit(this.contextMenuTask);
+      this.closeContextMenu();
+    }
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    if (this.showContextMenu) {
+      this.closeContextMenu();
+    }
+    if (this.showTooltip) {
+      this.hideTooltip();
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (this.tooltipTimeout) {
+      clearTimeout(this.tooltipTimeout);
+    }
+    if (this.longPressTimeout) {
+      clearTimeout(this.longPressTimeout);
+    }
+    if (this.focusSubscription) {
+      this.focusSubscription.unsubscribe();
+    }
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+    }
+  }
+}
+

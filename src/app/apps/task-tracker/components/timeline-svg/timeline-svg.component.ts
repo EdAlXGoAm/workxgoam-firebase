@@ -610,6 +610,7 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
   private longPressTimeout: any = null;
   private longPressStartX: number = 0;
   private longPressStartY: number = 0;
+  private isTouchActive: boolean = false; // Bandera para rastrear si el toque está activo
   private readonly LONG_PRESS_DURATION = 500; // 500ms para activar long press
   private readonly LONG_PRESS_MOVE_THRESHOLD = 10; // 10px de movimiento permitido
 
@@ -1384,6 +1385,15 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
   onTaskClick(task: Task, event: MouseEvent): void {
     event.stopPropagation();
     
+    // Cancelar cualquier long press pendiente cuando se hace click (toque normal)
+    // Esto evita que el menú contextual aparezca después de mostrar el tooltip
+    this.cancelLongPress();
+    
+    // Cerrar el menú contextual si está abierto
+    if (this.showContextMenu) {
+      this.closeContextMenu();
+    }
+    
     // Si el tooltip ya está visible para la misma tarea, ocultarlo
     if (this.showTooltip && this.tooltipTask && this.tooltipTask.id === task.id) {
       this.hideTooltip();
@@ -1597,19 +1607,33 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
   onTaskTouchStart(task: Task, event: TouchEvent): void {
     if (event.touches.length !== 1) return;
     
+    // Cancelar cualquier long press previo que pueda estar pendiente
+    this.cancelLongPress();
+    
+    // Marcar que el toque está activo
+    this.isTouchActive = true;
+    
     const touch = event.touches[0];
     this.longPressStartX = touch.clientX;
     this.longPressStartY = touch.clientY;
     
     console.log('👆 Touch start en tarea:', task.name);
     
+    // Guardar referencia a la tarea para el long press
+    const taskForLongPress = task;
+    
     // Iniciar timer para long press
     this.longPressTimeout = setTimeout(() => {
-      console.log('⏱️ Long press detectado en tarea:', task.name);
-      this.showTaskContextMenu(task, touch.clientX, touch.clientY);
-      // Vibración opcional en dispositivos móviles
-      if ('vibrate' in navigator) {
-        navigator.vibrate(50);
+      // Solo mostrar el menú si el toque aún está activo (el dedo sigue presionado)
+      if (this.longPressTimeout && this.isTouchActive) {
+        console.log('⏱️ Long press detectado en tarea:', taskForLongPress.name);
+        this.showTaskContextMenu(taskForLongPress, this.longPressStartX, this.longPressStartY);
+        // Vibración opcional en dispositivos móviles
+        if ('vibrate' in navigator) {
+          navigator.vibrate(50);
+        }
+        // Marcar que el toque ya no está activo después de mostrar el menú
+        this.isTouchActive = false;
       }
     }, this.LONG_PRESS_DURATION);
   }
@@ -1633,6 +1657,9 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
 
   // Touch end - cancelar long press si no se completó
   onTaskTouchEnd(event: TouchEvent): void {
+    // Marcar que el toque ya no está activo
+    this.isTouchActive = false;
+    // Cancelar el long press timeout
     this.cancelLongPress();
   }
 
@@ -1642,6 +1669,8 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
       clearTimeout(this.longPressTimeout);
       this.longPressTimeout = null;
     }
+    // También marcar que el toque ya no está activo cuando se cancela
+    this.isTouchActive = false;
   }
 
   // Mostrar menú contextual

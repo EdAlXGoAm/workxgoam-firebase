@@ -23,9 +23,9 @@
             <i class="fas fa-columns md:mr-2"></i>
             <span class="hidden sm:inline">Tablero</span>
           </button>
-          <button (click)="switchView('timeline')" [class.bg-indigo-600]="currentView === 'timeline'" [class.text-white]="currentView === 'timeline'" [class.bg-white]="currentView !== 'timeline'" [class.text-gray-700]="currentView !== 'timeline'" class="px-2 py-1.5 md:px-4 md:py-2 rounded-lg text-sm md:font-medium hover:bg-gray-100">
-            <i class="fas fa-stream md:mr-2"></i>
-            <span class="hidden sm:inline">Línea del Tiempo</span>
+          <button (click)="switchView('week')" [class.bg-indigo-600]="currentView === 'week'" [class.text-white]="currentView === 'week'" [class.bg-white]="currentView !== 'week'" [class.text-gray-700]="currentView !== 'week'" class="px-2 py-1.5 md:px-4 md:py-2 rounded-lg text-sm md:font-medium hover:bg-gray-100">
+            <i class="fas fa-calendar-week md:mr-2"></i>
+            <span class="hidden sm:inline">Semanal</span>
           </button>
           <button (click)="openManagementModal()" class="px-2 py-1.5 md:px-4 md:py-2 rounded-lg text-sm md:font-medium bg-gray-200 text-gray-700 hover:bg-gray-300">
             <i class="fas fa-cog md:mr-2"></i>
@@ -76,29 +76,35 @@
         (loadOrderFromDatabase)="loadOrderFromDatabase()">
       </app-board-view>
 
-      <!-- Timeline View -->
-      <div *ngIf="currentView === 'timeline'" class="w-full bg-white rounded-lg shadow-md p-4">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-xl font-bold">Línea del Tiempo</h2>
-          <div *ngIf="focusedEnvironment.id" class="flex items-center gap-2 px-3 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-sm">
-            <i class="fas fa-bullseye"></i>
-            <span>Enfocado: {{ getEnvironmentName(focusedEnvironment.id) }}</span>
-            <button (click)="toggleFocusEnvironment(focusedEnvironment.id!)" 
-                    class="ml-2 text-indigo-600 hover:text-indigo-800" 
-                    title="Desenfocar ambiente">
-              <i class="fas fa-times"></i>
-            </button>
-          </div>
-        </div>
-        <app-timeline-svg 
-          [tasks]="tasks" 
-          [environments]="environments" 
-          [taskTypes]="taskTypes" 
-          [projects]="projects" 
-          (editTask)="editTask($event)"
-          (deleteTask)="deleteTaskFromTimeline($event)">
-        </app-timeline-svg>
-      </div>
+      <!-- Week View -->
+      <app-week-view *ngIf="currentView === 'week'"
+        [tasks]="filteredTasks"
+        [projects]="projects"
+        [environments]="environments"
+        [taskTypes]="taskTypes"
+        [showHidden]="showHidden"
+        [environmentHiddenVisibility]="environmentHiddenVisibility"
+        [environmentViewMode]="environmentViewMode"
+        [environmentSortOrder]="environmentSortOrder"
+        [environmentCustomOrder]="environmentCustomOrder"
+        [isLoadingEnvironmentOrder]="isLoadingEnvironmentOrder"
+        [isSavingOrderToDatabase]="isSavingOrderToDatabase"
+        [isLoadingOrderFromDatabase]="isLoadingOrderFromDatabase"
+        [orderSyncMessage]="orderSyncMessage"
+        [orderSyncMessageType]="orderSyncMessageType"
+        (editTask)="editTask($event)"
+        (deleteTask)="deleteTaskFromTimeline($event)"
+        (moveEnvironmentUp)="moveEnvironmentUp($event)"
+        (moveEnvironmentDown)="moveEnvironmentDown($event)"
+        (taskContextMenu)="onTaskContextMenu($event.mouseEvent, $event.task)"
+        (taskQuickContextMenu)="onTaskQuickContextMenu($event.mouseEvent, $event.task)"
+        (environmentContextMenu)="onEnvironmentContextMenu($event.mouseEvent, $event.environment)"
+        (projectContextMenu)="onProjectContextMenu($event.mouseEvent, $event.project)"
+        (addTaskToProject)="openNewTaskModalForProject($event.environmentId, $event.projectId)"
+        (createProject)="createProjectForEnvironment($event)"
+        (saveOrderToDatabase)="saveOrderToDatabase()"
+        (loadOrderFromDatabase)="loadOrderFromDatabase()">
+      </app-week-view>
     </div>
   </main>
 

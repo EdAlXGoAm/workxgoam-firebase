@@ -18,6 +18,7 @@ import { RemindersModalComponent } from './components/reminders-modal/reminders-
 import { TaskTrackerHeaderComponent } from './components/amain_components/task-tracker-header';
 import { EnvironmentModalComponent } from './components/environment-modal/environment-modal.component';
 import { BoardViewComponent } from './components/amain_components/board-view';
+import { WeekViewComponent } from './components/amain_components/week-view';
 import { ChangeStatusModalComponent } from './components/change-status-modal/change-status-modal';
 import { DateRangeModalComponent } from './components/date-range-modal/date-range-modal.component';
 import { TaskTypeModalComponent } from './components/task-type-modal/task-type-modal.component';
@@ -29,7 +30,7 @@ import { CustomSelectComponent, SelectOption } from './components/custom-select/
 @Component({
   selector: 'app-task-tracker',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, TimelineSvgComponent, CurrentTaskInfoComponent, TaskModalComponent, RemindersModalComponent, TaskTrackerHeaderComponent, EnvironmentModalComponent, BoardViewComponent, ChangeStatusModalComponent, DateRangeModalComponent, TaskTypeModalComponent, CustomSelectComponent],
+  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, TimelineSvgComponent, CurrentTaskInfoComponent, TaskModalComponent, RemindersModalComponent, TaskTrackerHeaderComponent, EnvironmentModalComponent, BoardViewComponent, WeekViewComponent, ChangeStatusModalComponent, DateRangeModalComponent, TaskTypeModalComponent, CustomSelectComponent],
   templateUrl: './task-tracker.component.html',
   styleUrls: ['./task-tracker.component.css']
 })
@@ -37,7 +38,7 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
   @ViewChild('newTaskModal') newTaskModal?: TaskModalComponent;
   @ViewChild('editTaskModal') editTaskModal?: TaskModalComponent;
   
-  currentView: 'board' | 'timeline' = 'board';
+  currentView: 'board' | 'week' = 'board';
   showNewTaskModal = false;
   searchQuery = '';
   userName = '';
@@ -461,7 +462,7 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     }
   }
 
-  switchView(view: 'board' | 'timeline') {
+  switchView(view: 'board' | 'week') {
     this.currentView = view;
   }
 
