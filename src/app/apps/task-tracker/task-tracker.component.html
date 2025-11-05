@@ -1,0 +1,468 @@
+<div class="min-h-screen bg-gray-50">
+  <!-- Header -->
+  <app-task-tracker-header
+    [userName]="userName"
+    [userPhotoUrl]="userPhotoUrl"
+    (createTask)="openNewTaskModal()">
+  </app-task-tracker-header>
+
+  <!-- Main Content -->
+  <main class="max-w-7xl mx-auto px-4 py-6">
+    <!-- Current Task Info Card -->
+    <app-current-task-info 
+      [tasks]="tasks" 
+      [projects]="projects" 
+      [environments]="environments">
+    </app-current-task-info>
+
+    <!-- View Selector -->
+    <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+      <div class="flex flex-wrap justify-between items-center">
+        <div class="flex space-x-2 mb-4 md:mb-0">
+          <button (click)="switchView('board')" [class.bg-indigo-600]="currentView === 'board'" [class.text-white]="currentView === 'board'" [class.bg-white]="currentView !== 'board'" [class.text-gray-700]="currentView !== 'board'" class="px-4 py-2 rounded-lg font-medium hover:bg-gray-100">
+            <i class="fas fa-columns mr-2"></i>Tablero
+          </button>
+          <button (click)="switchView('timeline')" [class.bg-indigo-600]="currentView === 'timeline'" [class.text-white]="currentView === 'timeline'" [class.bg-white]="currentView !== 'timeline'" [class.text-gray-700]="currentView !== 'timeline'" class="px-4 py-2 rounded-lg font-medium hover:bg-gray-100">
+            <i class="fas fa-stream mr-2"></i>Línea del Tiempo
+          </button>
+          <button (click)="openManagementModal()" class="px-4 py-2 rounded-lg font-medium bg-gray-200 text-gray-700 hover:bg-gray-300">
+            <i class="fas fa-cog mr-2"></i>Gestionar
+          </button>
+        </div>
+        <div class="flex items-center space-x-2">
+          <div class="relative">
+            <input type="text" [(ngModel)]="searchQuery" (input)="filterTasks()" placeholder="Buscar tareas..." class="pl-10 pr-4 py-2 border rounded-lg w-full md:w-64">
+            <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+          </div>
+          <button (click)="toggleShowHidden()" class="p-2 hover:text-indigo-600" [class.text-indigo-600]="showHidden">
+            <i class="fas fa-filter"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Views Container -->
+    <div class="views-container">
+      <!-- Board View -->
+      <app-board-view *ngIf="currentView === 'board'"
+        [tasks]="filteredTasks"
+        [projects]="projects"
+        [environments]="environments"
+        [showHidden]="showHidden"
+        [environmentHiddenVisibility]="environmentHiddenVisibility"
+        [environmentViewMode]="environmentViewMode"
+        (editTask)="editTask($event)"
+        (taskContextMenu)="onTaskContextMenu($event.mouseEvent, $event.task)"
+        (taskQuickContextMenu)="onTaskQuickContextMenu($event.mouseEvent, $event.task)"
+        (environmentContextMenu)="onEnvironmentContextMenu($event.mouseEvent, $event.environment)"
+        (projectContextMenu)="onProjectContextMenu($event.mouseEvent, $event.project)"
+        (addTaskToProject)="openNewTaskModalForProject($event.environmentId, $event.projectId)"
+        (createProject)="createProjectForEnvironment($event)">
+      </app-board-view>
+
+      <!-- Timeline View -->
+      <div *ngIf="currentView === 'timeline'" class="w-full bg-white rounded-lg shadow-md p-4">
+        <h2 class="text-xl font-bold mb-4">Línea del Tiempo</h2>
+        <app-timeline-svg [tasks]="tasks" [environments]="environments" (editTask)="editTask($event)"></app-timeline-svg>
+      </div>
+    </div>
+  </main>
+
+  <!-- Tareas Huérfanas Section -->
+  <section *ngIf="orphanedTasks.length > 0" class="max-w-7xl mx-auto px-4 py-6">
+    <div class="bg-white rounded-lg shadow-md p-4">
+      <h2 class="text-xl font-bold mb-4 text-orange-600">Tareas Sin Asignar (Huérfanas)</h2>
+      <p class="text-sm text-gray-600 mb-4">
+        Estas tareas no están asociadas a ningún entorno o proyecto. Puedes seleccionarlas y asignarlas a un proyecto existente.
+      </p>
+      <div class="mb-4 flex justify-between items-center">
+        <button (click)="openAssignOrphanedTasksModal()" 
+                [disabled]="noOrphanedSelected || isAssigningOrphanedTasks"
+                class="bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50">
+          <i class="fas fa-check-double mr-2"></i>
+          {{ isAssigningOrphanedTasks ? 'Asignando...' : 'Asignar Seleccionadas' }}
+        </button>
+        <div *ngIf="orphanedTasks.length > 0" class="flex items-center">
+            <input type="checkbox" id="selectAllOrphaned" 
+                   [checked]="allOrphanedSelected" 
+                   (change)="toggleSelectAllOrphaned($event)"
+                   class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 mr-2">
+            <label for="selectAllOrphaned" class="text-sm text-gray-700">Seleccionar todas</label>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sel.</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prioridad</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <tr *ngFor="let task of orphanedTasks" [class.bg-indigo-50]="selectedOrphanedTasks[task.id]">
+              <td class="px-6 py-4 whitespace-nowrap">
+                <input type="checkbox" [(ngModel)]="selectedOrphanedTasks[task.id]" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm font-medium text-gray-900">
+                  {{ task.emoji }} {{ task.name }}
+                  <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-sm ml-2" title="Tarea oculta"></i>
+                </div>
+              </td>
+              <td class="px-6 py-4 text-sm text-gray-500 truncate max-w-xs">{{ task.description || '-' }}</td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                      [class.bg-green-100]="task.priority === 'low'" [class.text-green-800]="task.priority === 'low'"
+                      [class.bg-blue-100]="task.priority === 'medium'" [class.text-blue-800]="task.priority === 'medium'"
+                      [class.bg-red-100]="task.priority === 'high'" [class.text-red-800]="task.priority === 'high'"
+                      [class.bg-pink-100]="task.priority === 'critical'" [class.text-pink-800]="task.priority === 'critical'">
+                  {{ task.priority }}
+                </span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                <button (click)="editTask(task)" class="text-indigo-600 hover:text-indigo-900 mr-3">
+                  <i class="fas fa-pencil-alt mr-1"></i>Editar
+                </button>
+                <button (click)="deleteTask(task)" class="text-red-600 hover:text-red-900">
+                  <i class="fas fa-trash mr-1"></i>Eliminar
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Modals -->
+  <app-management-modal 
+    *ngIf="showManagementModal" 
+    [showModal]="showManagementModal"
+    [environments]="environments"
+    [projects]="projects"
+    (closeModal)="closeManagementModal()"
+  ></app-management-modal>
+
+  <!-- Assign Orphaned Tasks Modal -->
+  <div *ngIf="showAssignOrphanedTasksModal" class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-bold">Asignar Tareas a Proyecto</h3>
+          <button (click)="closeAssignOrphanedTasksModal()" class="text-gray-400 hover:text-gray-600">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <form (ngSubmit)="assignSelectedOrphanedTasks()" class="space-y-4">
+          <div>
+            <label for="assignProjectTarget" class="block text-sm font-medium text-gray-700">Seleccionar Proyecto Destino</label>
+            <select id="assignProjectTarget" name="assignProjectTarget" [(ngModel)]="projectForAssigningOrphans" required
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white">
+              <option value="" disabled>Elige un proyecto...</option>
+              <option *ngFor="let proj of projects" [value]="proj.id">
+                {{ proj.name }} (Entorno: {{ getEnvironmentName(proj.environment) || 'N/A' }})
+              </option>
+            </select>
+          </div>
+          <div class="flex justify-end space-x-3 pt-4">
+            <button type="button" (click)="closeAssignOrphanedTasksModal()"
+                    class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+              Cancelar
+            </button>
+            <button type="submit" [disabled]="!projectForAssigningOrphans || isAssigningOrphanedTasks"
+                    class="px-4 py-2 bg-indigo-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50">
+              {{ isAssigningOrphanedTasks ? 'Asignando...' : 'Confirmar Asignación' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Task Modal -->
+  <app-task-modal
+    *ngIf="showNewTaskModal"
+    [showModal]="showNewTaskModal"
+    [isEditing]="false"
+    [task]="newTask"
+    [environments]="orderedEnvironments"
+    [projects]="projects"
+    (closeModalEvent)="closeNewTaskModal()"
+    (saveTaskEvent)="saveTask()"
+    (openEnvironmentModal)="openNewEnvironmentModal()"
+    (openProjectModal)="openNewProjectModal()"
+    (openRemindersModal)="openRemindersModal('new')"
+    (openCalculatorModal)="openTimeCalculator($event.type, 'new')">
+  </app-task-modal>
+
+  <!-- New Environment Modal -->
+  <app-environment-modal
+    *ngIf="showNewEnvironmentModal"
+    [showModal]="showNewEnvironmentModal"
+    [suggestedColors]="suggestedColors"
+    [initialEnvironment]="newEnvironment"
+    (closeModal)="closeNewEnvironmentModal()"
+    (saveEnvironment)="onSaveNewEnvironment($event)">
+  </app-environment-modal>
+
+  <!-- New Project Modal -->
+  <div *ngIf="showNewProjectModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-bold">Nuevo Proyecto</h3>
+          <button (click)="closeNewProjectModal()" class="text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        
+        <form (ngSubmit)="saveNewProject()" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Nombre del proyecto</label>
+            <input type="text" [(ngModel)]="newProject.name" name="projectName" class="w-full px-3 py-2 border rounded-lg" required>
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+            <textarea [(ngModel)]="newProject.description" name="projectDescription" rows="3" class="w-full px-3 py-2 border rounded-lg"></textarea>
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Ambiente</label>
+            <select [(ngModel)]="newProject.environment" name="projectEnvironment" class="w-full px-3 py-2 border rounded-lg bg-white" required>
+              <option value="" disabled>Seleccionar ambiente</option>
+              <option *ngFor="let env of orderedEnvironments" [value]="env.id">{{env.name}}</option>
+            </select>
+          </div>
+          
+          <div class="flex justify-end space-x-3 pt-4">
+            <button type="button" (click)="closeNewProjectModal()" class="px-4 py-2 border rounded-lg font-medium">
+              Cancelar
+            </button>
+            <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700">
+              Guardar Proyecto
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Context Menu -->
+  <div *ngIf="showContextMenu" 
+       class="context-menu" 
+       [style.left]="contextMenuPosition.x + 'px'" 
+       [style.top]="contextMenuPosition.y + 'px'"
+       (click)="$event.stopPropagation()">
+    <div class="context-menu-item" (click)="editTask(selectedTask!)">
+      <i class="fas fa-edit"></i>
+      <span>Editar</span>
+    </div>
+    <div class="context-menu-item" (click)="deleteTask(selectedTask!)">
+      <i class="fas fa-trash"></i>
+      <span>Eliminar</span>
+    </div>
+    <div class="context-menu-item" (click)="toggleHidden(selectedTask!)">
+      <i class="fas" [ngClass]="selectedTask!.hidden ? 'fa-eye' : 'fa-eye-slash'"></i>
+      <span>{{ selectedTask!.hidden ? 'Mostrar' : 'Ocultar' }}</span>
+    </div>
+    <div class="context-menu-item context-menu-item-completed" (click)="changeStatus(selectedTask!, 'completed')" *ngIf="selectedTask?.status !== 'completed'">
+      <i class="fas fa-check"></i>
+      <span>Marcar completada</span>
+    </div>
+    <div class="context-menu-item context-menu-item-progress" (click)="changeStatus(selectedTask!, 'in-progress')" *ngIf="selectedTask?.status !== 'in-progress'">
+      <i class="fas fa-spinner"></i>
+      <span>Marcar en progreso</span>
+    </div>
+    <div class="context-menu-item context-menu-item-pending" (click)="changeStatus(selectedTask!, 'pending')" *ngIf="selectedTask?.status !== 'pending'">
+      <i class="fas fa-play"></i>
+      <span>Marcar pendiente</span>
+    </div>
+  </div>
+
+  <!-- Quick Context Menu (Completar y Ocultar) -->
+  <div *ngIf="showQuickContextMenu"
+       class="context-menu"
+       [style.left]="quickContextMenuPosition.x + 'px'"
+       [style.top]="quickContextMenuPosition.y + 'px'"
+       (click)="$event.stopPropagation()">
+    <div class="context-menu-item context-menu-item-completed" (click)="completeAndHide(selectedTask!)">
+      <i class="fas fa-check"></i>
+      <span>Completar y Ocultar</span>
+    </div>
+  </div>
+
+  <!-- Environment Context Menu -->
+  <div *ngIf="showEnvironmentContextMenu" 
+       class="context-menu environment-context-menu" 
+       [style.left]="environmentContextMenuPosition.x + 'px'" 
+       [style.top]="environmentContextMenuPosition.y + 'px'"
+       (click)="$event.stopPropagation()">
+    <div class="context-menu-item" (click)="createProjectForEnvironment(selectedEnvironment!.id)">
+      <i class="fas fa-folder-plus"></i>
+      <span>Crear Proyecto</span>
+    </div>
+    <hr class="my-1 border-gray-200">
+    <!-- Opciones de visibilidad de tareas ocultas -->
+    <div class="context-menu-item" 
+         [class.context-menu-item-active]="getEnvironmentHiddenVisibility(selectedEnvironment!.id) === 'show-all'"
+         (click)="setEnvironmentHiddenVisibility(selectedEnvironment!.id, 'show-all')">
+      <i class="fas fa-eye"></i>
+      <span>Mostrar ocultos</span>
+    </div>
+    <div class="context-menu-item" 
+         [class.context-menu-item-active]="getEnvironmentHiddenVisibility(selectedEnvironment!.id) === 'show-24h'"
+         (click)="setEnvironmentHiddenVisibility(selectedEnvironment!.id, 'show-24h')">
+      <i class="fas fa-clock"></i>
+      <span>Mostrar ocultos 24h</span>
+    </div>
+    <div class="context-menu-item" 
+         [class.context-menu-item-active]="getEnvironmentHiddenVisibility(selectedEnvironment!.id) === 'hidden'"
+         (click)="setEnvironmentHiddenVisibility(selectedEnvironment!.id, 'hidden')">
+      <i class="fas fa-eye-slash"></i>
+      <span>Ocultar ocultos</span>
+    </div>
+    <hr class="my-1 border-gray-200">
+    <!-- Alternar vista de proyectos/tareas dentro del ambiente -->
+    <div class="context-menu-item" (click)="toggleEnvironmentViewMode(selectedEnvironment!.id)">
+      <i class="fas" [ngClass]="getEnvironmentViewMode(selectedEnvironment!.id) === 'cards' ? 'fa-list' : 'fa-th-large'"></i>
+      <span>{{ getEnvironmentViewMode(selectedEnvironment!.id) === 'cards' ? 'Ver lista' : 'Ver tarjetas' }}</span>
+    </div>
+    <hr class="my-1 border-gray-200">
+    <div class="context-menu-item context-menu-item-danger" (click)="deleteEnvironment(selectedEnvironment!)">
+      <i class="fas fa-trash"></i>
+      <span>Eliminar Ambiente</span>
+    </div>
+  </div>
+
+  <!-- Project Context Menu -->
+  <div *ngIf="showProjectContextMenu" 
+       class="context-menu project-context-menu" 
+       [style.left]="projectContextMenuPosition.x + 'px'" 
+       [style.top]="projectContextMenuPosition.y + 'px'"
+       (click)="$event.stopPropagation()">
+    <div class="context-menu-item context-menu-item-danger" (click)="deleteProject(selectedProject!)">
+      <i class="fas fa-trash"></i>
+      <span>Eliminar Proyecto</span>
+    </div>
+  </div>
+
+  <!-- Edit Task Modal -->
+  <app-task-modal
+    *ngIf="showEditTaskModal"
+    [showModal]="showEditTaskModal"
+    [isEditing]="true"
+    [task]="selectedTask || {}"
+    [environments]="orderedEnvironments"
+    [projects]="projects"
+    (closeModalEvent)="showEditTaskModal = false"
+    (saveTaskEvent)="saveEditedTask()"
+    (openEnvironmentModal)="openNewEnvironmentModal()"
+    (openProjectModal)="openNewProjectModal()"
+    (openRemindersModal)="openRemindersModal('edit')"
+    (openCalculatorModal)="openTimeCalculator($event.type, 'edit')">
+  </app-task-modal>
+
+  <!-- Time Calculator Modal -->
+  <div *ngIf="showTimeCalculatorModal" 
+       class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+       (mousedown)="onCalculatorBackdropMouseDown($event)"
+       (mouseup)="onCalculatorBackdropMouseUp($event)">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-md"
+         (mousedown)="$event.stopPropagation()"
+         (mouseup)="$event.stopPropagation()">
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-bold">
+            Calcular {{ calculatorType === 'start' ? 'Hora de Inicio' : 'Hora de Fin' }}
+          </h3>
+          <button (click)="closeTimeCalculator()" class="text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              {{ calculatorType === 'start' ? 'Restar de la hora de fin:' : 'Sumar a la hora de inicio:' }}
+            </label>
+            <input 
+              type="text" 
+              [(ngModel)]="calculatorInput"
+              (input)="validateCalculatorInput()"
+              placeholder="ej: 1.5, 2h, 30, 1.5+0.5"
+              class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              [class.border-red-500]="calculatorError && calculatorInput"
+              [class.border-green-500]="calculatorIsValid && calculatorInput">
+          </div>
+          
+          <div class="text-sm text-gray-600">
+            <p class="mb-1"><strong>Formatos válidos:</strong></p>
+            <ul class="list-disc pl-5 space-y-1">
+              <li><strong>Minutos:</strong> 30, 45, 90</li>
+              <li><strong>Horas:</strong> 1h, 2.5h, 1.25 h</li>
+              <li><strong>Operaciones:</strong> 1+0.5, 2*1.5, 3-0.25h</li>
+              <li><strong>Con paréntesis:</strong> (45) h, (1.5+0.5) h, (2*1.5) h</li>
+            </ul>
+          </div>
+          
+          <div *ngIf="calculatorError && calculatorInput" class="bg-red-50 border border-red-200 rounded-lg p-3">
+            <div class="flex items-center">
+              <i class="fas fa-exclamation-triangle text-red-600 mr-2"></i>
+              <span class="text-red-600 text-sm">{{ calculatorError }}</span>
+            </div>
+          </div>
+          
+          <div *ngIf="calculatorIsValid && calculatorInput" class="bg-green-50 border border-green-200 rounded-lg p-3">
+            <div class="flex items-center">
+              <i class="fas fa-check-circle text-green-600 mr-2"></i>
+              <span class="text-green-600 text-sm">{{ getCalculatorPreview() }}</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="flex justify-end space-x-3 pt-6">
+          <button type="button" (click)="closeTimeCalculator()" class="px-4 py-2 border rounded-lg font-medium">
+            Cancelar
+          </button>
+          <button 
+            type="button" 
+            (click)="applyTimeCalculation()"
+            [disabled]="!calculatorIsValid || !calculatorInput"
+            [class.opacity-50]="!calculatorIsValid || !calculatorInput"
+            [class.cursor-not-allowed]="!calculatorIsValid || !calculatorInput"
+            class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:hover:bg-indigo-600">
+            <i class="fas fa-calculator mr-2"></i>Calcular
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status Change Confirmation Modal -->
+  <app-change-status-modal
+    *ngIf="showStatusChangeModal"
+    [statusChangeWillHide]="statusChangeWillHide"
+    [pendingStatusChange]="pendingStatusChange"
+    (closeModal)="closeStatusChangeModal()"
+    (confirmChangeVisibility)="confirmStatusChangeWithVisibility($event)">
+  </app-change-status-modal>
+
+  <!-- Modal de Gestión de Recordatorios -->
+  <app-reminders-modal
+    *ngIf="showRemindersModal"
+    [showModal]="showRemindersModal"
+    [reminders]="remindersModalContext === 'new' ? (newTask.reminders || []) : (selectedTask?.reminders || [])"
+    [taskDates]="{
+      start: remindersModalContext === 'new' ? newTask.start : selectedTask?.start,
+      end: remindersModalContext === 'new' ? newTask.end : selectedTask?.end,
+      deadline: remindersModalContext === 'new' ? newTask.deadline : selectedTask?.deadline
+    }"
+    (closeModalEvent)="closeRemindersModal()"
+    (remindersChanged)="remindersModalContext === 'new' ? (newTask.reminders = $event) : (selectedTask ? selectedTask.reminders = $event : null)">
+  </app-reminders-modal>
+</div>
+

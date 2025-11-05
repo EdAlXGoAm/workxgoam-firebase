@@ -1,0 +1,339 @@
+.priority-low { background-color: #4caf50; }
+.priority-medium { background-color: #ff9800; }
+.priority-high { background-color: #f44336; }
+.priority-critical { background-color: #9c27b0; }
+
+.board-column {
+  min-height: 200px;
+  max-height: 50vh;
+  background-color: #f3f4f6;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.environment-header {
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  background-color: #f3f4f6;
+  z-index: 10;
+  border-radius: 8px 8px 0 0;
+}
+
+.environment-content {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 1rem;
+}
+
+.environment-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.environment-content::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.environment-content::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.environment-content::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+.task-card {
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.task-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+}
+.task-list-item {
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  max-width: 75%;
+}
+.task-list-item:hover {
+  background: #f9fafb;
+}
+.day-separator {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: #6b7280;
+  font-size: 12px;
+  margin: 8px 0;
+}
+.day-separator::before,
+.day-separator::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #e5e7eb;
+}
+.day-separator:not(:empty)::before { margin-right: .5em; }
+.day-separator:not(:empty)::after { margin-left: .5em; }
+
+.emoji-picker {
+  position: absolute;
+  top: 100%;
+  margin-top: 8px;
+  right: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 10px;
+  width: 300px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 1000;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.emoji-option {
+  font-size: 20px;
+  padding: 5px;
+  cursor: pointer;
+  display: inline-block;
+}
+
+.emoji-option:hover {
+  transform: scale(1.2);
+}
+
+.context-menu {
+  position: fixed;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  z-index: 1000;
+  min-width: 200px;
+}
+
+.context-menu-item {
+  padding: 8px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.context-menu-item:hover {
+  background: #f3f4f6;
+}
+
+.context-menu-item-active {
+  background: #e0f2fe;
+  color: #0277bd;
+  font-weight: 500;
+}
+
+.context-menu-item-active:hover {
+  background: #b3e5fc;
+  color: #01579b;
+}
+
+.context-menu-item-danger {
+  color: #dc2626;
+}
+
+.context-menu-item-danger:hover {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.context-menu-item-completed {
+  color: #10b981;
+}
+
+.context-menu-item-completed:hover {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.context-menu-item-progress {
+  color: #f59e0b;
+}
+
+.context-menu-item-progress:hover {
+  background: #fffbeb;
+  color: #d97706;
+}
+
+.context-menu-item-pending {
+  color: #3b82f6;
+}
+
+.context-menu-item-pending:hover {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+/* Quick context menu can reuse the same styles; no extra rules needed */
+
+.task-options {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+}
+
+.task-option-btn {
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.8);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.task-option-btn:hover {
+  background: rgba(255,255,255,1);
+}
+
+/* Destacar estado de la tarea */
+.status-completed {
+  opacity: 0.6;
+  text-decoration: line-through;
+  border-left: 4px solid #22c55e;
+}
+.status-in-progress {
+  border-left: 4px solid #facc15;
+}
+.status-pending {
+  border-left: 4px solid #3b82f6;
+}
+
+.project-section {
+  border-left: 3px solid #e5e7eb;
+  padding-left: 8px;
+  margin-left: 4px;
+}
+
+.project-section:hover {
+  border-left-color: #6366f1;
+}
+
+.progress-bar-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 6px;
+  background-color: #e5e7eb;
+  border-radius: 8px 8px 0 0;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  transition: width 0.3s ease;
+  border-radius: 8px 8px 0 0;
+}
+
+.progress-pending {
+  width: 20%;
+  background-color: #3b82f6;
+}
+
+.progress-in-progress {
+  width: 60%;
+  background-color: #f59e0b;
+}
+
+.progress-completed {
+  width: 100%;
+  background-color: #10b981;
+}
+
+/* Tareas vencidas - efecto parpadeante */
+.task-overdue {
+  border: 3px solid transparent;
+  animation: overdue-pulse 1.5s infinite;
+  position: relative;
+}
+
+@keyframes overdue-pulse {
+  0%, 100% {
+    border-color: #ef4444;
+    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.4), 
+                0 0 20px rgba(239, 68, 68, 0.3),
+                0 0 40px rgba(239, 68, 68, 0.2);
+  }
+  50% {
+    border-color: #ffffff;
+    box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.8), 
+                0 0 25px rgba(255, 255, 255, 0.6),
+                0 0 45px rgba(255, 255, 255, 0.4);
+  }
+}
+
+/* Asegurar que el efecto se vea incluso en tareas hover */
+.task-overdue:hover {
+  animation: overdue-pulse 1.5s infinite;
+  transform: translateY(-2px);
+}
+
+/* Tareas en progreso - efecto parpadeante verde-blanco */
+.task-running {
+  border: 3px solid transparent;
+  animation: running-pulse 1.5s infinite;
+  position: relative;
+}
+
+@keyframes running-pulse {
+  0%, 100% {
+    border-color: #10b981;
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.4), 
+                0 0 20px rgba(16, 185, 129, 0.3),
+                0 0 40px rgba(16, 185, 129, 0.2);
+  }
+  50% {
+    border-color: #ffffff;
+    box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.8), 
+                0 0 25px rgba(255, 255, 255, 0.6),
+                0 0 45px rgba(255, 255, 255, 0.4);
+  }
+}
+
+/* Asegurar que el efecto se vea incluso en tareas hover */
+.task-running:hover {
+  animation: running-pulse 1.5s infinite;
+  transform: translateY(-2px);
+}
+
+.task-running::before {
+  animation: pulse 2s infinite;
+}
+
+.reminder-item {
+  transition: all 0.2s ease;
+}
+
+.reminder-item:hover {
+  background-color: #f3f4f6;
+  border: 1px solid #e5e7eb;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.5);
+  }
+}
+
