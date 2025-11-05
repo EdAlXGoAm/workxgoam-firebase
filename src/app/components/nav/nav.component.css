@@ -1,0 +1,31 @@
+/* Footer styles */
+:host {
+  display: block;
+  margin-top: auto; /* Empuja el footer al final si se usa flexbox en el body */
+}
+
+footer {
+  background-color: rgba(249, 250, 251, 0.95); /* bg-gray-50 con transparencia */
+  backdrop-filter: blur(10px);
+}
+
+/* Animación suave para los enlaces */
+footer a {
+  transition: all 0.2s ease;
+}
+
+footer a:hover {
+  transform: translateX(3px);
+}
+
+/* Asegurar que el footer no se vea aplastado en pantallas pequeñas */
+@media (max-width: 768px) {
+  footer {
+    padding-bottom: env(safe-area-inset-bottom, 20px);
+  }
+  
+  footer .grid {
+    gap: 2rem;
+  }
+}
+

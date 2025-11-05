@@ -15,6 +15,7 @@ import { LoginGlowService } from './services/login-glow.service';
 export class AppComponent {
   title = 'AixGoam';
   isUserMenuOpen = false;
+  menuPosition = { top: '0px', right: '0px' };
   
   constructor(
     public authService: AuthService,
@@ -30,7 +31,7 @@ export class AppComponent {
     
     // Comprobar si el clic fue dentro del menú o en el botón de usuario
     const target = event.target as HTMLElement;
-    if (target.closest('.user-menu-container') || target.closest('#user-profile-button')) {
+    if (target.closest('.user-menu-dropdown') || target.closest('#user-profile-button')) {
       return;
     }
     
@@ -66,6 +67,18 @@ export class AppComponent {
   toggleUserMenu(event?: MouseEvent): void {
     if (event) {
       event.stopPropagation(); // Evitar que el evento de clic se propague
+      
+      // Calcular la posición del menú basándose en la posición del botón
+      const button = event.target as HTMLElement;
+      const buttonRect = button.closest('#user-profile-button')?.getBoundingClientRect();
+      
+      if (buttonRect) {
+        // Posicionar el menú justo debajo del botón, alineado a la derecha
+        this.menuPosition = {
+          top: `${buttonRect.bottom + 8}px`, // 8px de espacio debajo del botón
+          right: `${window.innerWidth - buttonRect.right}px` // Alineado con el borde derecho del botón
+        };
+      }
     }
     this.isUserMenuOpen = !this.isUserMenuOpen;
   }

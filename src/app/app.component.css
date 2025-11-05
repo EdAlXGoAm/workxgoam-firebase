@@ -31,25 +31,20 @@
   background: linear-gradient(135deg, #6e8efb, #a777e3);
 }
 
-/* Estilos para el avatar y menú del usuario */
-.user-menu-container {
-  position: relative;
-}
-
+/* Estilos para el avatar del usuario */
 #user-profile-button {
   transition: transform 0.2s ease;
 }
 
-#user-profile-button:hover {
-  transform: scale(1.05);
-}
-
-/* Animación para el menú desplegable */
-.user-menu-container > div[class*="absolute"] {
+/* Menú desplegable del usuario - Fixed al viewport para estar en primer plano */
+.user-menu-dropdown {
+  position: fixed;
+  z-index: 9999; /* Muy alto para estar sobre todo */
   animation: fadeInDown 0.3s ease forwards;
-  transform-origin: top center;
+  transform-origin: top right;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  z-index: 100;
+  /* Asegurar que esté sobre cualquier overflow hidden */
+  pointer-events: auto;
 }
 
 @keyframes fadeInDown {
