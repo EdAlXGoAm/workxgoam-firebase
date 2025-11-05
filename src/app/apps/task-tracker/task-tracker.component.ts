@@ -1,4 +1,4 @@
-import { Component, OnInit, HostListener, ElementRef, ChangeDetectorRef, ViewChild } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener, ElementRef, ChangeDetectorRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
@@ -32,7 +32,7 @@ import { TimelineFocusService } from './services/timeline-focus.service';
   templateUrl: './task-tracker.component.html',
   styleUrls: ['./task-tracker.component.css']
 })
-export class TaskTrackerComponent implements OnInit {
+export class TaskTrackerComponent implements OnInit, OnDestroy {
   @ViewChild('newTaskModal') newTaskModal?: TaskModalComponent;
   @ViewChild('editTaskModal') editTaskModal?: TaskModalComponent;
   
@@ -65,6 +65,15 @@ export class TaskTrackerComponent implements OnInit {
   environmentViewMode: { [envId: string]: 'cards' | 'list' } = {};
   // Orden de tareas por environment: 'asc' (más antigua primero) o 'desc' (más reciente primero)
   environmentSortOrder: { [envId: string]: 'asc' | 'desc' } = {};
+  // Orden personalizado de environments: { [envId: string]: number }
+  environmentCustomOrder: { [envId: string]: number } = {};
+  // Estado de carga del orden personalizado
+  isLoadingEnvironmentOrder: boolean = true;
+  // Throttle para guardar la posición del scroll
+  private scrollSaveTimeout: any = null;
+  // Listener de scroll para limpiar al destruir
+  private scrollHandler: (() => void) | null = null;
+  private beforeUnloadHandler: (() => void) | null = null;
   // Ambiente enfocado en la línea de tiempo (null = sin enfoque)
   // Usamos un objeto wrapper para que Angular detecte cambios por referencia
   focusedEnvironment: { id: string | null } = { id: null };
@@ -231,6 +240,9 @@ export class TaskTrackerComponent implements OnInit {
   ) {}
 
   async ngOnInit() {
+    // Iniciar carga del orden
+    this.isLoadingEnvironmentOrder = true;
+    
     await this.loadInitialData();
     this.initializeNewTask();
     // Cargar el estado del filtro desde localStorage
@@ -239,6 +251,90 @@ export class TaskTrackerComponent implements OnInit {
     this.loadEnvironmentViewModes();
     // Cargar órdenes de clasificación por environment desde localStorage
     this.loadEnvironmentSortOrders();
+    // Cargar orden personalizado de environments desde localStorage (después de cargar environments)
+    this.loadEnvironmentCustomOrder();
+    // Inicializar orden solo para environments nuevos (después de cargar el orden guardado)
+    this.initializeEnvironmentOrder();
+    
+    // Finalizar carga del orden - usar requestAnimationFrame para asegurar que el DOM esté listo
+    requestAnimationFrame(() => {
+      this.isLoadingEnvironmentOrder = false;
+      this.cdr.detectChanges();
+      // Restaurar posición del scroll después de que el contenido esté completamente renderizado
+      // Esperar un poco más para asegurar que el DOM esté estable
+      setTimeout(() => {
+        this.restoreScrollPosition();
+      }, 150);
+    });
+
+    // Configurar listener para guardar posición del scroll antes de recargar
+    this.setupScrollSave();
+  }
+
+  ngOnDestroy(): void {
+    // Guardar posición del scroll antes de destruir el componente
+    this.saveScrollPosition();
+    
+    // Limpiar listeners
+    if (this.scrollHandler) {
+      window.removeEventListener('scroll', this.scrollHandler);
+    }
+    if (this.beforeUnloadHandler) {
+      window.removeEventListener('beforeunload', this.beforeUnloadHandler);
+    }
+    if (this.scrollSaveTimeout) {
+      clearTimeout(this.scrollSaveTimeout);
+    }
+  }
+
+  private setupScrollSave(): void {
+    // Guardar posición del scroll cuando el usuario hace scroll (con throttling)
+    this.scrollHandler = () => {
+      if (this.scrollSaveTimeout) {
+        clearTimeout(this.scrollSaveTimeout);
+      }
+      this.scrollSaveTimeout = setTimeout(() => {
+        this.saveScrollPosition();
+      }, 250); // Guardar después de 250ms sin scroll
+    };
+    window.addEventListener('scroll', this.scrollHandler, { passive: true });
+
+    // Guardar posición del scroll antes de que la página se recargue
+    this.beforeUnloadHandler = () => {
+      this.saveScrollPosition();
+    };
+    window.addEventListener('beforeunload', this.beforeUnloadHandler);
+  }
+
+  private saveScrollPosition(): void {
+    try {
+      const scrollPosition = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+      localStorage.setItem('taskTracker_scrollPosition', JSON.stringify(scrollPosition));
+    } catch (error) {
+      console.error('Error al guardar la posición del scroll:', error);
+    }
+  }
+
+  private restoreScrollPosition(): void {
+    try {
+      const savedPosition = localStorage.getItem('taskTracker_scrollPosition');
+      if (savedPosition) {
+        const scrollPosition = JSON.parse(savedPosition);
+        if (typeof scrollPosition === 'number' && scrollPosition > 0) {
+          // Usar setTimeout para asegurar que el DOM esté completamente renderizado
+          setTimeout(() => {
+            window.scrollTo({
+              top: scrollPosition,
+              behavior: 'auto' // Sin animación para que sea instantáneo
+            });
+            // Limpiar la posición guardada después de restaurarla
+            localStorage.removeItem('taskTracker_scrollPosition');
+          }, 100);
+        }
+      }
+    } catch (error) {
+      console.error('Error al restaurar la posición del scroll:', error);
+    }
   }
 
   async loadInitialData(): Promise<void> {
@@ -250,6 +346,7 @@ export class TaskTrackerComponent implements OnInit {
         this.loadTaskTypes()
       ]);
       await this.loadTasks();
+      // Nota: initializeEnvironmentOrder se llama en ngOnInit después de cargar el orden desde localStorage
     } catch (error) {
       console.error("Error loading initial data for TaskTrackerComponent:", error);
     }
@@ -646,6 +743,9 @@ export class TaskTrackerComponent implements OnInit {
     try {
       const createdEnvironmentId = await this.environmentService.createEnvironment(this.newEnvironment as Omit<Environment, 'id' | 'userId' | 'createdAt' | 'updatedAt'>);
       await this.loadEnvironments();
+      
+      // Inicializar el orden del nuevo environment
+      this.initializeEnvironmentOrder();
       
       // Auto-seleccionar el nuevo ambiente en la tarea
       if (this.showNewTaskModal && this.newTask) {
@@ -1431,6 +1531,12 @@ export class TaskTrackerComponent implements OnInit {
         // Eliminar el ambiente
         await this.environmentService.deleteEnvironment(environment.id);
         
+        // Limpiar el orden personalizado del environment eliminado
+        if (this.environmentCustomOrder[environment.id]) {
+          delete this.environmentCustomOrder[environment.id];
+          this.saveEnvironmentCustomOrder();
+        }
+        
         // Recargar datos
         await this.loadInitialData();
         
@@ -2012,7 +2118,18 @@ export class TaskTrackerComponent implements OnInit {
       if (aHasTasks && !bHasTasks) return -1;
       if (!aHasTasks && bHasTasks) return 1;
       
-      // Dentro del mismo grupo, ordenar alfabéticamente
+      // Dentro del mismo grupo, usar orden personalizado si existe
+      const aOrder = this.environmentCustomOrder[a.id] ?? Infinity;
+      const bOrder = this.environmentCustomOrder[b.id] ?? Infinity;
+      
+      if (aOrder !== Infinity || bOrder !== Infinity) {
+        // Si alguno tiene orden personalizado, usarlo
+        if (aOrder !== bOrder) {
+          return aOrder - bOrder;
+        }
+      }
+      
+      // Si no hay orden personalizado, ordenar alfabéticamente (fallback)
       return a.name.localeCompare(b.name);
     });
   }
@@ -2178,6 +2295,143 @@ export class TaskTrackerComponent implements OnInit {
     try {
       localStorage.setItem('taskTracker_envSortOrders', JSON.stringify(this.environmentSortOrder));
     } catch {}
+  }
+
+  private loadEnvironmentCustomOrder(): void {
+    try {
+      const raw = localStorage.getItem('taskTracker_envCustomOrder');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          this.environmentCustomOrder = parsed;
+          console.log('Orden personalizado cargado desde cache:', this.environmentCustomOrder);
+        }
+      } else {
+        console.log('No se encontró orden personalizado en cache, se inicializará uno nuevo');
+      }
+    } catch (error) {
+      console.error('Error al cargar el orden personalizado:', error);
+    }
+  }
+
+  private saveEnvironmentCustomOrder(): void {
+    try {
+      localStorage.setItem('taskTracker_envCustomOrder', JSON.stringify(this.environmentCustomOrder));
+      console.log('Orden personalizado guardado:', this.environmentCustomOrder);
+    } catch (error) {
+      console.error('Error al guardar el orden personalizado:', error);
+    }
+  }
+
+  private initializeEnvironmentOrder(): void {
+    // Solo asignar orden a environments que NO tienen orden personalizado guardado
+    const environmentsWithoutOrder = this.environments.filter(env => 
+      !(env.id in this.environmentCustomOrder) || this.environmentCustomOrder[env.id] === undefined
+    );
+
+    if (environmentsWithoutOrder.length === 0) {
+      // Todos los environments ya tienen orden, no hacer nada
+      return;
+    }
+
+    // Ordenar los environments sin orden alfabéticamente (respetando grupos con/sin tareas)
+    const sortedByName = [...environmentsWithoutOrder].sort((a, b) => {
+      const aHasTasks = this.environmentHasTasks(a.id);
+      const bHasTasks = this.environmentHasTasks(b.id);
+      if (aHasTasks && !bHasTasks) return -1;
+      if (!aHasTasks && bHasTasks) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    // Encontrar el máximo orden existente para asignar índices continuos
+    let maxOrder = -1;
+    Object.values(this.environmentCustomOrder).forEach(order => {
+      if (typeof order === 'number' && order > maxOrder) {
+        maxOrder = order;
+      }
+    });
+
+    // Asignar orden solo a los environments que no lo tienen
+    sortedByName.forEach((env, index) => {
+      if (!(env.id in this.environmentCustomOrder) || this.environmentCustomOrder[env.id] === undefined) {
+        this.environmentCustomOrder[env.id] = maxOrder + index + 1;
+      }
+    });
+
+    // Guardar siempre para asegurar que los nuevos órdenes se persistan
+    this.saveEnvironmentCustomOrder();
+  }
+
+  moveEnvironmentUp(envId: string): void {
+    const currentOrder = this.environmentCustomOrder[envId];
+    if (currentOrder === undefined) {
+      console.warn(`Environment ${envId} no tiene orden asignado`);
+      return;
+    }
+
+    // Encontrar el environment inmediatamente anterior en el mismo grupo (con/sin tareas)
+    const envHasTasks = this.environmentHasTasks(envId);
+    const environmentsInSameGroup = this.environments
+      .filter(env => this.environmentHasTasks(env.id) === envHasTasks)
+      .map(env => ({
+        env,
+        order: this.environmentCustomOrder[env.id] ?? Infinity
+      }))
+      .sort((a, b) => a.order - b.order);
+
+    const currentIndex = environmentsInSameGroup.findIndex(item => item.env.id === envId);
+    if (currentIndex > 0) {
+      const previousEnv = environmentsInSameGroup[currentIndex - 1];
+      const previousOrder = previousEnv.order;
+      
+      console.log(`Moviendo ${envId} arriba: orden ${currentOrder} -> ${previousOrder}`);
+      
+      // Intercambiar órdenes
+      this.environmentCustomOrder[envId] = previousOrder;
+      this.environmentCustomOrder[previousEnv.env.id] = currentOrder;
+      
+      this.saveEnvironmentCustomOrder();
+      // Forzar detección de cambios
+      this.cdr.detectChanges();
+    } else {
+      console.log(`No se puede mover ${envId} arriba: ya está en la primera posición`);
+    }
+  }
+
+  moveEnvironmentDown(envId: string): void {
+    const currentOrder = this.environmentCustomOrder[envId];
+    if (currentOrder === undefined) {
+      console.warn(`Environment ${envId} no tiene orden asignado`);
+      return;
+    }
+
+    // Encontrar el environment inmediatamente siguiente en el mismo grupo (con/sin tareas)
+    const envHasTasks = this.environmentHasTasks(envId);
+    const environmentsInSameGroup = this.environments
+      .filter(env => this.environmentHasTasks(env.id) === envHasTasks)
+      .map(env => ({
+        env,
+        order: this.environmentCustomOrder[env.id] ?? Infinity
+      }))
+      .sort((a, b) => a.order - b.order);
+
+    const currentIndex = environmentsInSameGroup.findIndex(item => item.env.id === envId);
+    if (currentIndex < environmentsInSameGroup.length - 1) {
+      const nextEnv = environmentsInSameGroup[currentIndex + 1];
+      const nextOrder = nextEnv.order;
+      
+      console.log(`Moviendo ${envId} abajo: orden ${currentOrder} -> ${nextOrder}`);
+      
+      // Intercambiar órdenes
+      this.environmentCustomOrder[envId] = nextOrder;
+      this.environmentCustomOrder[nextEnv.env.id] = currentOrder;
+      
+      this.saveEnvironmentCustomOrder();
+      // Forzar detección de cambios
+      this.cdr.detectChanges();
+    } else {
+      console.log(`No se puede mover ${envId} abajo: ya está en la última posición`);
+    }
   }
 
   // Métodos para el modal de confirmación de cambio de estado

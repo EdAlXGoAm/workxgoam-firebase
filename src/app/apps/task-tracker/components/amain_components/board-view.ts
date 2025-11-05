@@ -30,7 +30,15 @@ import { TaskType } from '../../models/task-type.model';
         <app-timeline-svg [tasks]="tasks" [environments]="environments" [taskTypes]="taskTypes" (editTask)="editTask.emit($event)"></app-timeline-svg>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <!-- Spinner de carga mientras se ordenan los environments -->
+      <div *ngIf="isLoadingEnvironmentOrder" class="flex justify-center items-center py-12">
+        <div class="flex flex-col items-center">
+          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
+          <p class="text-gray-600 text-sm">Cargando orden de environments...</p>
+        </div>
+      </div>
+
+      <div *ngIf="!isLoadingEnvironmentOrder" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div *ngFor="let env of orderedEnvironments" class="board-column">
           <div class="environment-header p-4 pb-2">
             <div class="flex items-center justify-between">
@@ -38,6 +46,20 @@ import { TaskType } from '../../models/task-type.model';
                   [style.background-color]="env.color + 'aa'" 
                   [style.color]="'black'">{{env.name}}</h3>
               <div class="flex items-center ml-2">
+                <div class="flex items-center mr-1 border-r border-gray-300 pr-1">
+                  <button (click)="moveEnvironmentUp.emit(env.id); $event.stopPropagation()"
+                          class="p-1 text-gray-500 hover:text-gray-700"
+                          [title]="'Mover arriba'"
+                          [disabled]="!canMoveEnvironmentUp(env.id)">
+                    <i class="fas fa-arrow-up text-xs"></i>
+                  </button>
+                  <button (click)="moveEnvironmentDown.emit(env.id); $event.stopPropagation()"
+                          class="p-1 text-gray-500 hover:text-gray-700"
+                          [title]="'Mover abajo'"
+                          [disabled]="!canMoveEnvironmentDown(env.id)">
+                    <i class="fas fa-arrow-down text-xs"></i>
+                  </button>
+                </div>
                 <button *ngIf="environmentHasTasks(env.id)"
                         (click)="toggleCollapseAllProjectsInEnvironment(env.id)"
                         class="p-1 text-gray-500 hover:text-gray-700 mr-1"
@@ -236,7 +258,7 @@ import { TaskType } from '../../models/task-type.model';
     .environment-content::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
     .task-card { transition: all 0.2s ease; position: relative; }
     .task-card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-    .task-list-item { padding: 8px 10px; border: 1px solid #e5e7eb; border-radius: 8px; background: #ffffff; cursor: pointer; transition: background 0.2s ease; max-width: 75%; }
+    .task-list-item { padding: 8px 10px; border: 1px solid #e5e7eb; border-radius: 8px; background: #ffffff; cursor: pointer; transition: background 0.2s ease; max-width: 75%; user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; }
     .task-list-item:hover { background: #f9fafb; }
     .day-separator { display: flex; align-items: center; text-align: center; color: #6b7280; font-size: 12px; margin: 8px 0; }
     .day-separator::before, .day-separator::after { content: ''; flex: 1; border-bottom: 1px solid #e5e7eb; }
@@ -264,6 +286,8 @@ import { TaskType } from '../../models/task-type.model';
       50% { border-color: #ffffff; box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.8), 0 0 25px rgba(255, 255, 255, 0.6), 0 0 45px rgba(255, 255, 255, 0.4); }
     }
     .task-running:hover { animation: running-pulse 1.5s infinite; transform: translateY(-2px); }
+    button[disabled] { opacity: 0.4; cursor: not-allowed; }
+    button[disabled]:hover { opacity: 0.4; }
   `]
 })
 export class BoardViewComponent {
@@ -275,6 +299,8 @@ export class BoardViewComponent {
   @Input() environmentHiddenVisibility: { [envId: string]: 'hidden' | 'show-all' | 'show-24h' | 'date-range' } = {};
   @Input() environmentViewMode: { [envId: string]: 'cards' | 'list' } = {};
   @Input() environmentSortOrder: { [envId: string]: 'asc' | 'desc' } = {};
+  @Input() environmentCustomOrder: { [envId: string]: number } = {};
+  @Input() isLoadingEnvironmentOrder: boolean = false;
 
   @Output() editTask = new EventEmitter<Task>();
   @Output() taskContextMenu = new EventEmitter<{ mouseEvent: MouseEvent; task: Task }>();
@@ -283,6 +309,8 @@ export class BoardViewComponent {
   @Output() projectContextMenu = new EventEmitter<{ mouseEvent: MouseEvent; project: Project }>();
   @Output() addTaskToProject = new EventEmitter<{ environmentId: string; projectId: string }>();
   @Output() createProject = new EventEmitter<string>();
+  @Output() moveEnvironmentUp = new EventEmitter<string>();
+  @Output() moveEnvironmentDown = new EventEmitter<string>();
 
   collapsedEmptyEnvironments: boolean = true;
   collapsedEnvironments: { [envId: string]: boolean } = {};
@@ -294,6 +322,19 @@ export class BoardViewComponent {
       const bHas = this.environmentHasTasks(b.id);
       if (aHas && !bHas) return -1;
       if (!aHas && bHas) return 1;
+      
+      // Dentro del mismo grupo, usar orden personalizado si existe
+      const aOrder = this.environmentCustomOrder[a.id] ?? Infinity;
+      const bOrder = this.environmentCustomOrder[b.id] ?? Infinity;
+      
+      if (aOrder !== Infinity || bOrder !== Infinity) {
+        // Si alguno tiene orden personalizado, usarlo
+        if (aOrder !== bOrder) {
+          return aOrder - bOrder;
+        }
+      }
+      
+      // Si no hay orden personalizado, ordenar alfabéticamente (fallback)
       return a.name.localeCompare(b.name);
     });
   }
@@ -574,6 +615,34 @@ export class BoardViewComponent {
     if (!task.type || !this.taskTypes.length) return null;
     const taskType = this.taskTypes.find(t => t.id === task.type);
     return taskType?.color || null;
+  }
+
+  canMoveEnvironmentUp(envId: string): boolean {
+    const envHasTasks = this.environmentHasTasks(envId);
+    const environmentsInSameGroup = this.environments
+      .filter(env => this.environmentHasTasks(env.id) === envHasTasks)
+      .map(env => ({
+        env,
+        order: this.environmentCustomOrder[env.id] ?? Infinity
+      }))
+      .sort((a, b) => a.order - b.order);
+
+    const currentIndex = environmentsInSameGroup.findIndex(item => item.env.id === envId);
+    return currentIndex > 0;
+  }
+
+  canMoveEnvironmentDown(envId: string): boolean {
+    const envHasTasks = this.environmentHasTasks(envId);
+    const environmentsInSameGroup = this.environments
+      .filter(env => this.environmentHasTasks(env.id) === envHasTasks)
+      .map(env => ({
+        env,
+        order: this.environmentCustomOrder[env.id] ?? Infinity
+      }))
+      .sort((a, b) => a.order - b.order);
+
+    const currentIndex = environmentsInSameGroup.findIndex(item => item.env.id === envId);
+    return currentIndex < environmentsInSameGroup.length - 1;
   }
 }
 
