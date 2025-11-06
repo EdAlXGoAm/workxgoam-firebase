@@ -147,11 +147,12 @@ interface WeekDay {
             
             <!-- Líneas de horas y etiquetas -->
             <g *ngFor="let hour of hours">
+              <!-- Línea más gruesa y oscura para horas completas, más delgada y clara para medias horas -->
               <line x1="0" y1="0" 
                     [attr.x2]="dayColumnWidth" 
                     [attr.y2]="0" 
-                    stroke="#e5e7eb" 
-                    stroke-width="1"
+                    [attr.stroke]="'#e5e7eb'" 
+                    [attr.stroke-width]="hour % 2 === 0 ? '2' : '1'"
                     [attr.transform]="'translate(0, ' + getHourY(hour) + ')'"/>
               
               <!-- Etiqueta de hora solo en la primera columna -->
