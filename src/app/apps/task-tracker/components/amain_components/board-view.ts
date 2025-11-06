@@ -136,7 +136,7 @@ import { TaskType } from '../../models/task-type.model';
               </div>
             </div>
           </div>
-
+          <div class="environment-content-wrapper">
           <div class="environment-content px-4">
             <div *ngIf="!isEnvironmentCollapsed(env.id)" class="space-y-4">
               <div *ngFor="let project of getProjectsByEnvironment(env.id)" class="project-section">
@@ -283,6 +283,7 @@ import { TaskType } from '../../models/task-type.model';
               </div>
             </div>
           </div>
+          </div>
         </div>
       </div>
     </div>
@@ -312,6 +313,9 @@ import { TaskType } from '../../models/task-type.model';
       flex: 1;
       overflow-y: auto;
       padding-bottom: 1rem;
+    }
+    .environment-content-wrapper {
+      margin-right: 1.5rem;
     }
     .board-column-empty .environment-content {
       padding-bottom: 0.5rem;
