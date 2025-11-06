@@ -253,6 +253,10 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     // Iniciar carga del orden
     this.isLoadingEnvironmentOrder = true;
     
+    // Exponer el componente en window para depuración
+    (window as any).taskTrackerComponent = this;
+    console.log('🔧 Componente expuesto en window.taskTrackerComponent para depuración');
+    
     await this.loadInitialData();
     this.initializeNewTask();
     // Cargar el estado del filtro desde localStorage
@@ -297,6 +301,11 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     }
     if (this.orderSyncMessageTimeout) {
       clearTimeout(this.orderSyncMessageTimeout);
+    }
+    
+    // Limpiar referencia en window
+    if ((window as any).taskTrackerComponent === this) {
+      delete (window as any).taskTrackerComponent;
     }
   }
 
@@ -2172,9 +2181,34 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
 
   // Nuevo: Métodos para manejar environments
   get orderedEnvironments(): Environment[] {
-    return [...this.environments].sort((a, b) => {
+    // Detectar si estamos en dispositivo móvil (ancho < 768px)
+    const isMobile = window.innerWidth < 768;
+    
+    console.log('🔍 orderedEnvironments - isMobile:', isMobile, 'window.innerWidth:', window.innerWidth);
+    
+    const result = [...this.environments].sort((a, b) => {
+      // En móviles, solo usar el orden personalizado sin priorizar por tareas
+      if (isMobile) {
+        const aOrder = this.environmentCustomOrder[a.id] ?? Infinity;
+        const bOrder = this.environmentCustomOrder[b.id] ?? Infinity;
+        
+        console.log(`  📱 Móvil - Comparando ${a.name} (orden: ${aOrder}) vs ${b.name} (orden: ${bOrder})`);
+        
+        if (aOrder !== Infinity || bOrder !== Infinity) {
+          if (aOrder !== bOrder) {
+            return aOrder - bOrder;
+          }
+        }
+        
+        // Fallback alfabético si no hay orden personalizado
+        return a.name.localeCompare(b.name);
+      }
+      
+      // En desktop, mantener la lógica original: priorizar environments con tareas
       const aHasTasks = this.environmentHasTasks(a.id);
       const bHasTasks = this.environmentHasTasks(b.id);
+      
+      console.log(`  🖥️ Desktop - ${a.name} (tareas: ${aHasTasks}) vs ${b.name} (tareas: ${bHasTasks})`);
       
       // Environments con tareas van primero
       if (aHasTasks && !bHasTasks) return -1;
@@ -2194,6 +2228,10 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
       // Si no hay orden personalizado, ordenar alfabéticamente (fallback)
       return a.name.localeCompare(b.name);
     });
+    
+    console.log('✅ Resultado final:', result.map(e => `${e.name} (orden: ${this.environmentCustomOrder[e.id]})`));
+    
+    return result;
   }
 
   environmentHasTasks(environmentId: string): boolean {
@@ -2366,14 +2404,52 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === 'object') {
           this.environmentCustomOrder = parsed;
-          console.log('Orden personalizado cargado desde cache:', this.environmentCustomOrder);
+          console.log('📦 Orden personalizado cargado desde cache:', this.environmentCustomOrder);
+          
+          // Depuración: mostrar el orden con nombres de environments
+          const orderDebug = Object.entries(this.environmentCustomOrder).map(([id, order]) => {
+            const env = this.environments.find(e => e.id === id);
+            return `${env?.name || id}: ${order}`;
+          });
+          console.log('📋 Orden con nombres:', orderDebug);
         }
       } else {
-        console.log('No se encontró orden personalizado en cache, se inicializará uno nuevo');
+        console.log('⚠️ No se encontró orden personalizado en cache, se inicializará uno nuevo');
       }
     } catch (error) {
-      console.error('Error al cargar el orden personalizado:', error);
+      console.error('❌ Error al cargar el orden personalizado:', error);
     }
+  }
+  
+  // Función de utilidad para reorganizar alfabéticamente (solo móviles)
+  // Ejecutar desde consola: (window as any).taskTrackerComponent.reorganizeEnvironmentsAlphabetically()
+  reorganizeEnvironmentsAlphabetically(): void {
+    const isMobile = window.innerWidth < 768;
+    
+    if (!isMobile) {
+      console.log('⚠️ Esta función solo funciona en dispositivos móviles');
+      return;
+    }
+    
+    console.log('🔄 Reorganizando environments alfabéticamente...');
+    
+    // Ordenar environments alfabéticamente
+    const sortedEnvs = [...this.environments].sort((a, b) => a.name.localeCompare(b.name));
+    
+    // Asignar nuevo orden
+    sortedEnvs.forEach((env, index) => {
+      this.environmentCustomOrder[env.id] = index;
+    });
+    
+    console.log('✅ Nuevo orden:', this.environmentCustomOrder);
+    
+    // Guardar
+    this.saveEnvironmentCustomOrder();
+    
+    // Forzar actualización
+    this.cdr.detectChanges();
+    
+    alert('Orden reorganizado alfabéticamente');
   }
 
   private saveEnvironmentCustomOrder(): void {
@@ -2396,8 +2472,17 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Ordenar los environments sin orden alfabéticamente (respetando grupos con/sin tareas)
+    // Detectar si estamos en dispositivo móvil
+    const isMobile = window.innerWidth < 768;
+
+    // Ordenar los environments sin orden
     const sortedByName = [...environmentsWithoutOrder].sort((a, b) => {
+      // En móviles, solo ordenar alfabéticamente sin priorizar por tareas
+      if (isMobile) {
+        return a.name.localeCompare(b.name);
+      }
+      
+      // En desktop, respetar grupos con/sin tareas
       const aHasTasks = this.environmentHasTasks(a.id);
       const bHasTasks = this.environmentHasTasks(b.id);
       if (aHasTasks && !bHasTasks) return -1;
@@ -2431,19 +2516,34 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Encontrar el environment inmediatamente anterior en el mismo grupo (con/sin tareas)
-    const envHasTasks = this.environmentHasTasks(envId);
-    const environmentsInSameGroup = this.environments
-      .filter(env => this.environmentHasTasks(env.id) === envHasTasks)
-      .map(env => ({
-        env,
-        order: this.environmentCustomOrder[env.id] ?? Infinity
-      }))
-      .sort((a, b) => a.order - b.order);
+    // Detectar si estamos en dispositivo móvil
+    const isMobile = window.innerWidth < 768;
 
-    const currentIndex = environmentsInSameGroup.findIndex(item => item.env.id === envId);
+    let environmentsToConsider;
+    
+    if (isMobile) {
+      // En móviles, considerar TODOS los environments sin importar si tienen tareas
+      environmentsToConsider = this.environments
+        .map(env => ({
+          env,
+          order: this.environmentCustomOrder[env.id] ?? Infinity
+        }))
+        .sort((a, b) => a.order - b.order);
+    } else {
+      // En desktop, mantener la lógica original de grupos
+      const envHasTasks = this.environmentHasTasks(envId);
+      environmentsToConsider = this.environments
+        .filter(env => this.environmentHasTasks(env.id) === envHasTasks)
+        .map(env => ({
+          env,
+          order: this.environmentCustomOrder[env.id] ?? Infinity
+        }))
+        .sort((a, b) => a.order - b.order);
+    }
+
+    const currentIndex = environmentsToConsider.findIndex(item => item.env.id === envId);
     if (currentIndex > 0) {
-      const previousEnv = environmentsInSameGroup[currentIndex - 1];
+      const previousEnv = environmentsToConsider[currentIndex - 1];
       const previousOrder = previousEnv.order;
       
       console.log(`Moviendo ${envId} arriba: orden ${currentOrder} -> ${previousOrder}`);
@@ -2467,19 +2567,34 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Encontrar el environment inmediatamente siguiente en el mismo grupo (con/sin tareas)
-    const envHasTasks = this.environmentHasTasks(envId);
-    const environmentsInSameGroup = this.environments
-      .filter(env => this.environmentHasTasks(env.id) === envHasTasks)
-      .map(env => ({
-        env,
-        order: this.environmentCustomOrder[env.id] ?? Infinity
-      }))
-      .sort((a, b) => a.order - b.order);
+    // Detectar si estamos en dispositivo móvil
+    const isMobile = window.innerWidth < 768;
 
-    const currentIndex = environmentsInSameGroup.findIndex(item => item.env.id === envId);
-    if (currentIndex < environmentsInSameGroup.length - 1) {
-      const nextEnv = environmentsInSameGroup[currentIndex + 1];
+    let environmentsToConsider;
+    
+    if (isMobile) {
+      // En móviles, considerar TODOS los environments sin importar si tienen tareas
+      environmentsToConsider = this.environments
+        .map(env => ({
+          env,
+          order: this.environmentCustomOrder[env.id] ?? Infinity
+        }))
+        .sort((a, b) => a.order - b.order);
+    } else {
+      // En desktop, mantener la lógica original de grupos
+      const envHasTasks = this.environmentHasTasks(envId);
+      environmentsToConsider = this.environments
+        .filter(env => this.environmentHasTasks(env.id) === envHasTasks)
+        .map(env => ({
+          env,
+          order: this.environmentCustomOrder[env.id] ?? Infinity
+        }))
+        .sort((a, b) => a.order - b.order);
+    }
+
+    const currentIndex = environmentsToConsider.findIndex(item => item.env.id === envId);
+    if (currentIndex < environmentsToConsider.length - 1) {
+      const nextEnv = environmentsToConsider[currentIndex + 1];
       const nextOrder = nextEnv.order;
       
       console.log(`Moviendo ${envId} abajo: orden ${currentOrder} -> ${nextOrder}`);

@@ -395,9 +395,33 @@ export class WeekViewComponent {
   collapsedProjects: { [projectId: string]: boolean } = {};
 
   get orderedEnvironments(): Environment[] {
+    // Detectar si estamos en dispositivo móvil (ancho < 768px)
+    const isMobile = window.innerWidth < 768;
+    
+    console.log('🔍 [WEEK-VIEW] orderedEnvironments - isMobile:', isMobile, 'window.innerWidth:', window.innerWidth);
+    
     return [...this.environments].sort((a, b) => {
+      // En móviles, solo usar el orden personalizado sin priorizar por tareas
+      if (isMobile) {
+        const aOrder = this.environmentCustomOrder[a.id] ?? Infinity;
+        const bOrder = this.environmentCustomOrder[b.id] ?? Infinity;
+        
+        console.log(`  📱 [WEEK-VIEW] Móvil - Comparando ${a.name} (orden: ${aOrder}) vs ${b.name} (orden: ${bOrder})`);
+        
+        if (aOrder !== Infinity || bOrder !== Infinity) {
+          if (aOrder !== bOrder) {
+            return aOrder - bOrder;
+          }
+        }
+        
+        // Fallback alfabético si no hay orden personalizado
+        return a.name.localeCompare(b.name);
+      }
+      
+      // En desktop, mantener la lógica original: priorizar environments con tareas
       const aHas = this.environmentHasTasks(a.id);
       const bHas = this.environmentHasTasks(b.id);
+      
       if (aHas && !bHas) return -1;
       if (!aHas && bHas) return 1;
       
