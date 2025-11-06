@@ -318,6 +318,8 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     if (this.task.project) {
       this.selectableTaskTypes = this.taskTypes.filter(t => t.projectId === this.task.project);
     }
+    // Actualizar las opciones del dropdown de Android también
+    this.buildTaskTypeOptions();
   }
 
   async loadRecentTasks() {
