@@ -798,6 +798,26 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
       }
     }
     
+    // Copiar recordatorios si existen, ajustándolos para mantener la distancia relativa
+    if (selectedTask.reminders && selectedTask.reminders.length > 0) {
+      // Solo copiar si hay fechas de inicio y fin definidas en ambas tareas
+      if (this.startDate && this.startTime && this.endDate && this.endTime && 
+          selectedTask.start && selectedTask.end) {
+        this.task.reminders = this.copyRemindersWithRelativeDistance(
+          selectedTask.reminders,
+          selectedTask.start,
+          selectedTask.end,
+          this.startDate,
+          this.startTime,
+          this.endDate,
+          this.endTime
+        );
+      } else {
+        // Si no hay fechas completas, copiar sin ajustar
+        this.task.reminders = [...selectedTask.reminders];
+      }
+    }
+    
     // Resetear el selector para permitir seleccionar otra tarea
     this.selectedRecentTaskIndex = '';
     
@@ -1612,6 +1632,65 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     this.cdr.detectChanges();
   }
   
+  /**
+   * Copia recordatorios de una tarea fuente ajustándolos para mantener la distancia relativa
+   * a las fechas de inicio y fin
+   */
+  private copyRemindersWithRelativeDistance(
+    sourceReminders: string[],
+    sourceStart: string,
+    sourceEnd: string | null,
+    targetStartDate: string,
+    targetStartTime: string,
+    targetEndDate: string,
+    targetEndTime: string
+  ): string[] {
+    if (!sourceReminders || sourceReminders.length === 0) {
+      return [];
+    }
+    
+    if (!sourceStart || !targetStartDate || !targetStartTime || !targetEndDate || !targetEndTime) {
+      return [...sourceReminders];
+    }
+    
+    // Convertir fechas a objetos Date
+    const sourceStartDate = new Date(sourceStart + (sourceStart.includes('Z') ? '' : 'Z'));
+    const sourceEndDate = sourceEnd ? new Date(sourceEnd + (sourceEnd.includes('Z') ? '' : 'Z')) : null;
+    const targetStartDateObj = new Date(`${targetStartDate}T${targetStartTime}`);
+    const targetEndDateObj = new Date(`${targetEndDate}T${targetEndTime}`);
+    
+    // Ajustar cada recordatorio manteniendo la distancia relativa
+    return sourceReminders.map(reminderStr => {
+      const reminderDate = new Date(reminderStr + (reminderStr.includes('Z') ? '' : 'Z'));
+      
+      // Calcular la distancia relativa al inicio y fin de la tarea fuente
+      const distanceFromStart = reminderDate.getTime() - sourceStartDate.getTime();
+      
+      let adjustedDate: Date;
+      
+      if (sourceEndDate) {
+        // Si hay fecha de fin, determinar la posición del recordatorio
+        const distanceFromEnd = reminderDate.getTime() - sourceEndDate.getTime();
+        
+        if (distanceFromStart < 0) {
+          // El recordatorio está antes del inicio, mantener la distancia relativa al inicio
+          adjustedDate = new Date(targetStartDateObj.getTime() + distanceFromStart);
+        } else if (distanceFromEnd <= 0) {
+          // El recordatorio está entre el inicio y el fin (durante el evento), mantener la distancia relativa al inicio
+          adjustedDate = new Date(targetStartDateObj.getTime() + distanceFromStart);
+        } else {
+          // El recordatorio está después del fin, mantener la distancia relativa al fin
+          adjustedDate = new Date(targetEndDateObj.getTime() + distanceFromEnd);
+        }
+      } else {
+        // Si no hay fecha de fin, mantener la distancia relativa al inicio
+        adjustedDate = new Date(targetStartDateObj.getTime() + distanceFromStart);
+      }
+      
+      return adjustedDate.toISOString().slice(0, 16);
+    });
+  }
+  
   // Preparo los campos de fecha/hora antes de abrir el modal de recordatorios
   prepareTaskDatesForReminders() {
     this.task.start = this.combineDateTime(this.startDate, this.startTime);
@@ -1674,6 +1753,26 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
             this.endTime = newEndDateTime.time;
             // Validar las fechas después del ajuste
             this.validateDates();
+          }
+        }
+        
+        // Copiar recordatorios si existen, ajustándolos para mantener la distancia relativa
+        if (mostRecentTask.reminders && mostRecentTask.reminders.length > 0) {
+          // Solo copiar si hay fechas de inicio y fin definidas en ambas tareas
+          if (this.startDate && this.startTime && this.endDate && this.endTime && 
+              mostRecentTask.start && mostRecentTask.end) {
+            this.task.reminders = this.copyRemindersWithRelativeDistance(
+              mostRecentTask.reminders,
+              mostRecentTask.start,
+              mostRecentTask.end,
+              this.startDate,
+              this.startTime,
+              this.endDate,
+              this.endTime
+            );
+          } else {
+            // Si no hay fechas completas, copiar sin ajustar
+            this.task.reminders = [...mostRecentTask.reminders];
           }
         }
         
