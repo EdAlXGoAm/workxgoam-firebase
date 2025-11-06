@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, OnChanges, ChangeDetectorRef } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, OnChanges, ChangeDetectorRef, ViewChild, ElementRef, Renderer2, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Task } from '../../models/task.model';
@@ -51,6 +51,13 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   selectableTaskTypes: TaskType[] = [];
   isLoading = false;
   
+  // Referencias para el selector de emojis
+  @ViewChild('emojiButton', { static: false }) emojiButton!: ElementRef;
+  private emojiPickerElement: HTMLElement | null = null;
+  private emojiPickerClickListener?: () => void;
+  private emojiGridElement: HTMLElement | null = null;
+  private emojiHeaderElement: HTMLElement | null = null;
+  
   // Tareas recientes del proyecto
   recentTasks: Task[] = [];
   showRecentTasksSelector = false;
@@ -88,15 +95,77 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   originalStartDateTime: Date | null = null;
   originalEndDateTime: Date | null = null;
   
-  emojis = ['📝', '⏰', '✅', '🛏️', '🍔', 
-            '😀', '😊', '😎', '🤩', '😍', '🤔', '😴', '🥳', '😇', '🤯', 
-            '📅', '📌', '🔑', '📚', '💻', '📱', '🔋',
-            '🏋️', '🚴', '🚗', '🍎', '🍕', '🛒', '☕', '🍷', '🎵', '🎮', '🎨', '✈️'];
+  // Emojis frecuentes (se mantienen al inicio)
+  frequentEmojis = ['📝', '⏰', '✅', '🛏️', '🍔', 
+                     '😀', '😊', '😎', '🤩', '😍', '🤔', '😴', '🥳', '😇', '🤯', 
+                     '📅', '📌', '🔑', '📚', '💻', '📱', '🔋',
+                     '🏋️', '🚴', '🚗', '🍎', '🍕', '🛒', '☕', '🍷', '🎵', '🎮', '🎨', '✈️'];
+  
+  // Categorías de emojis
+  emojiCategories: { name: string; icon: string; emojis: string[] }[] = [
+    {
+      name: 'Frecuentes',
+      icon: '⭐',
+      emojis: ['📝', '⏰', '✅', '🛏️', '🍔', 
+               '😀', '😊', '😎', '🤩', '😍', '🤔', '😴', '🥳', '😇', '🤯', 
+               '📅', '📌', '🔑', '📚', '💻', '📱', '🔋',
+               '🏋️', '🚴', '🚗', '🍎', '🍕', '🛒', '☕', '🍷', '🎵', '🎮', '🎨', '✈️']
+    },
+    {
+      name: 'Sonrisas y Emociones',
+      icon: '😀',
+      emojis: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '😶‍🌫️', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '😵‍💫', '🤐', '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕']
+    },
+    {
+      name: 'Gestos y Personas',
+      icon: '👋',
+      emojis: ['👋', '🤚', '🖐', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💪', '🦾', '🦿', '🦵', '🦶', '👂', '🦻', '👃', '👶', '👧', '🧒', '👦', '👩', '🧑', '👨', '👩‍🦱', '👨‍🦱', '👩‍🦰', '👨‍🦰', '👱‍♀️', '👱‍♂️', '👩‍🦳', '👨‍🦳', '👩‍🦲', '👨‍🦲', '🧓', '👴', '👵', '🙍', '🙎', '🙅', '🙆', '💁', '🙋', '🧏', '🙇', '🤦', '🤦‍♂️', '🤦‍♀️', '🤷', '🤷‍♂️', '🤷‍♀️', '👮', '👮‍♂️', '👮‍♀️', '🕵', '🕵‍♂️', '🕵‍♀️', '💂', '🥷', '👷', '👷‍♂️', '👷‍♀️', '🤴', '👸', '👳', '👳‍♂️', '👳‍♀️', '👲', '🧕', '🤵', '🤵‍♂️', '🤵‍♀️', '👰', '🤰', '🤱', '👼', '🎅', '🤶', '🦸', '🦸‍♂️', '🦸‍♀️', '🦹', '🦹‍♂️', '🦹‍♀️', '🧙', '🧙‍♂️', '🧙‍♀️', '🧚', '🧚‍♂️', '🧚‍♀️', '🧛', '🧛‍♂️', '🧛‍♀️', '🧜', '🧜‍♂️', '🧜‍♀️', '🧝', '🧝‍♂️', '🧝‍♀️', '🧞', '🧞‍♂️', '🧞‍♀️', '🧟', '🧟‍♂️', '🧟‍♀️', '💆', '💇', '🚶', '🚶‍♂️', '🚶‍♀️', '🧍', '🧍‍♂️', '🧍‍♀️', '🧎', '🧎‍♂️', '🧎‍♀️', '🏃', '🏃‍♂️', '🏃‍♀️', '💃', '🕺', '🕴', '👯', '👯‍♂️', '👯‍♀️', '🧖', '🧖‍♂️', '🧖‍♀️', '🧗', '🧗‍♂️', '🧗‍♀️', '🤺', '🏇', '⛷️', '🏂', '🏌️', '🏌️‍♂️', '🏌️‍♀️', '🏄', '🏄‍♂️', '🏄‍♀️', '🚣', '🚣‍♂️', '🚣‍♀️', '🏊', '🏊‍♂️', '🏊‍♀️', '⛹️', '⛹️‍♂️', '⛹️‍♀️', '🏋️', '🏋️‍♂️', '🏋️‍♀️', '🚴', '🚴‍♂️', '🚴‍♀️', '🚵', '🚵‍♂️', '🚵‍♀️', '🤸', '🤸‍♂️', '🤸‍♀️', '🤼', '🤼‍♂️', '🤼‍♀️', '🤽', '🤽‍♂️', '🤽‍♀️', '🤾', '🤾‍♂️', '🤾‍♀️', '🤹', '🤹‍♂️', '🤹‍♀️', '🧘', '🧘‍♂️', '🧘‍♀️']
+    },
+    {
+      name: 'Animales y Naturaleza',
+      icon: '🐶',
+      emojis: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐽', '🐸', '🐵', '🙈', '🙉', '🙊', '🐒', '🐔', '🐧', '🐦', '🐤', '🐣', '🐥', '🦆', '🦅', '🦉', '🦇', '🐺', '🐗', '🐴', '🦄', '🐝', '🐛', '🦋', '🐌', '🐞', '🐜', '🦟', '🦗', '🕷️', '🦂', '🐢', '🐍', '🦎', '🦖', '🦕', '🐙', '🦑', '🦐', '🦞', '🦀', '🐡', '🐠', '🐟', '🐬', '🐳', '🐋', '🦈', '🐊', '🐅', '🐆', '🦓', '🦍', '🦧', '🐘', '🦛', '🦏', '🐪', '🐫', '🦒', '🦘', '🦡', '🐾', '🐕', '🐩', '🐈', '🐓', '🦃', '🦚', '🦜', '🦢', '🦩', '🕊️', '🐇', '🦝', '🦨', '🦦', '🦥', '🐁', '🐀', '🐿️', '🦔', '🌍', '🌎', '🌏', '🌋', '🗻', '🏔️', '⛰️', '🏕️', '🏖️', '🏜️', '🏝️', '🏞️', '🏟️', '🏛️', '🏗️', '🌲', '🌳', '🌴', '🌵', '🌾', '🌿', '☘️', '🍀', '🍁', '🍂', '🍃']
+    },
+    {
+      name: 'Comida y Bebida',
+      icon: '🍎',
+      emojis: ['🍎', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🍈', '🍒', '🍑', '🥭', '🍍', '🥥', '🥝', '🍅', '🍆', '🥑', '🥦', '🥬', '🥒', '🌶️', '🌽', '🥕', '🥔', '🍠', '🥐', '🥯', '🍞', '🥖', '🥨', '🧀', '🥚', '🍳', '🥞', '🥓', '🥩', '🍗', '🍖', '🦴', '🌭', '🍔', '🍟', '🍕', '🥪', '🥙', '🌮', '🌯', '🥗', '🥘', '🥫', '🍝', '🍜', '🍲', '🍛', '🍣', '🍱', '🥟', '🍤', '🍙', '🍚', '🍘', '🍥', '🥠', '🥮', '🍢', '🍡', '🍧', '🍨', '🍦', '🥧', '🧁', '🍰', '🎂', '🍮', '🍭', '🍬', '🍫', '🍿', '🍩', '🍪', '🌰', '🥜', '🍯', '🥛', '🍼', '☕', '🍵', '🧃', '🥤', '🍶', '🍺', '🍻', '🥂', '🍷', '🥃', '🍸', '🍹', '🧉', '🍾', '🧊']
+    },
+    {
+      name: 'Actividades y Deportes',
+      icon: '⚽',
+      emojis: ['⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🥏', '🎱', '🏓', '🏸', '🥅', '🏒', '🏑', '🥍', '🏏', '🥃', '⛳', '🏹', '🎣', '🥊', '🥋', '🎽', '🛹', '🛷', '⛸️', '🥌', '🎿', '⛷️', '🏂', '🏋️', '🤼', '🤸', '🤺', '🤾', '🏌️', '🏇', '🧘', '🏄', '🏊', '🚣', '🧗', '🚵', '🚴', '🏃', '🚶', '🎯', '🎮', '🕹️', '🎰', '🎲', '🃏', '🀄', '🎴', '🎭', '🖼️', '🎨', '🎬', '🎤', '🎧', '🎼', '🎹', '🥁', '🎷', '🎺', '🎸', '🎻', '🎲', '🎳', '🎯', '🎪', '🎭', '🎨', '🎬', '🎤', '🎧', '🎼', '🎹', '🥁', '🎷', '🎺', '🎸', '🎻', '🎤', '🎧', '🎼', '🎹', '🎷', '🎺', '🎸', '🎻']
+    },
+    {
+      name: 'Viajes y Lugares',
+      icon: '🚗',
+      emojis: ['🚗', '🚕', '🚙', '🚌', '🚎', '🏎️', '🚓', '🚑', '🚒', '🚐', '🚚', '🚛', '🚜', '🛴', '🚲', '🛵', '🏍️', '🛺', '🚨', '🚔', '🚍', '🚘', '🚖', '🚡', '🚠', '🚟', '🚃', '🚋', '🚞', '🚝', '🚄', '🚅', '🚈', '🚂', '🚆', '🚇', '🚊', '🚉', '✈️', '🛫', '🛬', '🛩️', '💺', '🚁', '🚟', '🚠', '🚡', '⛵', '🚤', '🛥️', '🛳️', '⛴️', '🚢', '⚓', '⛽', '🚧', '🚦', '🚥', '🗺️', '🗿', '🗽', '🗼', '🏰', '🏯', '🏟️', '🎡', '🎢', '🎠', '⛲', '⛱️', '🏖️', '🏝️', '🏜️', '🌋', '⛰️', '🏔️', '🗻', '🏕️', '⛺', '🏠', '🏡', '🏘️', '🏚️', '🏗️', '🏭', '🏢', '🏬', '🏣', '🏤', '🏥', '🏦', '🏨', '🏪', '🏫', '🏩', '💒', '🏛️', '⛪', '🕌', '🕍', '🛕', '🕋', '⛩️', '🛤️', '🛣️', '🗾', '🎑', '🏞️', '🌅', '🌄', '🌠', '🎇', '🎆', '🌇', '🌆', '🏙️', '🌃', '🌌', '🌉', '🌁']
+    },
+    {
+      name: 'Objetos',
+      icon: '⌚',
+      emojis: ['⌚', '📱', '📲', '💻', '⌨️', '🖥️', '🖨️', '🖱️', '🖲️', '🕹️', '🗜️', '💾', '💿', '📀', '📼', '📷', '📸', '📹', '🎥', '📽️', '🎞️', '📞', '☎️', '📟', '📠', '📺', '📻', '🎙️', '🎚️', '🎛️', '⏱️', '⏲️', '⏰', '🕰️', '⌛', '⏳', '📡', '🔋', '🔌', '💡', '🔦', '🕯️', '🪔', '🧯', '🛢️', '💸', '💵', '💴', '💶', '💷', '💶', '💳', '💎', '⚖️', '🪜', '🧰', '🪛', '🔧', '🔨', '⚒️', '🛠️', '⛏️', '🪚', '🔩', '⚙️', '🪤', '🧱', '⛓️', '🧲', '🔫', '💣', '🧨', '🪓', '🔪', '🗡️', '⚔️', '🛡️', '🚬', '⚰️', '🪦', '⚱️', '🏺', '🔮', '📿', '🧿', '💈', '⚗️', '🔭', '🔬', '🕳️', '🩹', '🩺', '💊', '💉', '🩸', '🧬', '🦠', '🧫', '🧪', '🌡️', '🧹', '🪠', '🧺', '🧻', '🚽', '🚿', '🛁', '🛀', '🧼', '🪥', '🪒', '🪣', '🧴', '🛎️', '🔑', '🗝️', '🚪', '🪑', '🪑', '🛋️', '🛏️', '🛌', '🧸', '🪆', '🖼️', '🪞', '🪟', '🛍️', '🛒', '🎁', '🎈', '🎏', '🎀', '🪄', '🪅', '🪡', '🧵', '🪢', '👓', '🕶️', '🥽', '🥼', '🦺', '👔', '👕', '👖', '🩱', '🩲', '🩳', '👗', '👘', '🥻', '🩴', '👠', '👡', '👢', '👞', '👟', '🥾', '🥿', '🧦', '🧤', '🧣', '🎩', '🧢', '👒', '🎓', '⛑️', '🪖', '💄', '💍', '💼', '👜', '👝', '👛', '🛍️', '🎒', '🩴', '👡', '👠', '🪖', '🧳', '🌂', '☂️', '🧵', '🪡', '🪢', '🧶', '🧥', '🥼', '🦺', '👚', '👕', '👖', '🩲', '🩳', '👔', '👗', '👙', '👘', '🥻', '🩱', '👚', '👕', '👖', '🩲', '🩳', '👔', '👗', '👙', '👘', '🥻', '🩱', '🧦', '🧤', '🧣', '🧥', '🥼', '🦺', '👔', '👕', '👖', '🩲', '🩳', '👔', '👗', '👙', '👘', '🥻', '🩱', '🧥', '🥼', '🦺', '🧦', '🧤', '🧣', '🧥', '🥼', '🦺']
+    },
+    {
+      name: 'Símbolos',
+      icon: '❤️',
+      emojis: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '☮️', '✝️', '☪️', '🕉️', '☸️', '✡️', '🔯', '🕎', '☯️', '☦️', '🛐', '⛎', '♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓', '🆔', '⚛️', '🉑', '☢️', '☣️', '📴', '📳', '🈶', '🈚', '🈸', '🈺', '🈷️', '✴️', '🆚', '💮', '🉐', '㊙️', '㊗️', '🈴', '🈵', '🈹', '🈲', '🅰️', '🅱️', '🆎', '🆑', '🅾️', '🆘', '❌', '⭕', '🛑', '⛔', '📛', '🚫', '💯', '💢', '♨️', '🚷', '🚯', '🚳', '🚱', '🔞', '📵', '🚭', '❗', '❓', '❕', '❔', '‼️', '⁉️', '🔅', '🔆', '〽️', '⚠️', '🚸', '🔱', '⚜️', '🔰', '♻️', '✅', '🈯', '💹', '❇️', '✳️', '❎', '🌐', '💠', 'Ⓜ️', '🌀', '💤', '🏧', '🚾', '♿', '🅿️', '🈳', '🈂️', '🛂', '🛃', '🛄', '🛅', '🚹', '🚺', '🚼', '🚻', '🚮', '🎦', '📶', '🈁', '🔣', '🔤', '🔠', '🔡', '🔢', '🔟', '🔠', '🔡', '🔢', '🔟', '#️⃣', '*️⃣', '0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟', '🔺', '🔻', '🔸', '🔹', '🔶', '🔷', '🔳', '🔲', '▪️', '▫️', '◾', '◽', '◼️', '◻️', '🟥', '🟧', '🟨', '🟩', '🟦', '🟪', '🟫', '⬛', '⬜', '🔈', '🔇', '🔉', '🔊', '🔔', '🔕', '📣', '📢', '💬', '💭', '🗯️', '♠️', '♣️', '♥️', '♦️', '🃏', '🎴', '🀄', '🕐', '🕑', '🕒', '🕓', '🕔', '🕕', '🕖', '🕗', '🕘', '🕙', '🕚', '🕛', '🕜', '🕝', '🕞', '🕟', '🕠', '🕡', '🕢', '🕣', '🕤', '🕥', '🕦', '🕧']
+    },
+    {
+      name: 'Banderas',
+      icon: '🏳️',
+      emojis: ['🏳️', '🏴', '🏁', '🚩', '🏳️‍🌈', '🏳️‍⚧️', '🏴‍☠️', '🇦🇨', '🇦🇩', '🇦🇪', '🇦🇫', '🇦🇬', '🇦🇮', '🇦🇱', '🇦🇲', '🇦🇴', '🇦🇶', '🇦🇷', '🇦🇸', '🇦🇹', '🇦🇺', '🇦🇼', '🇦🇽', '🇦🇿', '🇧🇦', '🇧🇧', '🇧🇩', '🇧🇪', '🇧🇫', '🇧🇬', '🇧🇭', '🇧🇮', '🇧🇯', '🇧🇱', '🇧🇲', '🇧🇳', '🇧🇴', '🇧🇶', '🇧🇷', '🇧🇸', '🇧🇹', '🇧🇻', '🇧🇼', '🇧🇾', '🇧🇿', '🇨🇦', '🇨🇨', '🇨🇩', '🇨🇫', '🇨🇬', '🇨🇭', '🇨🇮', '🇨🇰', '🇨🇱', '🇨🇲', '🇨🇳', '🇨🇴', '🇨🇵', '🇨🇷', '🇨🇺', '🇨🇻', '🇨🇼', '🇨🇽', '🇨🇾', '🇨🇿', '🇩🇪', '🇩🇬', '🇩🇯', '🇩🇰', '🇩🇲', '🇩🇴', '🇩🇿', '🇪🇦', '🇪🇨', '🇪🇪', '🇪🇬', '🇪🇭', '🇪🇷', '🇪🇸', '🇪🇹', '🇪🇺', '🇫🇮', '🇫🇯', '🇫🇰', '🇫🇲', '🇫🇴', '🇫🇷', '🇬🇦', '🇬🇧', '🇬🇩', '🇬🇪', '🇬🇫', '🇬🇬', '🇬🇭', '🇬🇮', '🇬🇱', '🇬🇲', '🇬🇳', '🇬🇵', '🇬🇶', '🇬🇷', '🇬🇸', '🇬🇹', '🇬🇺', '🇬🇼', '🇬🇾', '🇭🇰', '🇭🇲', '🇭🇳', '🇭🇷', '🇭🇹', '🇭🇺', '🇮🇨', '🇮🇩', '🇮🇪', '🇮🇱', '🇮🇲', '🇮🇳', '🇮🇴', '🇮🇶', '🇮🇷', '🇮🇸', '🇮🇹', '🇯🇪', '🇯🇲', '🇯🇴', '🇯🇵', '🇰🇪', '🇰🇬', '🇰🇭', '🇰🇮', '🇰🇲', '🇰🇳', '🇰🇵', '🇰🇷', '🇰🇼', '🇰🇾', '🇰🇿', '🇱🇦', '🇱🇧', '🇱🇨', '🇱🇮', '🇱🇰', '🇱🇷', '🇱🇸', '🇱🇹', '🇱🇺', '🇱🇻', '🇱🇾', '🇲🇦', '🇲🇨', '🇲🇩', '🇲🇪', '🇲🇫', '🇲🇬', '🇲🇭', '🇲🇰', '🇲🇱', '🇲🇲', '🇲🇳', '🇲🇴', '🇲🇵', '🇲🇶', '🇲🇷', '🇲🇸', '🇲🇹', '🇲🇺', '🇲🇻', '🇲🇼', '🇲🇽', '🇲🇾', '🇲🇿', '🇳🇦', '🇳🇨', '🇳🇪', '🇳🇫', '🇳🇬', '🇳🇮', '🇳🇱', '🇳🇴', '🇳🇵', '🇳🇷', '🇳🇺', '🇳🇿', '🇴🇲', '🇵🇦', '🇵🇪', '🇵🇫', '🇵🇬', '🇵🇭', '🇵🇰', '🇵🇱', '🇵🇲', '🇵🇳', '🇵🇷', '🇵🇸', '🇵🇹', '🇵🇼', '🇵🇾', '🇶🇦', '🇷🇪', '🇷🇴', '🇷🇸', '🇷🇺', '🇷🇼', '🇸🇦', '🇸🇧', '🇸🇨', '🇸🇩', '🇸🇪', '🇸🇬', '🇸🇭', '🇸🇮', '🇸🇯', '🇸🇰', '🇸🇱', '🇸🇲', '🇸🇳', '🇸🇴', '🇸🇷', '🇸🇸', '🇸🇹', '🇸🇻', '🇸🇽', '🇸🇾', '🇸🇿', '🇹🇦', '🇹🇨', '🇹🇩', '🇹🇫', '🇹🇬', '🇹🇭', '🇹🇯', '🇹🇰', '🇹🇱', '🇹🇲', '🇹🇳', '🇹🇴', '🇹🇷', '🇹🇹', '🇹🇻', '🇹🇼', '🇹🇿', '🇺🇦', '🇺🇬', '🇺🇲', '🇺🇳', '🇺🇸', '🇺🇾', '🇺🇿', '🇻🇦', '🇻🇨', '🇻🇪', '🇻🇬', '🇻🇮', '🇻🇳', '🇻🇺', '🇼🇫', '🇼🇸', '🇽🇰', '🇾🇪', '🇾🇹', '🇿🇦', '🇿🇲', '🇿🇼']
+    }
+  ];
+  
+  selectedEmojiCategory = 0;
+  private categoryBarScrollPosition = 0;
 
   constructor(
     private cdr: ChangeDetectorRef,
     private taskTypeService: TaskTypeService,
-    private taskService: TaskService
+    private taskService: TaskService,
+    private renderer: Renderer2
   ) {}
 
   get formId(): string {
@@ -128,6 +197,8 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   ngOnDestroy() {
     // Asegurar que el scroll se desbloquee al destruir el componente
     this.enableBodyScroll();
+    // Limpiar el selector de emojis si está abierto
+    this.closeEmojiPicker();
   }
   
   async ngOnChanges(changes: any) {
@@ -144,6 +215,8 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
       this.showRecentTasksSelector = false;
       this.selectedRecentTaskIndex = '';
       this.isLoading = false;
+      // Cerrar el selector de emojis si está abierto
+      this.closeEmojiPicker();
     }
   }
   
@@ -241,6 +314,7 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   
   closeModal() {
     this.enableBodyScroll();
+    this.closeEmojiPicker();
     this.closeModalEvent.emit();
   }
   
@@ -258,12 +332,280 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   }
   
   toggleEmojiPicker() {
-    this.showEmojiPicker = !this.showEmojiPicker;
+    if (this.showEmojiPicker) {
+      this.closeEmojiPicker();
+    } else {
+      this.openEmojiPicker();
+    }
+  }
+  
+  openEmojiPicker() {
+    this.showEmojiPicker = true;
+    this.cdr.detectChanges();
+    
+    // Esperar a que el botón esté disponible y el DOM se actualice
+    setTimeout(() => {
+      if (!this.emojiButton || !this.emojiButton.nativeElement) {
+        // Si el botón aún no está disponible, intentar de nuevo
+        setTimeout(() => {
+          if (this.emojiButton && this.emojiButton.nativeElement) {
+            this.createEmojiPickerElement();
+          } else {
+            this.showEmojiPicker = false;
+          }
+        }, 100);
+        return;
+      }
+      this.createEmojiPickerElement();
+    }, 0);
+  }
+  
+  closeEmojiPicker() {
+    this.showEmojiPicker = false;
+    if (this.emojiPickerElement) {
+      this.renderer.removeChild(document.body, this.emojiPickerElement);
+      this.emojiPickerElement = null;
+    }
+    if (this.emojiPickerClickListener) {
+      this.emojiPickerClickListener();
+      this.emojiPickerClickListener = undefined;
+    }
+    this.emojiGridElement = null;
+    this.emojiHeaderElement = null;
+  }
+  
+  private createEmojiPickerElement() {
+    if (!this.emojiButton || !this.emojiButton.nativeElement) {
+      return;
+    }
+    
+    const button = this.emojiButton.nativeElement as HTMLElement;
+    const buttonRect = button.getBoundingClientRect();
+    
+    // Crear el contenedor del picker
+    const picker = this.renderer.createElement('div');
+    this.renderer.addClass(picker, 'emoji-picker-portal');
+    
+    // Crear el header con el nombre de la categoría
+    const header = this.renderer.createElement('div');
+    this.renderer.addClass(header, 'emoji-header');
+    
+    const categoryName = this.renderer.createElement('span');
+    categoryName.textContent = this.emojiCategories[this.selectedEmojiCategory].name;
+    this.renderer.setStyle(categoryName, 'font-weight', '600');
+    this.renderer.setStyle(categoryName, 'font-size', '14px');
+    this.renderer.appendChild(header, categoryName);
+    
+    const closeButton = this.renderer.createElement('button');
+    this.renderer.setAttribute(closeButton, 'type', 'button');
+    this.renderer.setStyle(closeButton, 'color', '#9ca3af');
+    this.renderer.setStyle(closeButton, 'cursor', 'pointer');
+    this.renderer.setStyle(closeButton, 'background', 'none');
+    this.renderer.setStyle(closeButton, 'border', 'none');
+    this.renderer.setStyle(closeButton, 'padding', '0');
+    this.renderer.setStyle(closeButton, 'font-size', '16px');
+    this.renderer.listen(closeButton, 'click', () => this.closeEmojiPicker());
+    this.renderer.listen(closeButton, 'mouseenter', () => {
+      this.renderer.setStyle(closeButton, 'color', '#4b5563');
+    });
+    this.renderer.listen(closeButton, 'mouseleave', () => {
+      this.renderer.setStyle(closeButton, 'color', '#9ca3af');
+    });
+    
+    const closeIcon = this.renderer.createElement('i');
+    this.renderer.addClass(closeIcon, 'fas');
+    this.renderer.addClass(closeIcon, 'fa-times');
+    this.renderer.appendChild(closeButton, closeIcon);
+    this.renderer.appendChild(header, closeButton);
+    this.renderer.appendChild(picker, header);
+    this.emojiHeaderElement = header;
+    
+    // Crear el grid de emojis de la categoría actual
+    const grid = this.renderer.createElement('div');
+    this.renderer.addClass(grid, 'emoji-grid');
+    
+    this.updateEmojiGrid(grid);
+    
+    this.renderer.appendChild(picker, grid);
+    this.emojiGridElement = grid;
+    
+    // Crear barra de navegación de categorías
+    const categoryBar = this.renderer.createElement('div');
+    this.renderer.setStyle(categoryBar, 'display', 'flex');
+    this.renderer.setStyle(categoryBar, 'gap', '4px');
+    this.renderer.setStyle(categoryBar, 'padding', '8px');
+    this.renderer.setStyle(categoryBar, 'border-top', '1px solid #f3f4f6');
+    this.renderer.setStyle(categoryBar, 'background', '#f9fafb');
+    this.renderer.setStyle(categoryBar, 'overflow-x', 'auto');
+    this.renderer.setStyle(categoryBar, 'overflow-y', 'hidden');
+    this.renderer.setStyle(categoryBar, 'border-radius', '0 0 12px 12px');
+    
+    this.emojiCategories.forEach((category, index) => {
+      const categoryButton = this.renderer.createElement('button');
+      this.renderer.setAttribute(categoryButton, 'type', 'button');
+      this.renderer.setAttribute(categoryButton, 'data-category-button', 'true');
+      this.renderer.setStyle(categoryButton, 'background', index === this.selectedEmojiCategory ? '#dbeafe' : 'transparent');
+      this.renderer.setStyle(categoryButton, 'border', 'none');
+      this.renderer.setStyle(categoryButton, 'border-radius', '8px');
+      this.renderer.setStyle(categoryButton, 'padding', '8px');
+      this.renderer.setStyle(categoryButton, 'cursor', 'pointer');
+      this.renderer.setStyle(categoryButton, 'font-size', '20px');
+      this.renderer.setStyle(categoryButton, 'min-width', '40px');
+      this.renderer.setStyle(categoryButton, 'display', 'flex');
+      this.renderer.setStyle(categoryButton, 'align-items', 'center');
+      this.renderer.setStyle(categoryButton, 'justify-content', 'center');
+      this.renderer.setStyle(categoryButton, 'transition', 'background-color 0.2s');
+      
+      categoryButton.textContent = category.icon;
+      
+      this.renderer.listen(categoryButton, 'click', () => {
+        this.selectedEmojiCategory = index;
+        this.updateCategoryContent();
+      });
+      
+      this.renderer.listen(categoryButton, 'mouseenter', () => {
+        if (index !== this.selectedEmojiCategory) {
+          this.renderer.setStyle(categoryButton, 'background', '#f3f4f6');
+        }
+      });
+      
+      this.renderer.listen(categoryButton, 'mouseleave', () => {
+        if (index !== this.selectedEmojiCategory) {
+          this.renderer.setStyle(categoryButton, 'background', 'transparent');
+        }
+      });
+      
+      this.renderer.appendChild(categoryBar, categoryButton);
+    });
+    
+    this.renderer.appendChild(picker, categoryBar);
+    
+    // Restaurar posición de scroll horizontal de la barra de categorías
+    setTimeout(() => {
+      categoryBar.scrollLeft = this.categoryBarScrollPosition;
+      
+      // Guardar posición de scroll horizontal cuando se hace scroll
+      this.renderer.listen(categoryBar, 'scroll', () => {
+        this.categoryBarScrollPosition = categoryBar.scrollLeft;
+      });
+    }, 0);
+    
+    // Calcular posición
+    const pickerWidth = 288; // width del picker
+    const pickerHeight = 380; // max-height del picker (aumentado para incluir barra de categorías)
+    const margin = 8;
+    
+    let left = buttonRect.left;
+    let top = buttonRect.bottom + margin;
+    
+    // Ajustar si se sale de la pantalla por la derecha
+    if (left + pickerWidth > window.innerWidth) {
+      left = window.innerWidth - pickerWidth - 16;
+    }
+    
+    // Ajustar si se sale de la pantalla por la izquierda
+    if (left < 16) {
+      left = 16;
+    }
+    
+    // Ajustar si se sale por abajo (mostrar arriba)
+    if (top + pickerHeight > window.innerHeight) {
+      top = buttonRect.top - pickerHeight - margin;
+    }
+    
+    // Asegurar que no se salga por arriba
+    if (top < 16) {
+      top = 16;
+    }
+    
+    this.renderer.setStyle(picker, 'position', 'fixed');
+    this.renderer.setStyle(picker, 'left', `${left}px`);
+    this.renderer.setStyle(picker, 'top', `${top}px`);
+    this.renderer.setStyle(picker, 'z-index', '10000');
+    
+    // Agregar al body
+    this.renderer.appendChild(document.body, picker);
+    this.emojiPickerElement = picker;
+    
+    // Agregar listener para cerrar al hacer clic fuera
+    setTimeout(() => {
+      this.emojiPickerClickListener = this.renderer.listen('document', 'click', (event: MouseEvent) => {
+        if (this.emojiPickerElement && 
+            !this.emojiPickerElement.contains(event.target as Node) && 
+            !button.contains(event.target as Node)) {
+          this.closeEmojiPicker();
+        }
+      });
+    }, 0);
   }
   
   selectEmoji(emoji: string) {
     this.task.emoji = emoji;
-    this.showEmojiPicker = false;
+    this.closeEmojiPicker();
+  }
+  
+  private updateCategoryContent() {
+    if (!this.emojiPickerElement || !this.emojiGridElement || !this.emojiHeaderElement) {
+      return;
+    }
+    
+    // Actualizar el nombre de la categoría en el header
+    const categoryNameSpan = this.emojiHeaderElement.querySelector('span');
+    if (categoryNameSpan) {
+      categoryNameSpan.textContent = this.emojiCategories[this.selectedEmojiCategory].name;
+    }
+    
+    // Actualizar el grid de emojis
+    // Limpiar el grid actual
+    while (this.emojiGridElement.firstChild) {
+      this.renderer.removeChild(this.emojiGridElement, this.emojiGridElement.firstChild);
+    }
+    
+    // Llenar con los emojis de la nueva categoría
+    this.updateEmojiGrid(this.emojiGridElement);
+    
+    // Actualizar el estado visual de los botones de categoría
+    const categoryButtons = this.emojiPickerElement.querySelectorAll('[data-category-button]');
+    categoryButtons.forEach((button: any, index: number) => {
+      if (index === this.selectedEmojiCategory) {
+        this.renderer.setStyle(button, 'background', '#dbeafe');
+      } else {
+        this.renderer.setStyle(button, 'background', 'transparent');
+      }
+    });
+    
+    // Resetear el scroll del grid al inicio
+    this.emojiGridElement.scrollTop = 0;
+  }
+  
+  private updateEmojiGrid(grid: HTMLElement) {
+    const currentCategory = this.emojiCategories[this.selectedEmojiCategory];
+    // Eliminar duplicados manteniendo el orden
+    const uniqueEmojis = Array.from(new Set(currentCategory.emojis));
+    
+    uniqueEmojis.forEach(emoji => {
+      const emojiOption = this.renderer.createElement('span');
+      this.renderer.addClass(emojiOption, 'emoji-option');
+      if (this.task.emoji === emoji) {
+        this.renderer.addClass(emojiOption, 'selected');
+      }
+      emojiOption.textContent = emoji;
+      this.renderer.listen(emojiOption, 'click', () => {
+        this.selectEmoji(emoji);
+      });
+      this.renderer.appendChild(grid, emojiOption);
+    });
+  }
+  
+  @HostListener('window:resize', ['$event'])
+  onResize() {
+    if (this.showEmojiPicker && this.emojiPickerElement) {
+      // Recalcular posición al redimensionar
+      this.closeEmojiPicker();
+      setTimeout(() => {
+        this.openEmojiPicker();
+      }, 100);
+    }
   }
   
   onEnvironmentChange() {

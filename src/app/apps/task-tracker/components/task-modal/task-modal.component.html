@@ -169,32 +169,12 @@
               <!-- Selector de emoji compacto -->
               <div class="relative">
                 <button 
+                  #emojiButton
                   type="button" 
                   (click)="toggleEmojiPicker()" 
                   class="w-12 h-11 flex items-center justify-center bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                   <span class="text-xl">{{task.emoji || '📝'}}</span>
                 </button>
-                
-                <!-- Picker de emojis mejorado -->
-                <div *ngIf="showEmojiPicker" class="emoji-picker">
-                  <div class="emoji-header">
-                    <span class="text-sm font-medium text-gray-600">Selecciona un emoji:</span>
-                    <button 
-                      type="button" 
-                      (click)="showEmojiPicker = false" 
-                      class="text-gray-400 hover:text-gray-600">
-                      <i class="fas fa-times"></i>
-                    </button>
-                  </div>
-                  <div class="emoji-grid">
-                    <span *ngFor="let emoji of emojis" 
-                          (click)="selectEmoji(emoji)" 
-                          class="emoji-option"
-                          [class.selected]="task.emoji === emoji">
-                      {{emoji}}
-                    </span>
-                  </div>
-                </div>
               </div>
               
               <!-- Input del nombre -->
