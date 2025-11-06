@@ -154,8 +154,10 @@ interface WeekDay {
                     stroke-width="1"
                     [attr.transform]="'translate(0, ' + getHourY(hour) + ')'"/>
               
-              <!-- Etiqueta de hora solo en la primera columna o cada 2 horas -->
-              <text *ngIf="dayIndex === 0 || hour % 2 === 0"
+              <!-- Etiqueta de hora solo en la primera columna -->
+              <!-- Muestra las 24 horas en formato 12 horas (12:00 AM - 11:00 PM) -->
+              <!-- Aunque hay divisiones cada media hora, las etiquetas muestran solo las horas completas -->
+              <text *ngIf="dayIndex === 0"
                     x="4" 
                     [attr.y]="getHourY(hour) + 4" 
                     [attr.font-size]="hourFontSize" 
@@ -538,7 +540,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   // Propiedades de dimensiones
   svgWidth = 1400;
   minSvgWidth = 800;
-  hoursAreaHeight = 1440; // 24 horas * 60 minutos = 1440px (1px por minuto)
+  hoursAreaHeight = 720; // 24 horas * 30px = 720px (30px por hora)
   svgHeight = 60 + this.hoursAreaHeight; // Encabezado + área de horas
   
   // Ancho de cada columna de día
@@ -554,8 +556,10 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   hourFontSize = 10;
   taskFontSize = 11;
   
-  // Array de horas (0-23)
-  hours: number[] = Array.from({length: 24}, (_, i) => i);
+  // Array de índices para crear divisiones cada media hora (0-47)
+  // Cada índice representa una división de media hora, creando 48 divisiones en total
+  // Las etiquetas muestran las 24 horas completas en formato 12 horas (12:00 AM - 11:00 PM)
+  hours: number[] = Array.from({length: 48}, (_, i) => i);
   
   // Días de la semana
   weekDays: WeekDay[] = [];
@@ -598,10 +602,11 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     return dayIndex * (this.dayColumnWidth + this.columnGap);
   }
 
-  // Obtener posición Y de una hora
-  getHourY(hour: number): number {
-    // Cada hora ocupa 60px (1440px / 24 horas)
-    return hour * 60;
+  // Obtener posición Y de una división (índice de media hora)
+  // Cada hora completa ocupa 30px, cada media hora ocupa 15px
+  // 48 divisiones × 15px = 720px (24 horas × 30px)
+  getHourY(hourIndex: number): number {
+    return hourIndex * 15;
   }
 
   // Verificar si una columna es el día de hoy
@@ -628,12 +633,33 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     const now = new Date();
     const hour = now.getHours();
     const minutes = now.getMinutes();
-    return (hour * 60) + minutes;
+    // Convertir a píxeles: cada hora son 30px, cada minuto son 30/60 = 0.5px
+    return (hour * 30) + (minutes * 0.5);
   }
 
-  // Formatear hora
-  formatHour(hour: number): string {
-    return `${hour.toString().padStart(2, '0')}:00`;
+  // Formatear hora en formato 12 horas
+  // Recibe un índice (0-47) que representa divisiones de media hora
+  // Muestra las 24 horas completas en formato 12 horas: 12:00 AM, 1:00 AM, ..., 11:00 AM, 12:00 PM, 1:00 PM, ..., 11:00 PM
+  // Aunque las divisiones son cada media hora, las etiquetas muestran solo las horas completas (:00)
+  formatHour(hourIndex: number): string {
+    const hour12 = hourIndex; // Índice usado directamente como hora (0-47 se convierte a 0-23 para display)
+    
+    // Convertir a formato 12 horas
+    let displayHour = hour12;
+    let period = 'AM';
+    
+    if (hour12 === 0) {
+      displayHour = 12; // 12:00 AM (medianoche)
+    } else if (hour12 === 12) {
+      displayHour = 12; // 12:00 PM (mediodía)
+      period = 'PM';
+    } else if (hour12 > 12) {
+      displayHour = hour12 - 12; // 1:00 PM - 11:00 PM
+      period = 'PM';
+    }
+    
+    const minutes = '00'; // Siempre muestra horas completas (:00)
+    return `${displayHour}:${minutes} ${period}`;
   }
 
   // Método utilitario para convertir fechas UTC a hora local
@@ -825,10 +851,11 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
       effectiveStart = new Date(itemStart);
     }
 
-    // Calcular minutos desde el inicio del día
+    // Calcular píxeles desde el inicio del día: cada hora son 30px, cada minuto son 0.5px
     const minutesFromDayStart = (effectiveStart.getHours() * 60) + effectiveStart.getMinutes();
+    const pixelsFromDayStart = minutesFromDayStart * 0.5; // 0.5px por minuto (30px por hora)
     
-    return minutesFromDayStart;
+    return pixelsFromDayStart;
   }
 
   // Obtener ancho de una tarea
@@ -870,8 +897,9 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     const endMinutes = (effectiveEnd.getHours() * 60) + effectiveEnd.getMinutes();
     
     const durationMinutes = Math.max(endMinutes - startMinutes, 15); // Mínimo 15 minutos
+    const durationPixels = durationMinutes * 0.5; // 0.5px por minuto (30px por hora)
     
-    return durationMinutes;
+    return durationPixels;
   }
 
   // Obtener texto de una tarea
