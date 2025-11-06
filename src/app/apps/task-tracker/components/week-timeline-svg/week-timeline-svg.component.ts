@@ -106,9 +106,9 @@ interface WeekDay {
       </div>
 
       <!-- Contenedor centrado para el SVG -->
-      <div class="svg-container flex justify-center overflow-x-auto">
+      <div class="svg-container">
         <svg [attr.width]="svgWidth" [attr.height]="svgHeight" [attr.viewBox]="'0 0 ' + svgWidth + ' ' + svgHeight" 
-             class="week-timeline-svg" [style.min-width.px]="minSvgWidth">
+             class="week-timeline-svg" [style.min-width.px]="svgWidth">
           
           <!-- Encabezado con nombres de días -->
           <g transform="translate(0, 0)">
@@ -278,6 +278,9 @@ interface WeekDay {
       -webkit-user-select: none;
       -moz-user-select: none;
       -ms-user-select: none;
+      overflow-x: auto;
+      overflow-y: visible;
+      -webkit-overflow-scrolling: touch;
     }
     
     .week-timeline-svg {
@@ -381,16 +384,26 @@ interface WeekDay {
 
     .svg-container {
       width: 100%;
+      display: flex;
+      justify-content: flex-start;
+      min-width: fit-content;
+    }
+    
+    .week-timeline-svg {
+      flex-shrink: 0;
+      display: block;
     }
     
     @media (min-width: 1280px) {
       .svg-container {
-        display: flex;
         justify-content: center;
       }
-      
-      .week-timeline-svg {
-        flex-shrink: 0;
+    }
+    
+    /* Asegurar que en pantallas pequeñas el scroll funcione desde el inicio */
+    @media (max-width: 1279px) {
+      .svg-container {
+        justify-content: flex-start;
       }
     }
 
@@ -516,7 +529,9 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   private longPressTimeout: any = null;
   private longPressStartX: number = 0;
   private longPressStartY: number = 0;
+  private longPressTask: Task | null = null; // Tarea asociada al long press actual
   private isTouchActive: boolean = false; // Bandera para rastrear si el toque está activo
+  private longPressCompleted: boolean = false; // Indica si el long press se completó antes del touchend
   private readonly LONG_PRESS_DURATION = 500;
   private readonly LONG_PRESS_MOVE_THRESHOLD = 10;
 
@@ -1109,35 +1124,42 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   }
 
   onTaskTouchStart(task: Task, event: TouchEvent): void {
+    // EVENTO: touchstart - Se dispara cuando el usuario comienza a tocar un bloque/tarea
     if (event.touches.length !== 1) return;
     
     // Cancelar cualquier long press previo que pueda estar pendiente
     this.cancelLongPress();
     
+    // Resetear banderas
+    this.longPressCompleted = false;
+    
     // Marcar que el toque está activo
     this.isTouchActive = true;
     
+    // Guardar la posición inicial del toque
     const touch = event.touches[0];
     this.longPressStartX = touch.clientX;
     this.longPressStartY = touch.clientY;
     
     // Guardar referencia a la tarea para el long press
-    const taskForLongPress = task;
+    this.longPressTask = task;
     
+    // Iniciar el timeout para detectar pulsación larga
     this.longPressTimeout = setTimeout(() => {
-      // Solo mostrar el menú si el toque aún está activo (el dedo sigue presionado)
+      // Solo marcar como completado si el toque aún está activo (el dedo sigue presionado)
+      // NO mostramos el menú aquí, esperamos a touchend para verificar el movimiento
       if (this.longPressTimeout && this.isTouchActive) {
-        this.showTaskContextMenu(taskForLongPress, this.longPressStartX, this.longPressStartY);
+        this.longPressCompleted = true;
         if ('vibrate' in navigator) {
           navigator.vibrate(50);
         }
-        // Marcar que el toque ya no está activo después de mostrar el menú
-        this.isTouchActive = false;
       }
     }, this.LONG_PRESS_DURATION);
   }
 
   onTaskTouchMove(event: TouchEvent): void {
+    // EVENTO: touchmove - Se dispara durante el desplazamiento/scroll mientras el dedo está sobre el bloque
+    // Si hay movimiento significativo durante el desplazamiento, cancelamos el long press
     if (!this.longPressTimeout) return;
     
     if (event.touches.length === 1) {
@@ -1145,6 +1167,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
       const deltaX = Math.abs(touch.clientX - this.longPressStartX);
       const deltaY = Math.abs(touch.clientY - this.longPressStartY);
       
+      // Si el movimiento supera el umbral, es un scroll y cancelamos el long press
       if (deltaX > this.LONG_PRESS_MOVE_THRESHOLD || deltaY > this.LONG_PRESS_MOVE_THRESHOLD) {
         this.cancelLongPress();
       }
@@ -1152,9 +1175,35 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   }
 
   onTaskTouchEnd(event: TouchEvent): void {
+    // EVENTO: touchend - Se dispara cuando el usuario suelta el dedo del bloque
+    // Aquí verificamos la distancia total recorrida para diferenciar entre scroll y pulsación larga
+    
     // Marcar que el toque ya no está activo
     this.isTouchActive = false;
-    // Cancelar el long press timeout
+    
+    // Si el long press se completó (el usuario mantuvo el dedo sin mover por 500ms)
+    // verificamos si realmente no hubo movimiento significativo
+    if (this.longPressCompleted && this.longPressTask && event.changedTouches.length > 0) {
+      const touch = event.changedTouches[0];
+      const touchEndX = touch.clientX;
+      const touchEndY = touch.clientY;
+      
+      // Calcular la distancia total recorrida desde el inicio del toque
+      const deltaX = Math.abs(touchEndX - this.longPressStartX);
+      const deltaY = Math.abs(touchEndY - this.longPressStartY);
+      
+      // Solo mostrar el menú si el movimiento fue menor que el umbral
+      // Esto significa que fue una pulsación larga, no un scroll
+      if (deltaX < this.LONG_PRESS_MOVE_THRESHOLD && deltaY < this.LONG_PRESS_MOVE_THRESHOLD) {
+        // El dedo permaneció prácticamente quieto, es un long press válido
+        this.showTaskContextMenu(this.longPressTask, this.longPressStartX, this.longPressStartY);
+      }
+      // Si el movimiento fue mayor, fue un scroll y no mostramos el menú
+    }
+    
+    // Limpiar todo
+    this.longPressCompleted = false;
+    this.longPressTask = null;
     this.cancelLongPress();
   }
 
@@ -1165,6 +1214,8 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     }
     // También marcar que el toque ya no está activo cuando se cancela
     this.isTouchActive = false;
+    this.longPressCompleted = false;
+    this.longPressTask = null;
   }
 
   showTaskContextMenu(task: Task, x: number, y: number): void {
