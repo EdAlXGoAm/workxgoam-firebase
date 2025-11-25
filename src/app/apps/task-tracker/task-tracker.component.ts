@@ -871,6 +871,10 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
           this.onNewTaskEnvironmentChange(); // Cargar proyectos disponibles
         }
         this.newTask.project = createdProjectId;
+        // Recargar la lista de proyectos en el modal de tarea
+        if (this.newTaskModal) {
+          this.newTaskModal.refreshProjects();
+        }
       } else if (this.showEditTaskModal && this.selectedTask) {
         // También asegurarnos de que el ambiente esté seleccionado
         if (this.newProject.environment) {
@@ -878,6 +882,10 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
           this.onEditTaskEnvironmentChange(); // Cargar proyectos disponibles
         }
         this.selectedTask.project = createdProjectId;
+        // Recargar la lista de proyectos en el modal de tarea
+        if (this.editTaskModal) {
+          this.editTaskModal.refreshProjects();
+        }
       }
       
       this.closeNewProjectModal();

@@ -681,6 +681,19 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     this.buildTaskTypeOptions();
   }
 
+  refreshProjects() {
+    // Actualizar los proyectos seleccionables basándose en el ambiente actual
+    if (this.task.environment) {
+      this.selectableProjects = this.projects.filter(p => p.environment === this.task.environment);
+    } else {
+      this.selectableProjects = [];
+    }
+    // Actualizar las opciones del selector de proyectos
+    this.buildProjectOptions();
+    // Forzar actualización de la vista
+    this.cdr.detectChanges();
+  }
+
   async loadRecentTasks() {
     if (!this.task.project || this.isEditing) {
       this.recentTasks = [];

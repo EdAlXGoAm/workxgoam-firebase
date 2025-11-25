@@ -33,6 +33,21 @@ interface WeekDay {
   imports: [CommonModule, FormsModule, AndroidDatePickerComponent],
   template: `
     <div #containerRef class="week-timeline-container w-full overflow-x-auto relative">
+      <!-- Toggle de modo de coloreado (solo visible cuando hay ambiente enfocado) -->
+      <div *ngIf="focusedEnvironmentId" class="color-mode-toggle mb-3 flex items-center justify-center gap-2 bg-white rounded-lg p-2 shadow-sm border">
+        <button 
+          (click)="toggleColorMode()"
+          class="toggle-button flex items-center gap-2 px-4 py-2 rounded-md transition-all duration-200"
+          [class.active-environment]="colorMode === 'environment'"
+          [class.active-tasktype]="colorMode === 'taskType'"
+          title="Cambiar modo de coloreado">
+          <i class="fas" [class.fa-layer-group]="colorMode === 'environment'" [class.fa-tag]="colorMode === 'taskType'"></i>
+          <span class="text-sm font-medium">
+            {{ colorMode === 'environment' ? 'Color por Ambiente' : 'Color por Tipo de Tarea' }}
+          </span>
+        </button>
+      </div>
+      
       <!-- Controles de Navegación de Semana -->
       <div class="week-navigation mb-4 flex flex-col md:flex-row items-center justify-between bg-white rounded-lg p-3 shadow-sm border gap-3">
         <!-- Primera fila: Navegador de semanas -->
@@ -286,6 +301,59 @@ interface WeekDay {
       -webkit-overflow-scrolling: touch;
     }
     
+    /* Estilos para el toggle de modo de coloreado */
+    .color-mode-toggle {
+      backdrop-filter: blur(10px);
+    }
+    
+    .toggle-button {
+      background: linear-gradient(135deg, #e5e7eb 0%, #f3f4f6 100%);
+      color: #6b7280;
+      border: 2px solid transparent;
+      cursor: pointer;
+      user-select: none;
+    }
+    
+    .toggle-button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .toggle-button:active {
+      transform: translateY(0);
+    }
+    
+    .toggle-button.active-environment {
+      background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+      color: #1e40af;
+      border-color: #3b82f6;
+    }
+    
+    .toggle-button.active-tasktype {
+      background: linear-gradient(135deg, #ddd6fe 0%, #c4b5fd 100%);
+      color: #5b21b6;
+      border-color: #8b5cf6;
+    }
+    
+    .toggle-button i {
+      font-size: 14px;
+    }
+    
+    @media (max-width: 640px) {
+      .toggle-button {
+        padding: 8px 12px;
+        font-size: 12px;
+      }
+      
+      .toggle-button span {
+        font-size: 11px;
+      }
+      
+      .toggle-button i {
+        font-size: 12px;
+      }
+    }
+    
     .week-timeline-svg {
       display: block;
       background: #f9fafb;
@@ -504,6 +572,9 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   
   focusedEnvironmentId: string | null = null;
   private focusSubscription?: Subscription;
+  
+  // Modo de coloreado: 'environment' por defecto, 'taskType' cuando se enfoca un ambiente
+  colorMode: 'environment' | 'taskType' = 'environment';
 
   constructor(
     private cdr: ChangeDetectorRef,
@@ -791,32 +862,32 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     const items: RenderableItem[] = [];
 
     for (const task of filteredTasks) {
-      const taskStart = this.parseUTCToLocal(task.start);
-      const taskEnd = this.parseUTCToLocal(task.end);
-
-      // Verificar si la tarea se superpone con este día
-      if (taskStart <= dayEnd && taskEnd >= dayStart) {
-        // Si tiene fragmentos, procesarlos
-        if (task.fragments && task.fragments.length > 0) {
-          for (let i = 0; i < task.fragments.length; i++) {
-            const fragment = task.fragments[i];
-            if (fragment.start && fragment.end) {
-              const fragmentStart = this.parseUTCToLocal(fragment.start);
-              const fragmentEnd = this.parseUTCToLocal(fragment.end);
-              
-              if (fragmentStart <= dayEnd && fragmentEnd >= dayStart) {
-                items.push({
-                  type: 'fragment',
-                  task: task,
-                  fragmentIndex: i,
-                  start: fragment.start,
-                  end: fragment.end
-                });
-              }
+      // Si tiene fragmentos, procesarlos individualmente sin verificar la tarea principal
+      if (task.fragments && task.fragments.length > 0) {
+        for (let i = 0; i < task.fragments.length; i++) {
+          const fragment = task.fragments[i];
+          if (fragment.start && fragment.end) {
+            const fragmentStart = this.parseUTCToLocal(fragment.start);
+            const fragmentEnd = this.parseUTCToLocal(fragment.end);
+            
+            // Verificar si este fragmento específico se superpone con este día
+            if (fragmentStart <= dayEnd && fragmentEnd >= dayStart) {
+              items.push({
+                type: 'fragment',
+                task: task,
+                fragmentIndex: i,
+                start: fragment.start,
+                end: fragment.end
+              });
             }
           }
-        } else {
-          // Tarea principal
+        }
+      } else {
+        // Si no tiene fragmentos, verificar la tarea principal
+        const taskStart = this.parseUTCToLocal(task.start);
+        const taskEnd = this.parseUTCToLocal(task.end);
+        
+        if (taskStart <= dayEnd && taskEnd >= dayStart) {
           items.push({
             type: 'task',
             task: task,
@@ -934,17 +1005,30 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   }
 
   getTaskColor(task: Task): string {
-    // Siempre priorizar el color del tipo de tarea si existe
-    const typeColor = this.getTaskTypeColor(task);
-    if (typeColor) {
-      return typeColor;
-    }
-    
-    // Si no hay color de tipo, usar el color del ambiente
-    if (task.environment && this.environments.length > 0) {
-      const environment = this.environments.find(env => env.id === task.environment);
-      if (environment && environment.color) {
-        return environment.color;
+    // Si NO hay ambiente enfocado, usar color de ambiente siempre
+    if (!this.focusedEnvironmentId) {
+      if (task.environment && this.environments.length > 0) {
+        const environment = this.environments.find(env => env.id === task.environment);
+        if (environment && environment.color) {
+          return environment.color;
+        }
+      }
+    } else {
+      // Si HAY ambiente enfocado, respetar el modo de coloreado seleccionado
+      if (this.colorMode === 'taskType') {
+        // Modo: colorear por tipo de tarea
+        const typeColor = this.getTaskTypeColor(task);
+        if (typeColor) {
+          return typeColor;
+        }
+      } else {
+        // Modo: colorear por ambiente (por defecto cuando hay enfoque)
+        if (task.environment && this.environments.length > 0) {
+          const environment = this.environments.find(env => env.id === task.environment);
+          if (environment && environment.color) {
+            return environment.color;
+          }
+        }
       }
     }
     
@@ -956,6 +1040,11 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
       case 'critical': return '#f472b6';
       default: return '#a3a3a3';
     }
+  }
+  
+  toggleColorMode(): void {
+    this.colorMode = this.colorMode === 'environment' ? 'taskType' : 'environment';
+    this.cdr.detectChanges();
   }
 
   getTaskTypeColor(task: Task): string | null {
