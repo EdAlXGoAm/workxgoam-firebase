@@ -934,13 +934,13 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   }
 
   getTaskColor(task: Task): string {
-    if (this.focusedEnvironmentId) {
-      const typeColor = this.getTaskTypeColor(task);
-      if (typeColor) {
-        return typeColor;
-      }
+    // Siempre priorizar el color del tipo de tarea si existe
+    const typeColor = this.getTaskTypeColor(task);
+    if (typeColor) {
+      return typeColor;
     }
     
+    // Si no hay color de tipo, usar el color del ambiente
     if (task.environment && this.environments.length > 0) {
       const environment = this.environments.find(env => env.id === task.environment);
       if (environment && environment.color) {
@@ -948,6 +948,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
       }
     }
     
+    // Fallback a colores por prioridad
     switch (task.priority) {
       case 'low': return '#4ade80';
       case 'medium': return '#60a5fa';

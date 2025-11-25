@@ -344,6 +344,27 @@
   overflow-x: hidden;
 }
 
+/* Asegurar que el header fixed funcione correctamente */
+app-task-tracker-header {
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  width: 100%;
+}
+
+app-task-tracker-header header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  width: 100%;
+  background-color: #4f46e5; /* bg-indigo-600 */
+}
+
 /* Ajustes específicos para móviles */
 @media (max-width: 768px) {
   .board-column {

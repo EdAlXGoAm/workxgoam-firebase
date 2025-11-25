@@ -6,8 +6,8 @@ import { CommonModule } from '@angular/common';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <!-- Nota: Header sticky. Usa Tailwind 'sticky top-0 z-50' para fijarse al hacer scroll y quedar sobre el contenido -->
-    <header class="bg-indigo-600 text-white shadow-lg sticky top-0 z-50">
+    <!-- Header fixed que permanece visible al hacer scroll -->
+    <header class="bg-indigo-600 text-white shadow-lg fixed top-0 left-0 right-0 z-50 w-full">
 
     <!-- Contenedor para el contenido del header -->
       <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">

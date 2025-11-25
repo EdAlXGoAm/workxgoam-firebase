@@ -15,21 +15,64 @@ import { Environment } from '../../models/environment.model';
          [class.no-task]="!currentTask"
          [class.dragging]="isDragging"
          [style.top.%]="bubbleTopPosition"
+         (click)="onBubbleClick($event)"
          (mousedown)="onBubbleMouseDown($event)"
          (touchstart)="onBubbleTouchStart($event)"
          [title]="getBubbleTooltip()">
-      <div class="bubble-content">
-        <div class="bubble-icon">
-          <i class="fas" [class.fa-play-circle]="currentTask" [class.fa-clock]="!currentTask"></i>
-        </div>
-        <div class="bubble-time">
+      <svg class="bubble-svg-content" viewBox="0 0 80 80" preserveAspectRatio="xMidYMid meet">
+        <!-- Drag indicator (puntos arriba) -->
+        <g class="drag-indicator-group">
+          <circle cx="30" cy="8" r="1.5" fill="rgba(255, 255, 255, 0.6)"/>
+          <circle cx="30" cy="12" r="1.5" fill="rgba(255, 255, 255, 0.6)"/>
+          <circle cx="35" cy="8" r="1.5" fill="rgba(255, 255, 255, 0.6)"/>
+          <circle cx="35" cy="12" r="1.5" fill="rgba(255, 255, 255, 0.6)"/>
+          <circle cx="40" cy="8" r="1.5" fill="rgba(255, 255, 255, 0.6)"/>
+          <circle cx="40" cy="12" r="1.5" fill="rgba(255, 255, 255, 0.6)"/>
+          <circle cx="45" cy="8" r="1.5" fill="rgba(255, 255, 255, 0.6)"/>
+          <circle cx="45" cy="12" r="1.5" fill="rgba(255, 255, 255, 0.6)"/>
+          <circle cx="50" cy="8" r="1.5" fill="rgba(255, 255, 255, 0.6)"/>
+          <circle cx="50" cy="12" r="1.5" fill="rgba(255, 255, 255, 0.6)"/>
+        </g>
+        
+        <!-- Ícono dinámico (play-circle si hay tarea, clock si no) -->
+        <g *ngIf="currentTask" class="bubble-icon-group" transform="translate(40, 25)">
+          <!-- Play circle icon -->
+          <circle cx="0" cy="0" r="9" stroke="white" stroke-width="1.5" fill="none"/>
+          <polygon points="-2,-4 -2,4 5,0" fill="white"/>
+        </g>
+        
+        <g *ngIf="!currentTask" class="bubble-icon-group" transform="translate(40, 25)">
+          <!-- Clock icon -->
+          <circle cx="0" cy="0" r="9" stroke="white" stroke-width="1.5" fill="none"/>
+          <line x1="0" y1="0" x2="0" y2="-5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="0" y1="0" x2="4" y2="0" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+        </g>
+        
+        <!-- Tiempo (dinámico) -->
+        <text x="40" y="48" 
+              text-anchor="middle" 
+              dominant-baseline="middle" 
+              fill="white" 
+              font-size="14" 
+              font-weight="bold" 
+              font-family="monospace"
+              class="bubble-time-text">
           {{ getBubbleTime() }}
-        </div>
-        <div class="bubble-label">
-          {{ getBubbleLabel() }}
-        </div>
-      </div>
-      <div class="drag-indicator">⋮⋮</div>
+        </text>
+        
+        <!-- Label (dinámico) -->
+        <text x="40" y="60" 
+              text-anchor="middle" 
+              dominant-baseline="middle" 
+              fill="white" 
+              font-size="6" 
+              font-weight="normal" 
+              letter-spacing="0.5"
+              opacity="0.9"
+              class="bubble-label-text">
+          {{ getBubbleLabel().toUpperCase() }}
+        </text>
+      </svg>
     </div>
 
     <!-- Modal (cuando se hace click en la burbuja) -->
@@ -210,51 +253,23 @@ import { Environment } from '../../models/environment.model';
       }
     }
     
-    .bubble-content {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      text-align: center;
+    .bubble-svg-content {
+      width: 100%;
+      height: 100%;
       pointer-events: none;
-      flex: 1;
+      overflow: visible;
     }
     
-    .drag-indicator {
-      position: absolute;
-      top: 5px;
-      left: 50%;
-      transform: translateX(-50%);
-      color: rgba(255, 255, 255, 0.6);
-      font-size: 12px;
-      line-height: 8px;
-      letter-spacing: -2px;
-      pointer-events: none;
+    .floating-bubble:hover .drag-indicator-group circle {
+      fill: rgba(255, 255, 255, 0.9);
     }
     
-    .floating-bubble:hover .drag-indicator {
-      color: rgba(255, 255, 255, 0.9);
+    .bubble-time-text {
+      user-select: none;
     }
     
-    .bubble-icon {
-      font-size: 20px;
-      margin-bottom: 4px;
-    }
-    
-    .bubble-time {
-      font-size: 14px;
-      font-weight: bold;
-      font-family: monospace;
-      line-height: 1;
-    }
-    
-    .bubble-label {
-      font-size: 8px;
-      opacity: 0.9;
-      margin-top: 2px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+    .bubble-label-text {
+      user-select: none;
     }
     
     /* Modal */
@@ -320,16 +335,21 @@ import { Environment } from '../../models/environment.model';
         right: 15px;
       }
       
-      .bubble-icon {
-        font-size: 18px;
+      .bubble-svg-content {
+        width: 100%;
+        height: 100%;
       }
       
-      .bubble-time {
+      .bubble-time-text {
         font-size: 12px;
       }
       
-      .bubble-label {
-        font-size: 7px;
+      .bubble-label-text {
+        font-size: 5px;
+      }
+      
+      .drag-indicator-group circle {
+        r: 1.2;
       }
     }
   `]
@@ -349,6 +369,7 @@ export class CurrentTaskInfoComponent implements OnInit, OnDestroy, OnChanges {
   isDragging: boolean = false;
   private dragStartY: number = 0;
   private dragStartTop: number = 0;
+  private lastDragEndTime: number = 0;
 
   ngOnInit() {
     this.loadBubblePosition();
@@ -613,12 +634,27 @@ export class CurrentTaskInfoComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   // Métodos para drag and drop de la burbuja
+  onBubbleClick(event: MouseEvent): void {
+    // Prevenir la apertura del modal si estamos o acabamos de hacer drag
+    // El evento click se previene en mouseUpHandler cuando se maneja el click allí
+    if (this.isDragging || Date.now() - this.lastDragEndTime < 500) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    // Fallback: solo abrir si mouseUpHandler no lo manejó (caso raro)
+    // Esto es principalmente para móviles donde el evento click puede dispararse sin mouseup
+    console.log('👆 Click en burbuja (fallback), abriendo modal');
+    this.toggleModal();
+  }
+
   onBubbleMouseDown(event: MouseEvent): void {
     console.log('🖱️ MouseDown en burbuja');
     // NO prevenir default aún, esperamos a ver si hay movimiento
     this.dragStartY = event.clientY;
     this.dragStartTop = this.bubbleTopPosition;
     let hasMoved = false;
+    const startTime = Date.now();
     
     const mouseMoveHandler = (e: MouseEvent) => {
       const deltaY = Math.abs(e.clientY - this.dragStartY);
@@ -636,13 +672,23 @@ export class CurrentTaskInfoComponent implements OnInit, OnDestroy, OnChanges {
       }
     };
     
-    const mouseUpHandler = () => {
-      console.log('🖱️ MouseUp, hasMoved:', hasMoved);
+    const mouseUpHandler = (e: MouseEvent) => {
+      const clickTime = Date.now() - startTime;
+      console.log('🖱️ MouseUp, hasMoved:', hasMoved, 'clickTime:', clickTime);
+      
       if (hasMoved) {
         this.endDrag();
-      } else {
-        // Fue un click, abrir modal
+        // Prevenir que el evento click se dispare después del drag
+        e.preventDefault();
+        e.stopPropagation();
+        this.lastDragEndTime = Date.now();
+      } else if (clickTime < 300) {
+        // Si no hubo movimiento y fue un click rápido, abrir modal
+        // Prevenir el evento click para evitar doble apertura
+        e.preventDefault();
+        e.stopPropagation();
         console.log('👆 Click detectado, abriendo modal');
+        this.lastDragEndTime = Date.now();
         this.toggleModal();
       }
       document.removeEventListener('mousemove', mouseMoveHandler);
@@ -650,7 +696,7 @@ export class CurrentTaskInfoComponent implements OnInit, OnDestroy, OnChanges {
     };
     
     document.addEventListener('mousemove', mouseMoveHandler);
-    document.addEventListener('mouseup', mouseUpHandler);
+    document.addEventListener('mouseup', mouseUpHandler, { once: true });
   }
 
   onBubbleTouchStart(event: TouchEvent): void {
@@ -661,6 +707,7 @@ export class CurrentTaskInfoComponent implements OnInit, OnDestroy, OnChanges {
     this.dragStartY = touch.clientY;
     this.dragStartTop = this.bubbleTopPosition;
     let hasMoved = false;
+    const startTime = Date.now();
     
     const touchMoveHandler = (e: TouchEvent) => {
       if (e.touches.length === 1) {
@@ -680,13 +727,17 @@ export class CurrentTaskInfoComponent implements OnInit, OnDestroy, OnChanges {
       }
     };
     
-    const touchEndHandler = () => {
-      console.log('👆 TouchEnd, hasMoved:', hasMoved);
+    const touchEndHandler = (e: TouchEvent) => {
+      const tapTime = Date.now() - startTime;
+      console.log('👆 TouchEnd, hasMoved:', hasMoved, 'tapTime:', tapTime);
+      
       if (hasMoved) {
         this.endDrag();
-      } else {
-        // Fue un tap, abrir modal
+        this.lastDragEndTime = Date.now();
+      } else if (tapTime < 300) {
+        // Fue un tap rápido, abrir modal
         console.log('👆 Tap detectado, abriendo modal');
+        this.lastDragEndTime = Date.now();
         this.toggleModal();
       }
       document.removeEventListener('touchmove', touchMoveHandler);
@@ -694,7 +745,7 @@ export class CurrentTaskInfoComponent implements OnInit, OnDestroy, OnChanges {
     };
     
     document.addEventListener('touchmove', touchMoveHandler, { passive: false });
-    document.addEventListener('touchend', touchEndHandler);
+    document.addEventListener('touchend', touchEndHandler, { once: true });
   }
 
   private startDrag(clientY: number): void {
@@ -723,6 +774,7 @@ export class CurrentTaskInfoComponent implements OnInit, OnDestroy, OnChanges {
     if (this.isDragging) {
       console.log('🏁 Finalizando drag');
       this.isDragging = false;
+      this.lastDragEndTime = Date.now();
       this.saveBubblePosition();
     }
   }

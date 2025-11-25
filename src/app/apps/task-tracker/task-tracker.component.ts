@@ -12,6 +12,7 @@ import { Project } from './models/project.model';
 import { Environment } from './models/environment.model';
 import { ManagementModalComponent } from './components/management-modal/management-modal.component';
 import { CurrentTaskInfoComponent } from './components/current-task-info/current-task-info.component';
+import { PendingTasksBubbleComponent } from './components/pending-tasks-bubble/pending-tasks-bubble.component';
 import { TaskModalComponent } from './components/task-modal/task-modal.component';
 import { RemindersModalComponent } from './components/reminders-modal/reminders-modal.component';
 import { TaskTrackerHeaderComponent } from './components/amain_components/task-tracker-header';
@@ -25,11 +26,15 @@ import { TaskTypeService } from './services/task-type.service';
 import { TaskType } from './models/task-type.model';
 import { TimelineFocusService } from './services/timeline-focus.service';
 import { CustomSelectComponent, SelectOption } from './components/custom-select/custom-select.component';
+import { WeekTimelineSvgComponent } from './components/week-timeline-svg/week-timeline-svg.component';
+import { TaskSumTemplateService } from './services/task-sum-template.service';
+import { TaskSumTemplate } from './models/task-sum-template.model';
+import { SumsBubbleComponent } from './components/sums-bubble/sums-bubble.component';
 
 @Component({
   selector: 'app-task-tracker',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, CurrentTaskInfoComponent, TaskModalComponent, RemindersModalComponent, TaskTrackerHeaderComponent, EnvironmentModalComponent, BoardViewComponent, WeekViewComponent, ChangeStatusModalComponent, DateRangeModalComponent, TaskTypeModalComponent, CustomSelectComponent],
+  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, CurrentTaskInfoComponent, PendingTasksBubbleComponent, TaskModalComponent, RemindersModalComponent, TaskTrackerHeaderComponent, EnvironmentModalComponent, BoardViewComponent, WeekViewComponent, ChangeStatusModalComponent, DateRangeModalComponent, TaskTypeModalComponent, CustomSelectComponent, WeekTimelineSvgComponent, SumsBubbleComponent],
   templateUrl: './task-tracker.component.html',
   styleUrls: ['./task-tracker.component.css']
 })
@@ -145,6 +150,19 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
   showProjectContextMenu = false;
   projectContextMenuPosition = { x: 0, y: 0 };
   selectedProject: Project | null = null;
+  
+  // Variables para modal de tareas del proyecto
+  showProjectTasksModal = false;
+  selectedProjectForTasksModal: Project | null = null;
+  projectTasksForModal: Task[] = [];
+  projectTaskIncluded: { [taskId: string]: boolean } = {};
+  lastSelectedTaskIndex: number | null = null;
+  isCalendarExpanded: boolean = true; // Por defecto expandido
+  
+  // Variables para plantillas de suma
+  taskSumTemplates: TaskSumTemplate[] = [];
+  showSaveSumTemplateModal = false;
+  newSumTemplateName = '';
 
   // Propiedades para tareas huérfanas
   orphanedTasks: Task[] = [];
@@ -244,6 +262,7 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     private projectService: ProjectService,
     private environmentService: EnvironmentService,
     private taskTypeService: TaskTypeService,
+    private taskSumTemplateService: TaskSumTemplateService,
     private timelineFocusService: TimelineFocusService,
     private elementRef: ElementRef,
     private cdr: ChangeDetectorRef
@@ -386,12 +405,22 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
       await Promise.all([
         this.loadEnvironments(),
         this.loadProjects(),
-        this.loadTaskTypes()
+        this.loadTaskTypes(),
+        this.loadTaskSumTemplates()
       ]);
       await this.loadTasks();
       // Nota: initializeEnvironmentOrder se llama en ngOnInit después de cargar el orden desde localStorage
     } catch (error) {
       console.error("Error loading initial data for TaskTrackerComponent:", error);
+    }
+  }
+
+  private async loadTaskSumTemplates() {
+    try {
+      this.taskSumTemplates = await this.taskSumTemplateService.getTemplates();
+    } catch (error) {
+      console.error('Error al cargar plantillas de suma:', error);
+      this.taskSumTemplates = [];
     }
   }
 
@@ -1188,8 +1217,8 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     event.stopPropagation();
     this.selectedProject = project;
     
-    // Calcular la altura del menú de proyecto (1 elemento: Eliminar Proyecto)
-    const menuHeight = 1 * 40 + 16; // 1 item * 40px + padding
+    // Calcular la altura del menú de proyecto (2 elementos: Ver Tareas del Proyecto, Eliminar Proyecto + separador)
+    const menuHeight = 2 * 40 + 16 + 8; // 2 items * 40px + padding + separador
     
     // Obtener dimensiones del viewport
     const viewportHeight = window.innerHeight;
@@ -1265,6 +1294,369 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
 
   closeProjectContextMenu() {
     this.showProjectContextMenu = false;
+  }
+
+  openProjectTasksModal(project: Project) {
+    this.selectedProjectForTasksModal = project;
+    // Obtener todas las tareas del proyecto
+    let projectTasks = this.tasks.filter(t => t.project === project.id);
+    
+    // Ordenar por fecha de inicio descendente (más reciente primero)
+    projectTasks = projectTasks.sort((a, b) => {
+      const dateA = a.start ? new Date(a.start.includes('Z') ? a.start : a.start + 'Z').getTime() : 0;
+      const dateB = b.start ? new Date(b.start.includes('Z') ? b.start : b.start + 'Z').getTime() : 0;
+      return dateB - dateA; // Descendente
+    });
+    
+    this.projectTasksForModal = projectTasks;
+    
+    // Inicializar todos los checkboxes como true (incluidos por defecto)
+    this.projectTaskIncluded = {};
+    this.projectTasksForModal.forEach(task => {
+      this.projectTaskIncluded[task.id] = true;
+    });
+    
+    // Inicializar índice de última selección
+    this.lastSelectedTaskIndex = null;
+    
+    // Resetear estado del calendario a expandido por defecto
+    this.isCalendarExpanded = true;
+    
+    this.showProjectTasksModal = true;
+    this.closeProjectContextMenu();
+  }
+
+  closeProjectTasksModal() {
+    this.showProjectTasksModal = false;
+    this.selectedProjectForTasksModal = null;
+    this.projectTasksForModal = [];
+    this.projectTaskIncluded = {};
+    this.lastSelectedTaskIndex = null;
+    this.isCalendarExpanded = true;
+  }
+
+  toggleCalendarExpanded() {
+    this.isCalendarExpanded = !this.isCalendarExpanded;
+  }
+
+  openSaveSumTemplateModal() {
+    this.newSumTemplateName = '';
+    this.showSaveSumTemplateModal = true;
+  }
+
+  closeSaveSumTemplateModal() {
+    this.showSaveSumTemplateModal = false;
+    this.newSumTemplateName = '';
+  }
+
+  async saveTaskSumTemplate() {
+    if (!this.newSumTemplateName.trim() || !this.selectedProjectForTasksModal) {
+      alert('Por favor ingresa un nombre para la suma');
+      return;
+    }
+
+    try {
+      // Obtener IDs de tareas seleccionadas
+      const selectedTaskIds = this.projectTasksForModal
+        .filter(task => this.projectTaskIncluded[task.id] !== false)
+        .map(task => task.id);
+
+      // Calcular suma total
+      let totalHours = 0;
+      selectedTaskIds.forEach(taskId => {
+        const task = this.projectTasksForModal.find(t => t.id === taskId);
+        if (task) {
+          const duration = this.getTaskDuration(task);
+          if (duration !== null) {
+            totalHours += duration;
+          }
+        }
+      });
+
+      // Obtener environmentId del proyecto
+      const project = this.projects.find(p => p.id === this.selectedProjectForTasksModal!.id);
+      if (!project) {
+        alert('Error: No se pudo encontrar el proyecto');
+        return;
+      }
+
+      // Guardar plantilla
+      await this.taskSumTemplateService.createTemplate({
+        name: this.newSumTemplateName.trim(),
+        projectId: this.selectedProjectForTasksModal.id,
+        environmentId: project.environment,
+        selectedTaskIds: selectedTaskIds,
+        totalDuration: totalHours
+      });
+
+      // Guardar el nombre antes de cerrar el modal (que limpia la variable)
+      const savedName = this.newSumTemplateName.trim();
+
+      // Recargar plantillas
+      await this.loadTaskSumTemplates();
+
+      // Cerrar modal
+      this.closeSaveSumTemplateModal();
+
+      alert(`Suma "${savedName}" guardada exitosamente`);
+    } catch (error) {
+      console.error('Error al guardar plantilla de suma:', error);
+      alert('Error al guardar la suma. Por favor intenta nuevamente.');
+    }
+  }
+
+  async openSavedTemplate(template: TaskSumTemplate) {
+    // Buscar el proyecto
+    const project = this.projects.find(p => p.id === template.projectId);
+    if (!project) {
+      alert('Error: No se pudo encontrar el proyecto de esta suma');
+      return;
+    }
+
+    // Abrir el modal del proyecto
+    await this.openProjectTasksModal(project);
+
+    // Restaurar la selección de checkboxes
+    this.projectTaskIncluded = {};
+    this.projectTasksForModal.forEach(task => {
+      this.projectTaskIncluded[task.id] = template.selectedTaskIds.includes(task.id);
+    });
+  }
+
+  async deleteTaskSumTemplate(id: string) {
+    try {
+      await this.taskSumTemplateService.deleteTemplate(id);
+      await this.loadTaskSumTemplates();
+    } catch (error) {
+      console.error('Error al eliminar plantilla de suma:', error);
+      alert('Error al eliminar la suma. Por favor intenta nuevamente.');
+    }
+  }
+
+  getTaskDuration(task: Task): number | null {
+    // Si hay fragmentos, sumar la duración de todos
+    if (task.fragments && task.fragments.length > 0) {
+      let totalDuration = 0;
+      for (const fragment of task.fragments) {
+        if (fragment.start && fragment.end) {
+          const startStr = fragment.start.includes('Z') ? fragment.start : fragment.start + 'Z';
+          const endStr = fragment.end.includes('Z') ? fragment.end : fragment.end + 'Z';
+          const start = new Date(startStr).getTime();
+          const end = new Date(endStr).getTime();
+          const diffMs = end - start;
+          const diffHours = diffMs / (1000 * 60 * 60);
+          totalDuration += Math.max(0, diffHours);
+        }
+      }
+      return totalDuration > 0 ? totalDuration : null;
+    }
+    
+    // Si no hay fragmentos pero hay duration definida, usarla
+    if (task.duration && task.duration > 0) {
+      return task.duration;
+    }
+    
+    // Si no hay fragmentos ni duration, calcular desde start y end
+    if (task.start && task.end) {
+      const startStr = task.start.includes('Z') ? task.start : task.start + 'Z';
+      const endStr = task.end.includes('Z') ? task.end : task.end + 'Z';
+      const start = new Date(startStr).getTime();
+      const end = new Date(endStr).getTime();
+      const diffMs = end - start;
+      const diffHours = diffMs / (1000 * 60 * 60);
+      return Math.max(0, diffHours);
+    }
+    
+    return null;
+  }
+
+  formatTaskDuration(hours: number | null): string {
+    if (!hours || hours === 0) return '0 horas';
+    
+    const wholeHours = Math.floor(hours);
+    const minutes = Math.round((hours - wholeHours) * 60);
+    
+    if (minutes === 0) {
+      return `${wholeHours} hora${wholeHours !== 1 ? 's' : ''}`;
+    } else if (wholeHours === 0) {
+      return `${minutes} minutos`;
+    } else {
+      return `${wholeHours} hora${wholeHours !== 1 ? 's' : ''} y ${minutes} minutos`;
+    }
+  }
+
+  getTotalProjectDuration(): string {
+    let totalHours = 0;
+    
+    this.projectTasksForModal.forEach(task => {
+      // Solo incluir si el checkbox está marcado (true por defecto)
+      if (this.projectTaskIncluded[task.id] !== false) {
+        const duration = this.getTaskDuration(task);
+        if (duration !== null) {
+          totalHours += duration;
+        }
+      }
+    });
+    
+    return this.formatTaskDuration(totalHours);
+  }
+
+  getSelectedProjectTasks(): Task[] {
+    return this.projectTasksForModal.filter(task => 
+      this.projectTaskIncluded[task.id] !== false
+    );
+  }
+
+  getDayTotalDuration(dateKey: string): string {
+    const grouped = this.getGroupedProjectTasks();
+    const dayTasks = grouped[dateKey] || [];
+    
+    let totalHours = 0;
+    
+    dayTasks.forEach(task => {
+      // Solo incluir si el checkbox está marcado (true por defecto)
+      if (this.projectTaskIncluded[task.id] !== false) {
+        const duration = this.getTaskDuration(task);
+        if (duration !== null) {
+          totalHours += duration;
+        }
+      }
+    });
+    
+    return this.formatTaskDuration(totalHours);
+  }
+
+  updateTotalDuration() {
+    // Este método se llama cuando cambia un checkbox
+    // La suma se recalcula automáticamente mediante getTotalProjectDuration()
+    // No necesitamos hacer nada aquí, Angular se encarga de la actualización
+  }
+
+  getGroupedProjectTasks(): { [dateKey: string]: Task[] } {
+    const grouped: { [dateKey: string]: Task[] } = {};
+    
+    this.projectTasksForModal.forEach(task => {
+      if (task.start) {
+        const dateStr = task.start.includes('Z') ? task.start : task.start + 'Z';
+        const date = new Date(dateStr);
+        const dateKey = date.toISOString().split('T')[0]; // YYYY-MM-DD
+        
+        if (!grouped[dateKey]) {
+          grouped[dateKey] = [];
+        }
+        grouped[dateKey].push(task);
+      } else {
+        // Tareas sin fecha van a un grupo especial
+        const noDateKey = 'sin-fecha';
+        if (!grouped[noDateKey]) {
+          grouped[noDateKey] = [];
+        }
+        grouped[noDateKey].push(task);
+      }
+    });
+    
+    return grouped;
+  }
+
+  formatTaskDate(dateString: string | null | undefined): string {
+    if (!dateString) return 'Sin fecha';
+    
+    try {
+      const dateStr = dateString.includes('Z') ? dateString : dateString + 'Z';
+      const taskDate = new Date(dateStr);
+      
+      // Validar que la fecha sea válida
+      if (isNaN(taskDate.getTime())) {
+        return 'Sin fecha';
+      }
+      
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      // Resetear horas para comparar solo fechas
+      const taskDateOnly = new Date(taskDate.getFullYear(), taskDate.getMonth(), taskDate.getDate());
+      const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const yesterdayOnly = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
+      
+      if (taskDateOnly.getTime() === todayOnly.getTime()) {
+        return 'Hoy';
+      } else if (taskDateOnly.getTime() === yesterdayOnly.getTime()) {
+        return 'Ayer';
+      } else {
+        // Formato DD/MM/YYYY
+        const day = taskDate.getDate().toString().padStart(2, '0');
+        const month = (taskDate.getMonth() + 1).toString().padStart(2, '0');
+        const year = taskDate.getFullYear();
+        return `${day}/${month}/${year}`;
+      }
+    } catch (error) {
+      return 'Sin fecha';
+    }
+  }
+
+  formatTaskTime(dateString: string | null | undefined): string {
+    if (!dateString) return '';
+    
+    try {
+      const dateStr = dateString.includes('Z') ? dateString : dateString + 'Z';
+      const date = new Date(dateStr);
+      
+      // Validar que la fecha sea válida
+      if (isNaN(date.getTime())) {
+        return '';
+      }
+      
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      
+      return `${hours}:${minutes}`;
+    } catch (error) {
+      return '';
+    }
+  }
+
+  getGroupedProjectTasksKeys(): string[] {
+    const grouped = this.getGroupedProjectTasks();
+    // Ordenar las claves de fecha descendente (más reciente primero)
+    // Las tareas sin fecha van al final
+    return Object.keys(grouped).sort((a, b) => {
+      if (a === 'sin-fecha') return 1;
+      if (b === 'sin-fecha') return -1;
+      return b.localeCompare(a); // Descendente
+    });
+  }
+
+  getTaskGlobalIndex(task: Task): number {
+    return this.projectTasksForModal.findIndex(t => t.id === task.id);
+  }
+
+  handleCheckboxChange(task: Task, index: number, event: MouseEvent) {
+    event.preventDefault(); // Prevenir el cambio automático del checkbox
+    
+    const isShiftPressed = event.shiftKey;
+    const currentState = this.projectTaskIncluded[task.id];
+    const newState = !currentState;
+    
+    if (isShiftPressed && this.lastSelectedTaskIndex !== null) {
+      // Selección por rango
+      const startIndex = Math.min(this.lastSelectedTaskIndex, index);
+      const endIndex = Math.max(this.lastSelectedTaskIndex, index);
+      
+      // Aplicar el nuevo estado (el que tendrá el checkbox actual) a todo el rango
+      for (let i = startIndex; i <= endIndex; i++) {
+        const rangeTask = this.projectTasksForModal[i];
+        if (rangeTask) {
+          this.projectTaskIncluded[rangeTask.id] = newState;
+        }
+      }
+    } else {
+      // Selección individual normal
+      this.projectTaskIncluded[task.id] = newState;
+    }
+    
+    // Actualizar el último índice seleccionado
+    this.lastSelectedTaskIndex = index;
   }
 
   closeQuickContextMenu() {
@@ -1452,6 +1844,33 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
       this.selectedTask = null;
     } catch (error) {
       console.error('Error al actualizar la tarea:', error);
+    }
+  }
+
+  async onUpdateTaskProject(event: { taskId: string, projectId: string }) {
+    try {
+      const task = this.tasks.find(t => t.id === event.taskId);
+      if (!task) {
+        console.error('Tarea no encontrada:', event.taskId);
+        return;
+      }
+
+      const project = this.projects.find(p => p.id === event.projectId);
+      if (!project) {
+        console.error('Proyecto no encontrado:', event.projectId);
+        return;
+      }
+
+      // Actualizar el proyecto y asegurar que el ambiente coincida
+      await this.taskService.updateTask(event.taskId, {
+        project: event.projectId,
+        environment: project.environment
+      });
+      
+      await this.loadTasks();
+    } catch (error) {
+      console.error('Error al actualizar el proyecto de la tarea:', error);
+      alert('Error al actualizar el proyecto. Por favor, intenta de nuevo.');
     }
   }
 

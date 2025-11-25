@@ -109,6 +109,14 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
     }
 
+    // task-tracker_Plantillas de Suma
+    match /task-tracker_task-sum-templates/{templateId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow update: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+
     // Por defecto denegar todo lo demás
     match /{document=**} {
       allow read, write: if false;
