@@ -163,6 +163,9 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
   taskSumTemplates: TaskSumTemplate[] = [];
   showSaveSumTemplateModal = false;
   newSumTemplateName = '';
+  editingTemplateId: string | null = null;
+  startDateFilter: string = '';
+  endDateFilter: string = '';
 
   // Propiedades para tareas huérfanas
   orphanedTasks: Task[] = [];
@@ -1309,6 +1312,28 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     // Obtener todas las tareas del proyecto
     let projectTasks = this.tasks.filter(t => t.project === project.id);
     
+    // Aplicar filtro de fechas si existe
+    if (this.startDateFilter || this.endDateFilter) {
+      projectTasks = projectTasks.filter(task => {
+        if (!task.start) return false;
+        
+        const taskStartDate = new Date(task.start.includes('Z') ? task.start : task.start + 'Z');
+        const taskDateOnly = new Date(taskStartDate.getFullYear(), taskStartDate.getMonth(), taskStartDate.getDate());
+        
+        if (this.startDateFilter) {
+          const startFilterDate = new Date(this.startDateFilter + 'T00:00:00');
+          if (taskDateOnly < startFilterDate) return false;
+        }
+        
+        if (this.endDateFilter) {
+          const endFilterDate = new Date(this.endDateFilter + 'T23:59:59');
+          if (taskDateOnly > endFilterDate) return false;
+        }
+        
+        return true;
+      });
+    }
+    
     // Ordenar por fecha de inicio descendente (más reciente primero)
     projectTasks = projectTasks.sort((a, b) => {
       const dateA = a.start ? new Date(a.start.includes('Z') ? a.start : a.start + 'Z').getTime() : 0;
@@ -1341,6 +1366,12 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     this.projectTaskIncluded = {};
     this.lastSelectedTaskIndex = null;
     this.isCalendarExpanded = true;
+    // Limpiar filtros y estado de edición solo si no estamos guardando
+    if (!this.showSaveSumTemplateModal) {
+      this.editingTemplateId = null;
+      this.startDateFilter = '';
+      this.endDateFilter = '';
+    }
   }
 
   toggleCalendarExpanded() {
@@ -1348,13 +1379,44 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
   }
 
   openSaveSumTemplateModal() {
-    this.newSumTemplateName = '';
+    // Si estamos editando, cargar el nombre de la plantilla
+    if (this.editingTemplateId) {
+      const template = this.taskSumTemplates.find(t => t.id === this.editingTemplateId);
+      this.newSumTemplateName = template?.name || '';
+    } else {
+      this.newSumTemplateName = '';
+    }
     this.showSaveSumTemplateModal = true;
   }
 
   closeSaveSumTemplateModal() {
     this.showSaveSumTemplateModal = false;
     this.newSumTemplateName = '';
+    // No limpiar editingTemplateId aquí, se limpia después de guardar exitosamente
+  }
+
+  onDateFilterChange() {
+    // Re-aplicar filtros cuando cambian las fechas
+    if (this.selectedProjectForTasksModal) {
+      // Guardar el estado actual de los checkboxes
+      const currentIncluded = { ...this.projectTaskIncluded };
+      
+      // Reabrir el modal con los nuevos filtros
+      this.openProjectTasksModal(this.selectedProjectForTasksModal);
+      
+      // Restaurar los checkboxes que estaban seleccionados y siguen visibles
+      Object.keys(currentIncluded).forEach(taskId => {
+        if (this.projectTasksForModal.find(t => t.id === taskId)) {
+          this.projectTaskIncluded[taskId] = currentIncluded[taskId];
+        }
+      });
+    }
+  }
+
+  clearDateFilters() {
+    this.startDateFilter = '';
+    this.endDateFilter = '';
+    this.onDateFilterChange();
   }
 
   async saveTaskSumTemplate() {
@@ -1388,14 +1450,31 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
         return;
       }
 
-      // Guardar plantilla
-      await this.taskSumTemplateService.createTemplate({
+      const templateData: any = {
         name: this.newSumTemplateName.trim(),
         projectId: this.selectedProjectForTasksModal.id,
         environmentId: project.environment,
         selectedTaskIds: selectedTaskIds,
         totalDuration: totalHours
-      });
+      };
+
+      // Agregar filtros de fecha si existen
+      if (this.startDateFilter) {
+        templateData.startDateFilter = this.startDateFilter;
+      }
+      if (this.endDateFilter) {
+        templateData.endDateFilter = this.endDateFilter;
+      }
+
+      // Guardar si estamos editando o creando
+      const isEditing = !!this.editingTemplateId;
+      
+      // Guardar o actualizar plantilla
+      if (isEditing) {
+        await this.taskSumTemplateService.updateTemplate(this.editingTemplateId!, templateData);
+      } else {
+        await this.taskSumTemplateService.createTemplate(templateData);
+      }
 
       // Guardar el nombre antes de cerrar el modal (que limpia la variable)
       const savedName = this.newSumTemplateName.trim();
@@ -1403,10 +1482,13 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
       // Recargar plantillas
       await this.loadTaskSumTemplates();
 
+      // Limpiar estado de edición
+      this.editingTemplateId = null;
+
       // Cerrar modal
       this.closeSaveSumTemplateModal();
 
-      alert(`Suma "${savedName}" guardada exitosamente`);
+      alert(`Suma "${savedName}" ${isEditing ? 'actualizada' : 'guardada'} exitosamente`);
     } catch (error) {
       console.error('Error al guardar plantilla de suma:', error);
       alert('Error al guardar la suma. Por favor intenta nuevamente.');
@@ -1421,7 +1503,14 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Abrir el modal del proyecto
+    // Establecer estado de edición
+    this.editingTemplateId = template.id;
+    
+    // Cargar filtros de fecha si existen (robusto para plantillas antiguas)
+    this.startDateFilter = template.startDateFilter || '';
+    this.endDateFilter = template.endDateFilter || '';
+
+    // Abrir el modal del proyecto (aplicará los filtros automáticamente)
     await this.openProjectTasksModal(project);
 
     // Restaurar la selección de checkboxes

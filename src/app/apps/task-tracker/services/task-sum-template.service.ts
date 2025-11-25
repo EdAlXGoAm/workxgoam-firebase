@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Firestore, collection, addDoc, deleteDoc, doc, query, where, getDocs } from '@angular/fire/firestore';
+import { Firestore, collection, addDoc, deleteDoc, doc, query, where, getDocs, updateDoc } from '@angular/fire/firestore';
 import { AuthService } from '../../../services/auth.service';
 import { TaskSumTemplate } from '../models/task-sum-template.model';
 import { EnvironmentService } from './environment.service';
@@ -60,6 +60,18 @@ export class TaskSumTemplateService {
       id: doc.id,
       ...doc.data()
     } as TaskSumTemplate;
+  }
+
+  async updateTemplate(id: string, updates: Partial<Omit<TaskSumTemplate, 'id' | 'userId' | 'createdAt'>>): Promise<void> {
+    const user = this.authService.getCurrentUser();
+    if (!user) throw new Error('Usuario no autenticado');
+
+    const templateRef = doc(this.firestore, `${EnvironmentService.COLLECTION_PREFIX}task-sum-templates`, id);
+    const updateData = {
+      ...updates,
+      updatedAt: new Date().toISOString()
+    };
+    await updateDoc(templateRef, updateData);
   }
 
   async deleteTemplate(id: string): Promise<void> {
