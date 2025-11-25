@@ -87,9 +87,21 @@ import { TaskType } from '../../models/task-type.model';
               <i class="fas fa-tasks text-base md:text-xl text-orange-500"></i>
               <span>Tareas Pendientes</span>
             </h2>
-            <button (click)="closeModal()" class="text-gray-500 hover:text-gray-700 transition-colors p-2 -mr-2">
-              <i class="fas fa-times text-xl md:text-2xl"></i>
-            </button>
+            <div class="flex items-center gap-2">
+              <!-- Botón de ordenamiento -->
+              <div class="relative">
+                <button 
+                  (click)="toggleSortDropdown($event)" 
+                  class="sort-button flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                  <i class="fas" [ngClass]="getSortModeIcon()"></i>
+                  <span class="hidden md:inline">{{ getSortModeLabel() }}</span>
+                  <i class="fas fa-chevron-down text-xs transition-transform" [class.rotated]="showSortDropdown"></i>
+                </button>
+              </div>
+              <button (click)="closeModal()" class="text-gray-500 hover:text-gray-700 transition-colors p-2 -mr-2">
+                <i class="fas fa-times text-xl md:text-2xl"></i>
+              </button>
+            </div>
           </div>
           
           <!-- Contador -->
@@ -176,6 +188,44 @@ import { TaskType } from '../../models/task-type.model';
               </p>
             </div>
           </ng-template>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Dropdown de ordenamiento (renderizado fuera del modal, al mismo nivel) -->
+    <div *ngIf="showSortDropdown && sortDropdownPosition" 
+         class="sort-dropdown fixed bg-white rounded-lg shadow-xl border border-gray-200 min-w-[200px]"
+         [style.top.px]="sortDropdownPosition.top"
+         [style.left.px]="sortDropdownPosition.left"
+         (click)="$event.stopPropagation()">
+      <div class="p-2">
+        <div class="sort-option px-3 py-2 rounded-md cursor-pointer hover:bg-gray-100 transition-colors flex items-center gap-2"
+             [class.selected]="sortMode === 'chronological-asc'"
+             (click)="selectSortMode('chronological-asc')">
+          <i class="fas fa-sort-amount-up text-gray-600"></i>
+          <span class="flex-1 text-sm text-gray-700">Más próxima</span>
+          <i *ngIf="sortMode === 'chronological-asc'" class="fas fa-check text-indigo-600"></i>
+        </div>
+        <div class="sort-option px-3 py-2 rounded-md cursor-pointer hover:bg-gray-100 transition-colors flex items-center gap-2"
+             [class.selected]="sortMode === 'chronological-desc'"
+             (click)="selectSortMode('chronological-desc')">
+          <i class="fas fa-sort-amount-down text-gray-600"></i>
+          <span class="flex-1 text-sm text-gray-700">Más lejana</span>
+          <i *ngIf="sortMode === 'chronological-desc'" class="fas fa-check text-indigo-600"></i>
+        </div>
+        <div class="sort-option px-3 py-2 rounded-md cursor-pointer hover:bg-gray-100 transition-colors flex items-center gap-2"
+             [class.selected]="sortMode === 'project-asc'"
+             (click)="selectSortMode('project-asc')">
+          <i class="fas fa-layer-group text-gray-600"></i>
+          <span class="flex-1 text-sm text-gray-700">Proyecto + Reciente</span>
+          <i *ngIf="sortMode === 'project-asc'" class="fas fa-check text-indigo-600"></i>
+        </div>
+        <div class="sort-option px-3 py-2 rounded-md cursor-pointer hover:bg-gray-100 transition-colors flex items-center gap-2"
+             [class.selected]="sortMode === 'project-desc'"
+             (click)="selectSortMode('project-desc')">
+          <i class="fas fa-layer-group text-gray-600"></i>
+          <span class="flex-1 text-sm text-gray-700">Proyecto + Lejana</span>
+          <i *ngIf="sortMode === 'project-desc'" class="fas fa-check text-indigo-600"></i>
         </div>
       </div>
     </div>
@@ -426,6 +476,49 @@ import { TaskType } from '../../models/task-type.model';
        font-weight: 500;
      }
      
+     /* Estilos para ordenamiento */
+     .sort-button {
+       user-select: none;
+       -webkit-tap-highlight-color: transparent;
+       white-space: nowrap;
+     }
+     
+     .sort-button .fa-chevron-down {
+       transition: transform 0.2s ease;
+     }
+     
+     .sort-button .fa-chevron-down.rotated {
+       transform: rotate(180deg);
+     }
+     
+     .sort-dropdown {
+       animation: slideDown 0.2s ease-out;
+       position: fixed !important;
+       z-index: 9999 !important;
+       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+       -webkit-overflow-scrolling: touch;
+       pointer-events: auto;
+       will-change: transform;
+     }
+     
+     .sort-option {
+       user-select: none;
+       -webkit-tap-highlight-color: transparent;
+     }
+     
+     .sort-option.selected {
+       background-color: #eff6ff;
+     }
+     
+     .sort-option.selected span {
+       color: #3b82f6;
+       font-weight: 500;
+     }
+     
+     .sort-option.selected i:first-child {
+       color: #3b82f6;
+     }
+     
      @keyframes slideDown {
        from {
          opacity: 0;
@@ -530,6 +623,11 @@ export class PendingTasksBubbleComponent implements OnInit, OnDestroy, OnChanges
   openDropdownTaskId: string | null = null;
   private dropdownPositions: { [taskId: string]: { top: number, left?: number, right?: number } } = {};
   
+  // Propiedades para ordenamiento
+  sortMode: 'chronological-asc' | 'chronological-desc' | 'project-asc' | 'project-desc' = 'chronological-asc';
+  showSortDropdown: boolean = false;
+  sortDropdownPosition: { top: number, left: number } | null = null;
+  
   // Propiedades para drag and drop
   bubbleTopPosition: number = 40; // Porcentaje del viewport (40% = arriba de la burbuja actual)
   isDragging: boolean = false;
@@ -557,7 +655,8 @@ export class PendingTasksBubbleComponent implements OnInit, OnDestroy, OnChanges
   }
 
   private updatePendingTasks(): void {
-    this.pendingTasks = this.getPendingTasks();
+    const filteredTasks = this.getPendingTasks();
+    this.pendingTasks = this.sortTasks(filteredTasks);
   }
 
   getPendingTasks(): Task[] {
@@ -568,6 +667,97 @@ export class PendingTasksBubbleComponent implements OnInit, OnDestroy, OnChanges
       const typeNameLower = taskType.name.toLowerCase();
       return typeNameLower === 'pendiente' || typeNameLower === 'pending';
     });
+  }
+
+  sortTasks(tasks: Task[]): Task[] {
+    switch (this.sortMode) {
+      case 'chronological-asc':
+        return this.sortChronologicalAsc(tasks);
+      case 'chronological-desc':
+        return this.sortChronologicalDesc(tasks);
+      case 'project-asc':
+        return this.sortByProjectAsc(tasks);
+      case 'project-desc':
+        return this.sortByProjectDesc(tasks);
+      default:
+        return tasks;
+    }
+  }
+
+  sortChronologicalAsc(tasks: Task[]): Task[] {
+    return [...tasks].sort((a, b) => {
+      const dateA = this.getTaskStartDate(a);
+      const dateB = this.getTaskStartDate(b);
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
+      return dateA.getTime() - dateB.getTime();
+    });
+  }
+
+  sortChronologicalDesc(tasks: Task[]): Task[] {
+    return [...tasks].sort((a, b) => {
+      const dateA = this.getTaskStartDate(a);
+      const dateB = this.getTaskStartDate(b);
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
+      return dateB.getTime() - dateA.getTime();
+    });
+  }
+
+  sortByProjectAsc(tasks: Task[]): Task[] {
+    return [...tasks].sort((a, b) => {
+      const projectNameA = this.getProjectNameForSort(a.project);
+      const projectNameB = this.getProjectNameForSort(b.project);
+      
+      // Primero ordenar por nombre de proyecto (alfabético)
+      const projectCompare = projectNameA.localeCompare(projectNameB);
+      if (projectCompare !== 0) return projectCompare;
+      
+      // Si es el mismo proyecto, ordenar por fecha ascendente
+      const dateA = this.getTaskStartDate(a);
+      const dateB = this.getTaskStartDate(b);
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
+      return dateA.getTime() - dateB.getTime();
+    });
+  }
+
+  sortByProjectDesc(tasks: Task[]): Task[] {
+    return [...tasks].sort((a, b) => {
+      const projectNameA = this.getProjectNameForSort(a.project);
+      const projectNameB = this.getProjectNameForSort(b.project);
+      
+      // Primero ordenar por nombre de proyecto (alfabético)
+      const projectCompare = projectNameA.localeCompare(projectNameB);
+      if (projectCompare !== 0) return projectCompare;
+      
+      // Si es el mismo proyecto, ordenar por fecha descendente
+      const dateA = this.getTaskStartDate(a);
+      const dateB = this.getTaskStartDate(b);
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
+      return dateB.getTime() - dateA.getTime();
+    });
+  }
+
+  getProjectNameForSort(projectId: string): string {
+    if (!projectId) return 'zzz-sin-proyecto'; // Sin proyecto al final alfabéticamente
+    const project = this.projects.find(p => p.id === projectId);
+    return project?.name.toLowerCase() || 'zzz-sin-proyecto';
+  }
+
+  private getTaskStartDate(task: Task): Date | null {
+    if (!task.start) return null;
+    try {
+      const dateStr = task.start.includes('Z') ? task.start : task.start + 'Z';
+      return new Date(dateStr);
+    } catch {
+      return null;
+    }
   }
 
   getEnvironmentName(environmentId: string): string {
@@ -718,6 +908,18 @@ export class PendingTasksBubbleComponent implements OnInit, OnDestroy, OnChanges
         this.openDropdownTaskId = null;
       }
     }
+    
+    // Cerrar dropdown de ordenamiento si se hace click fuera
+    if (this.showSortDropdown) {
+      const target = event.target as HTMLElement;
+      const clickedInSortButton = target.closest('.sort-button');
+      const clickedInSortDropdown = target.closest('.sort-dropdown');
+      
+      if (!clickedInSortButton && !clickedInSortDropdown) {
+        this.showSortDropdown = false;
+        this.sortDropdownPosition = null;
+      }
+    }
   }
 
   @HostListener('window:resize', ['$event'])
@@ -737,6 +939,11 @@ export class PendingTasksBubbleComponent implements OnInit, OnDestroy, OnChanges
       const taskId = this.openDropdownTaskId;
       this.openDropdownTaskId = null;
       delete this.dropdownPositions[taskId];
+    }
+    // Cerrar dropdown de ordenamiento al hacer scroll
+    if (this.showSortDropdown) {
+      this.showSortDropdown = false;
+      this.sortDropdownPosition = null;
     }
   }
 
@@ -773,6 +980,8 @@ export class PendingTasksBubbleComponent implements OnInit, OnDestroy, OnChanges
   closeModal(): void {
     this.isModalOpen = false;
     this.openDropdownTaskId = null;
+    this.showSortDropdown = false;
+    this.sortDropdownPosition = null;
     this.dropdownPositions = {};
     document.body.style.overflow = '';
   }
@@ -780,6 +989,130 @@ export class PendingTasksBubbleComponent implements OnInit, OnDestroy, OnChanges
   onEditTask(task: Task): void {
     this.editTask.emit(task);
     this.closeModal();
+  }
+
+  toggleSortDropdown(event: Event): void {
+    event.stopPropagation();
+    
+    if (this.showSortDropdown) {
+      // Cerrar si ya está abierto
+      this.showSortDropdown = false;
+      this.sortDropdownPosition = null;
+      return;
+    }
+    
+    // Cerrar otros dropdowns abiertos
+    const previousTaskId = this.openDropdownTaskId;
+    this.openDropdownTaskId = null;
+    if (previousTaskId) {
+      delete this.dropdownPositions[previousTaskId];
+    }
+    
+    // Calcular posición del dropdown
+    const target = event.target as HTMLElement;
+    const buttonElement = target.closest('.sort-button') as HTMLElement;
+    
+    if (buttonElement) {
+      const rect = buttonElement.getBoundingClientRect();
+      const dropdownWidth = 200; // Ancho aproximado del dropdown
+      const dropdownHeight = 200; // Altura máxima del dropdown
+      const spacing = 8; // Espacio entre el botón y el dropdown
+      const padding = 10; // Padding mínimo desde los bordes
+      
+      // Calcular posición desde arriba
+      let top = rect.bottom + spacing;
+      
+      // Verificar si cabe hacia abajo
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      
+      if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+        // Mostrar arriba del botón
+        top = rect.top - dropdownHeight - spacing;
+      }
+      
+      // Asegurar que no se salga por arriba
+      if (top < padding) {
+        top = padding;
+      }
+      
+      // Asegurar que no se salga por abajo
+      if (top + dropdownHeight > window.innerHeight - padding) {
+        top = window.innerHeight - dropdownHeight - padding;
+      }
+      
+      // Calcular posición horizontal
+      // Intentar alinear con el botón desde la derecha (ya que el botón está a la derecha)
+      let left = rect.right - dropdownWidth;
+      
+      // Verificar si cabe desde la derecha
+      if (left < padding) {
+        // No cabe, usar posición desde la izquierda del botón
+        left = rect.left;
+      }
+      
+      // Asegurar que no se salga por la izquierda
+      if (left < padding) {
+        left = padding;
+      }
+      
+      // Asegurar que no se salga por la derecha
+      if (left + dropdownWidth > window.innerWidth - padding) {
+        left = window.innerWidth - dropdownWidth - padding;
+      }
+      
+      this.sortDropdownPosition = {
+        top: top,
+        left: left
+      };
+      
+      // Usar setTimeout para asegurar que Angular actualice el DOM antes de mostrar
+      setTimeout(() => {
+        this.showSortDropdown = true;
+      }, 0);
+    }
+  }
+
+  selectSortMode(mode: 'chronological-asc' | 'chronological-desc' | 'project-asc' | 'project-desc'): void {
+    this.sortMode = mode;
+    this.showSortDropdown = false;
+    this.sortDropdownPosition = null;
+    this.updatePendingTasks();
+  }
+
+  getSortModeLabel(): string {
+    switch (this.sortMode) {
+      case 'chronological-asc':
+        return 'Más próxima';
+      case 'chronological-desc':
+        return 'Más lejana';
+      case 'project-asc':
+        return 'Proyecto + Reciente';
+      case 'project-desc':
+        return 'Proyecto + Lejana';
+      default:
+        return 'Ordenar';
+    }
+  }
+
+  getSortModeIcon(): string {
+    switch (this.sortMode) {
+      case 'chronological-asc':
+        return 'fa-sort-amount-up';
+      case 'chronological-desc':
+        return 'fa-sort-amount-down';
+      case 'project-asc':
+        return 'fa-layer-group';
+      case 'project-desc':
+        return 'fa-layer-group';
+      default:
+        return 'fa-sort';
+    }
+  }
+
+  closeSortDropdown(): void {
+    this.showSortDropdown = false;
+    this.sortDropdownPosition = null;
   }
 
   // Métodos para drag and drop de la burbuja

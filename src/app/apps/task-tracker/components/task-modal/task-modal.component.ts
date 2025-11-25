@@ -1,6 +1,8 @@
 import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, OnChanges, ChangeDetectorRef, ViewChild, ElementRef, Renderer2, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Subject } from 'rxjs';
+import { debounceTime } from 'rxjs/operators';
 import { Task } from '../../models/task.model';
 import { Project } from '../../models/project.model';
 import { Environment } from '../../models/environment.model';
@@ -94,6 +96,10 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   // Fechas originales para calcular el desplazamiento de recordatorios
   originalStartDateTime: Date | null = null;
   originalEndDateTime: Date | null = null;
+  
+  // Subject para debounce de cambios en duración
+  private durationChangeSubject = new Subject<number>();
+  private durationChangeSubscription: any;
   
   // Emojis frecuentes (se mantienen al inicio)
   frequentEmojis = ['📝', '⏰', '✅', '🛏️', '🍔', 
@@ -192,6 +198,13 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     
     // Sincronizar el primer fragmento con las fechas principales si existe
     this.syncFirstFragmentWithMainDates();
+    
+    // Configurar suscripción para debounce de cambios en duración
+    this.durationChangeSubscription = this.durationChangeSubject
+      .pipe(debounceTime(500)) // 500ms de delay, similar a VSCode
+      .subscribe((newDuration) => {
+        this.recalculateEndTimeFromDuration(newDuration);
+      });
   }
   
   ngOnDestroy() {
@@ -199,6 +212,10 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     this.enableBodyScroll();
     // Limpiar el selector de emojis si está abierto
     this.closeEmojiPicker();
+    // Desuscribirse del subject de cambios de duración
+    if (this.durationChangeSubscription) {
+      this.durationChangeSubscription.unsubscribe();
+    }
   }
   
   async ngOnChanges(changes: any) {
@@ -941,44 +958,66 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
       this.task.fragments = [];
     }
     
-    // Si es el primer fragmento y hay fechas principales (inicio y fin), usar esas
+    // Si es el primer clic (no hay fragmentos), crear automáticamente DOS fragmentos
     if (this.task.fragments.length === 0 && this.startDate && this.startTime && this.endDate && this.endTime) {
-      this.task.fragments.push({
+      // Primer fragmento: usar fechas principales de inicio y fin de la tarea
+      const firstFragment = {
         start: this.combineDateTime(this.startDate, this.startTime),
         end: this.combineDateTime(this.endDate, this.endTime)
+      };
+      this.task.fragments.push(firstFragment);
+      
+      // Calcular la duración del primer fragmento
+      const firstFragmentDuration = this.calculateFragmentDuration(0);
+      
+      // Segundo fragmento: comienza donde termina el primero, con la misma duración
+      const firstFragmentEnd = this.splitDateTime(firstFragment.end);
+      const secondFragmentEnd = this.calculateNewEndDateTime(
+        firstFragmentEnd.date,
+        firstFragmentEnd.time,
+        firstFragmentDuration
+      );
+      
+      this.task.fragments.push({
+        start: firstFragment.end,
+        end: this.combineDateTime(secondFragmentEnd.date, secondFragmentEnd.time)
       });
+      
       return;
     }
     
-    // Determinar la fecha/hora de inicio del fragmento
-    let fragmentStartDate: string;
-    let fragmentStartTime: string;
-    
-    if (this.startDate && this.startTime) {
-      // Si hay fecha/hora de inicio de la tarea, usar esa como referencia
-      fragmentStartDate = this.startDate;
-      fragmentStartTime = this.roundTimeToNearest30Minutes(this.startTime);
-    } else {
-      // Si no hay fecha/hora de inicio, usar la fecha/hora actual redondeada
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const day = String(now.getDate()).padStart(2, '0');
-      fragmentStartDate = `${year}-${month}-${day}`;
+    // Para fragmentos posteriores (tercero, cuarto, etc.)
+    if (this.task.fragments.length > 0) {
+      // Obtener el último fragmento
+      const lastFragmentIndex = this.task.fragments.length - 1;
+      const lastFragment = this.task.fragments[lastFragmentIndex];
       
-      const currentTime = this.getCurrentTime();
-      fragmentStartTime = this.roundTimeToNearest30Minutes(currentTime);
+      if (!lastFragment.start || !lastFragment.end) {
+        return;
+      }
+      
+      // Calcular la duración del último fragmento
+      const lastFragmentDuration = this.calculateFragmentDuration(lastFragmentIndex);
+      
+      if (lastFragmentDuration <= 0) {
+        return;
+      }
+      
+      // El nuevo fragmento comienza donde termina el último
+      const lastFragmentEnd = this.splitDateTime(lastFragment.end);
+      
+      // Calcular la fecha/hora de fin del nuevo fragmento con la misma duración
+      const newFragmentEnd = this.calculateNewEndDateTime(
+        lastFragmentEnd.date,
+        lastFragmentEnd.time,
+        lastFragmentDuration
+      );
+      
+      this.task.fragments.push({
+        start: lastFragment.end,
+        end: this.combineDateTime(newFragmentEnd.date, newFragmentEnd.time)
+      });
     }
-    
-    // Calcular la fecha/hora de fin (1 hora después del inicio)
-    const endDateTime = this.calculateNewEndDateTime(fragmentStartDate, fragmentStartTime, 1);
-    const fragmentEndDate = endDateTime.date;
-    const fragmentEndTime = endDateTime.time;
-    
-    this.task.fragments.push({
-      start: this.combineDateTime(fragmentStartDate, fragmentStartTime),
-      end: this.combineDateTime(fragmentEndDate, fragmentEndTime)
-    });
   }
 
   private roundTimeToNearest30Minutes(time: string): string {
@@ -1134,6 +1173,79 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   
   openTimeCalculator(type: 'start' | 'end') {
     this.openCalculatorModal.emit({ type });
+  }
+  
+  /**
+   * Aplica el cálculo de tiempo desde el modal de calculadora
+   * @param type 'start' para calcular hora de inicio desde hora de fin, 'end' para calcular hora de fin desde hora de inicio
+   * @param minutes Duración en minutos a sumar/restar
+   */
+  applyTimeCalculation(type: 'start' | 'end', minutes: number) {
+    if (type === 'start') {
+      // Calcular hora de inicio restando minutos de la hora de fin
+      if (this.endDate && this.endTime) {
+        // Crear fecha de fin usando el mismo método que combineDateTime
+        const [endHours, endMinutes] = this.endTime.split(':').map(Number);
+        const endYear = parseInt(this.endDate.substring(0, 4));
+        const endMonth = parseInt(this.endDate.substring(5, 7)) - 1;
+        const endDay = parseInt(this.endDate.substring(8, 10));
+        
+        const endDateTime = new Date(endYear, endMonth, endDay, endHours, endMinutes, 0, 0);
+        const startDateTime = new Date(endDateTime.getTime() - (minutes * 60 * 1000));
+        
+        // Extraer fecha y hora usando métodos locales (no UTC) para mantener consistencia
+        const newStartDate = `${startDateTime.getFullYear()}-${String(startDateTime.getMonth() + 1).padStart(2, '0')}-${String(startDateTime.getDate()).padStart(2, '0')}`;
+        const newStartTime = `${String(startDateTime.getHours()).padStart(2, '0')}:${String(startDateTime.getMinutes()).padStart(2, '0')}`;
+        
+        // Actualizar las fechas usando los métodos existentes para mantener la sincronización
+        this.startDate = newStartDate;
+        this.startTime = newStartTime;
+        
+        // Sincronizar con el primer fragmento si existe
+        this.syncFirstFragmentStart();
+        
+        // Actualizar la duración estimada basándose en las nuevas fechas
+        this.updateDuration();
+        
+        // Validar las fechas
+        this.validateDates();
+        
+        // Forzar actualización de la vista
+        this.cdr.detectChanges();
+      }
+    } else {
+      // Calcular hora de fin sumando minutos a la hora de inicio
+      if (this.startDate && this.startTime) {
+        // Crear fecha de inicio usando el mismo método que combineDateTime
+        const [startHours, startMinutes] = this.startTime.split(':').map(Number);
+        const startYear = parseInt(this.startDate.substring(0, 4));
+        const startMonth = parseInt(this.startDate.substring(5, 7)) - 1;
+        const startDay = parseInt(this.startDate.substring(8, 10));
+        
+        const startDateTime = new Date(startYear, startMonth, startDay, startHours, startMinutes, 0, 0);
+        const endDateTime = new Date(startDateTime.getTime() + (minutes * 60 * 1000));
+        
+        // Extraer fecha y hora usando métodos locales (no UTC) para mantener consistencia
+        const newEndDate = `${endDateTime.getFullYear()}-${String(endDateTime.getMonth() + 1).padStart(2, '0')}-${String(endDateTime.getDate()).padStart(2, '0')}`;
+        const newEndTime = `${String(endDateTime.getHours()).padStart(2, '0')}:${String(endDateTime.getMinutes()).padStart(2, '0')}`;
+        
+        // Actualizar las fechas usando los métodos existentes para mantener la sincronización
+        this.endDate = newEndDate;
+        this.endTime = newEndTime;
+        
+        // Sincronizar con el primer fragmento si existe
+        this.syncFirstFragmentEnd();
+        
+        // Actualizar la duración estimada basándose en las nuevas fechas
+        this.updateDuration();
+        
+        // Validar las fechas
+        this.validateDates();
+        
+        // Forzar actualización de la vista
+        this.cdr.detectChanges();
+      }
+    }
   }
   
   // Métodos de utilidad
@@ -1783,5 +1895,40 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
       console.error('Error al buscar tareas por nombre y proyecto:', error);
       // No mostrar error al usuario, solo registrar en consola
     }
+  }
+  
+  /**
+   * Maneja el cambio en el campo de duración con debounce
+   */
+  onDurationChange(newDuration: number | null) {
+    const duration = newDuration || 0;
+    // Emitir el cambio al subject para aplicar debounce
+    this.durationChangeSubject.next(duration);
+  }
+  
+  /**
+   * Recalcula la fecha/hora de fin basándose en la fecha/hora de inicio y la duración
+   */
+  private recalculateEndTimeFromDuration(duration: number) {
+    // Solo recalcular si hay fecha/hora de inicio y una duración válida
+    if (!this.startDate || !this.startTime || !duration || duration <= 0) {
+      return;
+    }
+    
+    // Calcular la nueva fecha/hora de fin
+    const newEndDateTime = this.calculateNewEndDateTime(this.startDate, this.startTime, duration);
+    
+    // Actualizar las fechas de fin
+    this.endDate = newEndDateTime.date;
+    this.endTime = newEndDateTime.time;
+    
+    // Sincronizar con el primer fragmento si existe
+    this.syncFirstFragmentEnd();
+    
+    // Validar las fechas después del ajuste
+    this.validateDates();
+    
+    // Forzar actualización de la vista
+    this.cdr.detectChanges();
   }
 } 

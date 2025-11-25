@@ -2542,58 +2542,16 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
   }
 
   applyNewTaskTimeCalculation(minutes: number) {
-    if (this.calculatorType === 'start') {
-      // Calcular hora de inicio restando minutos de la hora de fin
-      if (this.newTaskEndDate && this.newTaskEndTime) {
-        const endDateTime = new Date(`${this.newTaskEndDate}T${this.newTaskEndTime}`);
-        const startDateTime = new Date(endDateTime.getTime() - (minutes * 60 * 1000));
-        
-        this.newTaskStartDate = startDateTime.toISOString().split('T')[0];
-        this.newTaskStartTime = startDateTime.toTimeString().slice(0, 5);
-        
-        this.onNewTaskDateChange('start', this.newTaskStartDate);
-        this.onNewTaskStartTimeChange(this.newTaskStartTime);
-      }
-    } else {
-      // Calcular hora de fin sumando minutos a la hora de inicio
-      if (this.newTaskStartDate && this.newTaskStartTime) {
-        const startDateTime = new Date(`${this.newTaskStartDate}T${this.newTaskStartTime}`);
-        const endDateTime = new Date(startDateTime.getTime() + (minutes * 60 * 1000));
-        
-        this.newTaskEndDate = endDateTime.toISOString().split('T')[0];
-        this.newTaskEndTime = endDateTime.toTimeString().slice(0, 5);
-        
-        this.onNewTaskDateChange('end', this.newTaskEndDate);
-        this.onNewTaskEndTimeChange(this.newTaskEndTime);
-      }
+    // Usar el método público del modal para aplicar el cálculo
+    if (this.newTaskModal) {
+      this.newTaskModal.applyTimeCalculation(this.calculatorType, minutes);
     }
   }
 
   applyEditTaskTimeCalculation(minutes: number) {
-    if (this.calculatorType === 'start') {
-      // Calcular hora de inicio restando minutos de la hora de fin
-      if (this.editTaskEndDate && this.editTaskEndTime) {
-        const endDateTime = new Date(`${this.editTaskEndDate}T${this.editTaskEndTime}`);
-        const startDateTime = new Date(endDateTime.getTime() - (minutes * 60 * 1000));
-        
-        this.editTaskStartDate = startDateTime.toISOString().split('T')[0];
-        this.editTaskStartTime = startDateTime.toTimeString().slice(0, 5);
-        
-        this.onEditTaskDateChange('start', this.editTaskStartDate);
-        this.onEditTaskStartTimeChange(this.editTaskStartTime);
-      }
-    } else {
-      // Calcular hora de fin sumando minutos a la hora de inicio
-      if (this.editTaskStartDate && this.editTaskStartTime) {
-        const startDateTime = new Date(`${this.editTaskStartDate}T${this.editTaskStartTime}`);
-        const endDateTime = new Date(startDateTime.getTime() + (minutes * 60 * 1000));
-        
-        this.editTaskEndDate = endDateTime.toISOString().split('T')[0];
-        this.editTaskEndTime = endDateTime.toTimeString().slice(0, 5);
-        
-        this.onEditTaskDateChange('end', this.editTaskEndDate);
-        this.onEditTaskEndTimeChange(this.editTaskEndTime);
-      }
+    // Usar el método público del modal para aplicar el cálculo
+    if (this.editTaskModal) {
+      this.editTaskModal.applyTimeCalculation(this.calculatorType, minutes);
     }
   }
 
