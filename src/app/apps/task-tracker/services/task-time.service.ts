@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Firestore, doc, updateDoc, writeBatch } from '@angular/fire/firestore';
+import { Firestore, doc, updateDoc } from '@angular/fire/firestore';
 import { AuthService } from '../../../services/auth.service';
 import { Task } from '../models/task.model';
 import { EnvironmentService } from './environment.service';
@@ -368,6 +368,107 @@ export class TaskTimeService {
     }
     
     return options;
+  }
+
+  /**
+   * Obtener la última tarea que terminó antes de la hora actual
+   * Usa las tareas ya cargadas en memoria para evitar consultas adicionales a Firestore
+   * @param tasks Array de tareas ya cargadas
+   * @returns La última tarea con su hora de fin, o null si no hay ninguna
+   */
+  getLastTaskBeforeNow(tasks: Task[]): Task | null {
+    if (!tasks || tasks.length === 0) {
+      console.log('🔍 getLastTaskBeforeNow: No hay tareas cargadas');
+      return null;
+    }
+
+    const now = new Date();
+    const nowTime = now.getTime();
+    
+    console.log('🔍 getLastTaskBeforeNow: Buscando última tarea antes de', now.toISOString());
+    console.log('🔍 Total de tareas a revisar:', tasks.length);
+
+    // Filtrar tareas que terminaron antes de ahora y no están ocultas/completadas
+    const tasksBeforeNow = tasks
+      .filter(task => {
+        if (!task.end) return false;
+        
+        // Parsear la fecha de fin
+        const endStr = task.end.includes('Z') ? task.end : task.end + 'Z';
+        const endTime = new Date(endStr).getTime();
+        
+        return endTime < nowTime;
+      })
+      .sort((a, b) => {
+        // Ordenar por fecha de fin descendente (más reciente primero)
+        const aEndStr = a.end.includes('Z') ? a.end : a.end + 'Z';
+        const bEndStr = b.end.includes('Z') ? b.end : b.end + 'Z';
+        return new Date(bEndStr).getTime() - new Date(aEndStr).getTime();
+      });
+
+    if (tasksBeforeNow.length === 0) {
+      console.log('🔍 getLastTaskBeforeNow: No se encontraron tareas que terminaran antes de ahora');
+      return null;
+    }
+
+    const lastTask = tasksBeforeNow[0];
+    console.log('🔍 getLastTaskBeforeNow: Última tarea encontrada:', lastTask.name, 'termina a las', lastTask.end);
+    
+    return lastTask;
+  }
+
+  /**
+   * Calcula las horas propuestas para una nueva tarea creada desde la burbuja
+   * - Hora de inicio: fin de la última tarea antes de ahora
+   * - Hora de fin: próximo múltiplo de 30 minutos después de ahora
+   * @param lastTask Última tarea antes de la hora actual (puede ser null)
+   * @returns Objeto con las horas de inicio y fin propuestas
+   */
+  calculateBubbleTaskTimes(lastTask: Task | null): { startDateTime: Date; endDateTime: Date } {
+    const now = new Date();
+    const msHalfHour = 30 * 60 * 1000; // 30 minutos en ms
+    
+    console.log('⏰ calculateBubbleTaskTimes: Hora actual:', now.toISOString());
+    console.log('⏰ calculateBubbleTaskTimes: lastTask recibida:', lastTask ? lastTask.name : 'null');
+    
+    // Calcular hora de fin: próximo múltiplo de 30 minutos después de ahora
+    const endDateTime = new Date(Math.ceil(now.getTime() / msHalfHour) * msHalfHour);
+    console.log('⏰ calculateBubbleTaskTimes: Hora fin calculada:', endDateTime.toISOString());
+    
+    // Calcular hora de inicio
+    let startDateTime: Date;
+    
+    if (lastTask && lastTask.end) {
+      // Usar la hora de fin de la última tarea
+      const lastTaskEndStr = lastTask.end.includes('Z') ? lastTask.end : lastTask.end + 'Z';
+      console.log('⏰ calculateBubbleTaskTimes: Fin de última tarea (string):', lastTask.end);
+      console.log('⏰ calculateBubbleTaskTimes: Fin de última tarea (con Z):', lastTaskEndStr);
+      
+      startDateTime = new Date(lastTaskEndStr);
+      console.log('⏰ calculateBubbleTaskTimes: Fecha parseada:', startDateTime.toISOString());
+      
+      // Si la hora de fin de la última tarea es después de ahora, usar ahora
+      if (startDateTime > now) {
+        console.log('⏰ calculateBubbleTaskTimes: La hora de fin de última tarea es FUTURA, usando hora actual');
+        startDateTime = now;
+      }
+    } else {
+      // Si no hay última tarea, usar la hora actual
+      console.log('⏰ calculateBubbleTaskTimes: No hay última tarea, usando hora actual');
+      startDateTime = now;
+    }
+    
+    console.log('⏰ calculateBubbleTaskTimes: Hora inicio final:', startDateTime.toISOString());
+    
+    // Asegurarse de que el inicio sea antes del fin
+    if (startDateTime >= endDateTime) {
+      // Si el inicio es igual o posterior al fin, ajustar el fin
+      const newEnd = new Date(startDateTime.getTime() + msHalfHour);
+      console.log('⏰ calculateBubbleTaskTimes: Ajustando hora fin a:', newEnd.toISOString());
+      return { startDateTime, endDateTime: newEnd };
+    }
+    
+    return { startDateTime, endDateTime };
   }
 }
 

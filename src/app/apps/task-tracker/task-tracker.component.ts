@@ -25,6 +25,7 @@ import { TaskTypeModalComponent } from './components/task-type-modal/task-type-m
 import { TaskTypeService } from './services/task-type.service';
 import { TaskType } from './models/task-type.model';
 import { TimelineFocusService } from './services/timeline-focus.service';
+import { TaskTimeService } from './services/task-time.service';
 import { CustomSelectComponent, SelectOption } from './components/custom-select/custom-select.component';
 import { WeekTimelineSvgComponent } from './components/week-timeline-svg/week-timeline-svg.component';
 import { TaskSumTemplateService } from './services/task-sum-template.service';
@@ -267,6 +268,7 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     private taskTypeService: TaskTypeService,
     private taskSumTemplateService: TaskSumTemplateService,
     private timelineFocusService: TimelineFocusService,
+    private taskTimeService: TaskTimeService,
     private elementRef: ElementRef,
     private cdr: ChangeDetectorRef
   ) {}
@@ -519,6 +521,39 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     this.onNewTaskEnvironmentChange();
     // Ahora preseleccionar el proyecto (después de que se carguen los proyectos disponibles)
     this.newTask.project = projectId;
+    this.showNewTaskModal = true;
+  }
+
+  /**
+   * Abre el modal de nueva tarea desde la burbuja flotante roja (sin tarea actual)
+   * - Hora de inicio: fin de la última tarea antes de ahora
+   * - Hora de fin: próximo múltiplo de 30 minutos después de ahora
+   */
+  openNewTaskModalFromBubble() {
+    this.resetNewTask();
+    
+    // Obtener la última tarea antes de la hora actual (usando las tareas ya cargadas)
+    const lastTask = this.taskTimeService.getLastTaskBeforeNow(this.tasks);
+    
+    // Calcular las horas propuestas
+    const { startDateTime, endDateTime } = this.taskTimeService.calculateBubbleTaskTimes(lastTask);
+    
+    console.log('📅 openNewTaskModalFromBubble: Hora inicio calculada:', startDateTime.toISOString());
+    console.log('📅 openNewTaskModalFromBubble: Hora fin calculada:', endDateTime.toISOString());
+    
+    // Formatear y establecer los valores
+    this.newTask.start = this.formatDateTimeLocalForDefaults(startDateTime);
+    this.newTask.end = this.formatDateTimeLocalForDefaults(endDateTime);
+    
+    // Actualizar las fechas y horas separadas usando HORA LOCAL
+    this.newTaskStartDate = `${startDateTime.getFullYear()}-${String(startDateTime.getMonth() + 1).padStart(2, '0')}-${String(startDateTime.getDate()).padStart(2, '0')}`;
+    this.newTaskStartTime = `${startDateTime.getHours().toString().padStart(2, '0')}:${startDateTime.getMinutes().toString().padStart(2, '0')}`;
+    this.newTaskEndDate = `${endDateTime.getFullYear()}-${String(endDateTime.getMonth() + 1).padStart(2, '0')}-${String(endDateTime.getDate()).padStart(2, '0')}`;
+    this.newTaskEndTime = `${endDateTime.getHours().toString().padStart(2, '0')}:${endDateTime.getMinutes().toString().padStart(2, '0')}`;
+    
+    // Recalcular la duración
+    this.updateNewTaskDuration();
+    
     this.showNewTaskModal = true;
   }
 

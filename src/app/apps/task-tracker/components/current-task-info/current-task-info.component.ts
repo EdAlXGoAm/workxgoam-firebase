@@ -363,6 +363,7 @@ export class CurrentTaskInfoComponent implements OnInit, OnDestroy, OnChanges {
   @Input() projects: Project[] = [];
   @Input() environments: Environment[] = [];
   @Output() createTask = new EventEmitter<void>();
+  @Output() createTaskFromBubble = new EventEmitter<void>(); // Evento especial cuando viene de la burbuja roja
 
   currentTask: Task | null = null;
   nextTask: Task | null = null;
@@ -650,10 +651,10 @@ export class CurrentTaskInfoComponent implements OnInit, OnDestroy, OnChanges {
     // Fallback: solo abrir si mouseUpHandler no lo manejó (caso raro)
     // Esto es principalmente para móviles donde el evento click puede dispararse sin mouseup
     console.log('👆 Click en burbuja (fallback)');
-    // Si no hay tarea actual, abrir modal de nueva tarea
+    // Si no hay tarea actual, abrir modal de nueva tarea desde burbuja
     if (!this.currentTask) {
-      console.log('⚠️ Sin tarea actual, abriendo modal de nueva tarea');
-      this.createTask.emit();
+      console.log('⚠️ Sin tarea actual, abriendo modal de nueva tarea desde burbuja');
+      this.createTaskFromBubble.emit();
     } else {
       console.log('📋 Abriendo modal de info');
       this.toggleModal();
@@ -700,10 +701,10 @@ export class CurrentTaskInfoComponent implements OnInit, OnDestroy, OnChanges {
         e.preventDefault();
         e.stopPropagation();
         this.lastDragEndTime = Date.now();
-        // Si no hay tarea actual, abrir modal de nueva tarea
+        // Si no hay tarea actual, abrir modal de nueva tarea desde burbuja
         if (!this.currentTask) {
-          console.log('⚠️ Click detectado, sin tarea actual, abriendo modal de nueva tarea');
-          this.createTask.emit();
+          console.log('⚠️ Click detectado, sin tarea actual, abriendo modal de nueva tarea desde burbuja');
+          this.createTaskFromBubble.emit();
         } else {
           console.log('👆 Click detectado, abriendo modal de info');
           this.toggleModal();
@@ -755,10 +756,10 @@ export class CurrentTaskInfoComponent implements OnInit, OnDestroy, OnChanges {
       } else if (tapTime < 300) {
         // Fue un tap rápido
         this.lastDragEndTime = Date.now();
-        // Si no hay tarea actual, abrir modal de nueva tarea
+        // Si no hay tarea actual, abrir modal de nueva tarea desde burbuja
         if (!this.currentTask) {
-          console.log('⚠️ Tap detectado, sin tarea actual, abriendo modal de nueva tarea');
-          this.createTask.emit();
+          console.log('⚠️ Tap detectado, sin tarea actual, abriendo modal de nueva tarea desde burbuja');
+          this.createTaskFromBubble.emit();
         } else {
           console.log('👆 Tap detectado, abriendo modal de info');
           this.toggleModal();
