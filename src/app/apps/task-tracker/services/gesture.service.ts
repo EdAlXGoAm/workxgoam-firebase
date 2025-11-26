@@ -12,14 +12,19 @@ export type GestureType =
   | 'drag-down'      // Arrastrar hacia abajo
   | 'resize-start'   // Redimensionar desde el inicio (borde izquierdo/superior)
   | 'resize-end'     // Redimensionar desde el final (borde derecho/inferior)
-  | 'tap'            // Toque simple
-  | 'long-press';    // Pulsación larga
+  | 'tap'            // Toque simple (click izquierdo sin arrastre)
+  | 'double-tap'     // Doble click
+  | 'long-press'     // Pulsación larga
+  | 'contextmenu';   // Click derecho
+
+export type GesturePhase = 'start' | 'move' | 'end';
 
 /**
  * Información completa del gesto detectado
  */
 export interface GestureEvent {
   type: GestureType;
+  phase: GesturePhase;
   element: HTMLElement | SVGElement;
   startX: number;
   startY: number;
@@ -156,6 +161,12 @@ export class GestureService {
     // hoverHandler solo detecta zona de resize cuando NO hay drag activo
     const hoverHandler = (e: Event) => this.onHover(e as MouseEvent, element, mergedConfig);
     const mouseLeaveHandler = () => this.resetCursor(element);
+    // Handler para click derecho (contextmenu)
+    const contextMenuHandler = (e: Event) => this.onContextMenu(e as MouseEvent, element, data);
+    // Handler para doble click
+    const dblClickHandler = (e: Event) => this.onDoubleClick(e as MouseEvent, element, data);
+    // Handler para click simple (para asegurar detección en PC)
+    const clickHandler = (e: Event) => this.onClick(e as MouseEvent, element, data);
     
     // Handlers para touch (estos se quedan en el elemento por ahora, implicit capture)
     const touchStartHandler = (e: Event) => this.onTouchStart(e as TouchEvent, element, data, mergedConfig);
@@ -170,6 +181,9 @@ export class GestureService {
         element.addEventListener('mousedown', mouseDownHandler);
         element.addEventListener('mousemove', hoverHandler);
         element.addEventListener('mouseleave', mouseLeaveHandler);
+        element.addEventListener('contextmenu', contextMenuHandler);
+        element.addEventListener('dblclick', dblClickHandler);
+        element.addEventListener('click', clickHandler);
         
         element.addEventListener('touchstart', touchStartHandler, { passive: false });
         element.addEventListener('touchmove', touchMoveHandler, { passive: false });
@@ -182,6 +196,9 @@ export class GestureService {
       element.removeEventListener('mousedown', mouseDownHandler);
       element.removeEventListener('mousemove', hoverHandler);
       element.removeEventListener('mouseleave', mouseLeaveHandler);
+      element.removeEventListener('contextmenu', contextMenuHandler);
+      element.removeEventListener('dblclick', dblClickHandler);
+      element.removeEventListener('click', clickHandler);
       element.removeEventListener('touchstart', touchStartHandler);
       element.removeEventListener('touchmove', touchMoveHandler);
       element.removeEventListener('touchend', touchEndHandler);
@@ -267,6 +284,87 @@ export class GestureService {
   }
 
   /**
+   * Handler para click derecho (contextmenu)
+   */
+  private onContextMenu(e: MouseEvent, element: HTMLElement | SVGElement, data: any): void {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const event: GestureEvent = {
+      type: 'contextmenu',
+      phase: 'end',
+      element: element,
+      startX: e.clientX,
+      startY: e.clientY,
+      endX: e.clientX,
+      endY: e.clientY,
+      deltaX: 0,
+      deltaY: 0,
+      duration: 0,
+      velocity: 0,
+      data: data
+    };
+    
+    this.ngZone.run(() => {
+      this.gestureSubject.next(event);
+    });
+  }
+
+  /**
+   * Handler para doble click
+   */
+  private onDoubleClick(e: MouseEvent, element: HTMLElement | SVGElement, data: any): void {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const event: GestureEvent = {
+      type: 'double-tap',
+      phase: 'end',
+      element: element,
+      startX: e.clientX,
+      startY: e.clientY,
+      endX: e.clientX,
+      endY: e.clientY,
+      deltaX: 0,
+      deltaY: 0,
+      duration: 0,
+      velocity: 0,
+      data: data
+    };
+    
+    this.ngZone.run(() => {
+      this.gestureSubject.next(event);
+    });
+  }
+
+  /**
+   * Handler para click simple
+   */
+  private onClick(e: MouseEvent, element: HTMLElement | SVGElement, data: any): void {
+    e.stopPropagation();
+    
+    // Emitir tap (click detectado nativamente)
+    const event: GestureEvent = {
+      type: 'tap',
+      phase: 'end',
+      element: element,
+      startX: e.clientX,
+      startY: e.clientY,
+      endX: e.clientX,
+      endY: e.clientY,
+      deltaX: 0,
+      deltaY: 0,
+      duration: 0,
+      velocity: 0,
+      data: data
+    };
+    
+    this.ngZone.run(() => {
+      this.gestureSubject.next(event);
+    });
+  }
+
+  /**
    * Inicio de gesto con mouse
    */
   private onPointerDown(
@@ -277,7 +375,9 @@ export class GestureService {
   ): void {
     if (e.button !== 0) return; // Solo botón izquierdo
     
-    e.preventDefault();
+    // NO prevenimos default para permitir que ocurra el evento 'click' nativo
+    // Esto es crucial para detectar clicks simples de forma fiable en PC
+    // e.preventDefault(); 
     e.stopPropagation();
     
     // Determinar si es resize: o por configuración fija o por detección de zona
@@ -318,7 +418,11 @@ export class GestureService {
   private onPointerMove(e: MouseEvent, config: GestureConfig): void {
     if (!this.state.isActive || !this.state.element) return;
     
-    // Solo para feedback visual durante el drag (opcional)
+    const deltaX = e.clientX - this.state.startX;
+    const deltaY = e.clientY - this.state.startY;
+    const duration = Date.now() - this.state.startTime;
+
+    this.processGesture(deltaX, deltaY, duration, config, 'move');
   }
 
   /**
@@ -333,7 +437,9 @@ export class GestureService {
     const deltaY = endY - this.state.startY;
     const duration = Date.now() - this.state.startTime;
     
-    this.processGesture(deltaX, deltaY, duration, config);
+    // Para mouse, no emitimos 'tap' aquí, dejamos que el evento 'click' lo maneje
+    // esto es más robusto y evita conflictos
+    this.processGesture(deltaX, deltaY, duration, config, 'end', false);
     
     // Restaurar cursor usando clases
     this.state.element.classList.remove('cursor-resize-h', 'cursor-resize-v', 'cursor-grabbing');
@@ -390,13 +496,16 @@ export class GestureService {
     if (!this.state.isActive || e.touches.length !== 1) return;
     
     const touch = e.touches[0];
-    const deltaX = Math.abs(touch.clientX - this.state.startX);
-    const deltaY = Math.abs(touch.clientY - this.state.startY);
+    const deltaX = touch.clientX - this.state.startX;
+    const deltaY = touch.clientY - this.state.startY;
+    const duration = Date.now() - this.state.startTime;
     
     // Si hay movimiento significativo, cancelar long-press
-    if (deltaX > config.dragThreshold || deltaY > config.dragThreshold) {
+    if (Math.abs(deltaX) > config.dragThreshold || Math.abs(deltaY) > config.dragThreshold) {
       this.cancelLongPress();
     }
+
+    this.processGesture(deltaX, deltaY, duration, config, 'move');
   }
 
   /**
@@ -404,6 +513,11 @@ export class GestureService {
    */
   private onTouchEnd(e: TouchEvent, config: GestureConfig): void {
     if (!this.state.isActive) return;
+    
+    // Prevenir eventos de mouse fantasma (click, mousedown, etc.) que siguen al touch
+    if (e.cancelable) {
+      e.preventDefault();
+    }
     
     this.cancelLongPress();
     
@@ -423,9 +537,9 @@ export class GestureService {
     if (this.state.longPressTriggered && 
         Math.abs(deltaX) < config.dragThreshold && 
         Math.abs(deltaY) < config.dragThreshold) {
-      this.emitGesture('long-press', 0, 0, duration);
+      this.emitGesture('long-press', 0, 0, duration, 'end');
     } else {
-      this.processGesture(deltaX, deltaY, duration, config);
+      this.processGesture(deltaX, deltaY, duration, config, 'end');
     }
     
     this.resetState();
@@ -434,20 +548,30 @@ export class GestureService {
   /**
    * Procesar y clasificar el gesto
    */
-  private processGesture(deltaX: number, deltaY: number, duration: number, config: GestureConfig): void {
+  private processGesture(
+    deltaX: number, 
+    deltaY: number, 
+    duration: number, 
+    config: GestureConfig,
+    phase: GesturePhase = 'end',
+    emitTap: boolean = true
+  ): void {
     const absDeltaX = Math.abs(deltaX);
     const absDeltaY = Math.abs(deltaY);
     
-    // Si el movimiento es menor que el umbral, es un tap
+    // Si el movimiento es menor que el umbral
     if (absDeltaX < config.dragThreshold && absDeltaY < config.dragThreshold) {
-      this.emitGesture('tap', deltaX, deltaY, duration);
+      // Solo emitir tap si es fase final y está habilitado
+      if (phase === 'end' && emitTap) {
+        this.emitGesture('tap', deltaX, deltaY, duration, phase);
+      }
       return;
     }
     
     // Si está en modo resize
     if (this.state.isResizing && this.state.resizeEdge) {
       const type: GestureType = this.state.resizeEdge === 'start' ? 'resize-start' : 'resize-end';
-      this.emitGesture(type, deltaX, deltaY, duration);
+      this.emitGesture(type, deltaX, deltaY, duration, phase);
       return;
     }
     
@@ -455,24 +579,31 @@ export class GestureService {
     if (config.direction === 'horizontal' || 
         (config.direction === 'both' && absDeltaX > absDeltaY)) {
       const type: GestureType = deltaX > 0 ? 'drag-right' : 'drag-left';
-      this.emitGesture(type, deltaX, deltaY, duration);
+      this.emitGesture(type, deltaX, deltaY, duration, phase);
     } else if (config.direction === 'vertical' || 
                (config.direction === 'both' && absDeltaY > absDeltaX)) {
       const type: GestureType = deltaY > 0 ? 'drag-down' : 'drag-up';
-      this.emitGesture(type, deltaX, deltaY, duration);
+      this.emitGesture(type, deltaX, deltaY, duration, phase);
     }
   }
 
   /**
    * Emitir evento de gesto
    */
-  private emitGesture(type: GestureType, deltaX: number, deltaY: number, duration: number): void {
+  private emitGesture(
+    type: GestureType, 
+    deltaX: number, 
+    deltaY: number, 
+    duration: number,
+    phase: GesturePhase
+  ): void {
     if (!this.state.element) return;
     
     const velocity = Math.sqrt(deltaX * deltaX + deltaY * deltaY) / (duration / 1000);
     
     const event: GestureEvent = {
       type,
+      phase,
       element: this.state.element,
       startX: this.state.startX,
       startY: this.state.startY,

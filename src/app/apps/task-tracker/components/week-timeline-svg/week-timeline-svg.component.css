@@ -390,6 +390,11 @@
   fill: #888 !important;
 }
 
+.preview-shadow {
+  pointer-events: none;
+  transition: none;
+}
+
 /* Estilos para resplandor de tareas overdue */
 .task-overdue {
   filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.6)) drop-shadow(0 0 4px rgba(239, 68, 68, 0.5)) drop-shadow(0 0 6px rgba(239, 68, 68, 0.4));

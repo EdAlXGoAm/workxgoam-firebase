@@ -646,6 +646,7 @@ export class DurationEditModalComponent implements OnInit {
   @Input() task: Task | null = null;
   @Input() fragmentIndex: number | null = null;
   @Input() suggestedAdjustStart: boolean = false; // true si se arrastró desde el borde izquierdo/superior
+  @Input() suggestedDurationMinutes: number | null = null;
   
   @Output() confirm = new EventEmitter<DurationEditResult>();
   @Output() cancel = new EventEmitter<void>();
@@ -682,9 +683,14 @@ export class DurationEditModalComponent implements OnInit {
         this.currentDurationMinutes = this.taskTimeService.getTaskDurationMinutes(this.task);
       }
       
-      this.selectedDuration = this.currentDurationMinutes;
-      this.customHours = Math.floor(this.currentDurationMinutes / 60);
-      this.customMinutes = this.currentDurationMinutes % 60;
+      // Usar duración sugerida si existe, sino la actual
+      const durationToUse = this.suggestedDurationMinutes && this.suggestedDurationMinutes > 0 
+        ? this.suggestedDurationMinutes 
+        : this.currentDurationMinutes;
+
+      this.selectedDuration = durationToUse;
+      this.customHours = Math.floor(durationToUse / 60);
+      this.customMinutes = durationToUse % 60;
     }
   }
 

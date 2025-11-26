@@ -246,6 +246,20 @@
               stroke="#f87171" 
               stroke-width="2" 
               stroke-dasharray="4 2" />
+        
+        <!-- Sombra de previsualización -->
+        <rect *ngIf="previewState.visible && previewState.dayIndex === dayIndex"
+              [attr.x]="previewState.x"
+              [attr.y]="previewState.y"
+              [attr.width]="previewState.width"
+              [attr.height]="previewState.height"
+              fill="rgba(99, 102, 241, 0.2)"
+              stroke="#6366f1"
+              stroke-width="2"
+              stroke-dasharray="4 4"
+              rx="4" ry="4"
+              class="preview-shadow"
+              pointer-events="none" />
       </g>
     </svg>
   </div>
@@ -314,6 +328,7 @@
   [task]="durationTask"
   [fragmentIndex]="durationFragmentIndex"
   [suggestedAdjustStart]="suggestedAdjustStart"
+  [suggestedDurationMinutes]="suggestedDurationMinutes"
   (confirm)="onDurationConfirm($event)"
   (cancel)="onDurationCancel()">
 </app-duration-edit-modal>

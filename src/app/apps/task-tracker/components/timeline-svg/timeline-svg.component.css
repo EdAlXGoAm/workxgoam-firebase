@@ -313,6 +313,11 @@
   background: #fee2e2;
 }
 
+.preview-shadow {
+  pointer-events: none;
+  transition: none;
+}
+
 .context-menu-item.completed,
 .context-menu-item-completed {
   color: #10b981;

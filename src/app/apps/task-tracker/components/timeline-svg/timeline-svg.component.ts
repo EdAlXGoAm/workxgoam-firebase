@@ -49,6 +49,16 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
   private gestureSubscription?: Subscription;
   private gestureCleanups: (() => void)[] = [];
 
+  // Estado de previsualización (sombra ghost)
+  previewState = {
+    visible: false,
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+    section: 0
+  };
+
   constructor(
     private cdr: ChangeDetectorRef,
     private timelineFocusService: TimelineFocusService,
@@ -93,6 +103,7 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
   durationTask: Task | null = null;
   durationFragmentIndex: number | null = null;
   suggestedAdjustStart: boolean = false;
+  suggestedDurationMinutes: number = 0;
 
   // Propiedades de dimensiones responsive
   svgWidth = 600;
@@ -216,12 +227,14 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
       const rect = rectRef.nativeElement;
       const taskId = rect.getAttribute('data-task-id');
       const fragmentIndexStr = rect.getAttribute('data-fragment-index');
+      const sectionStr = rect.getAttribute('data-section');
       const fragmentIndex = fragmentIndexStr ? parseInt(fragmentIndexStr, 10) : undefined;
+      const section = sectionStr ? parseInt(sectionStr, 10) : 0;
 
       if (taskId) {
         const task = this.tasks.find(t => t.id === taskId);
         if (task) {
-          const data = { task, fragmentIndex };
+          const data = { task, fragmentIndex, section };
           
           // 1. Registrar tarea PRINCIPAL solo para DRAG (disable resize detection on edges)
           const cleanupTask = this.gestureService.registerElement(rect, data, {
@@ -264,26 +277,84 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
 
     const task: Task = event.data.task;
     const fragmentIndex: number | undefined = event.data.fragmentIndex;
+    const section: number = event.data.section || 0;
 
-    switch (event.type) {
-      case 'drag-left':
-      case 'drag-right':
-        this.openTimeShiftModal(task, fragmentIndex, event);
-        break;
-
-      case 'resize-start':
-      case 'resize-end':
-        this.openDurationModal(task, fragmentIndex, event);
-        break;
-
-      case 'tap':
-        this.showTaskTooltip(task);
-        break;
-
-      case 'long-press':
-        this.showTaskContextMenu(task, event.endX, event.endY);
-        break;
+    // Fase MOVE: Actualizar previsualización (sombra)
+    if (event.phase === 'move') {
+      this.updatePreview(task, fragmentIndex, section, event);
+      return;
     }
+
+    // Fase END: Ejecutar acción y limpiar
+    if (event.phase === 'end') {
+      this.previewState.visible = false;
+      this.cdr.detectChanges();
+
+      switch (event.type) {
+        case 'drag-left':
+        case 'drag-right':
+          this.openTimeShiftModal(task, fragmentIndex, event);
+          break;
+
+        case 'resize-start':
+        case 'resize-end':
+          this.openDurationModal(task, fragmentIndex, event);
+          break;
+
+        case 'tap':
+          this.showTaskTooltip(task);
+          break;
+
+        case 'double-tap':
+          this.editTask.emit(task);
+          break;
+
+        case 'long-press':
+        case 'contextmenu':
+          this.showTaskContextMenu(task, event.endX, event.endY);
+          break;
+      }
+    }
+  }
+
+  /**
+   * Actualizar la sombra de previsualización durante el gesto
+   */
+  private updatePreview(task: Task, fragmentIndex: number | undefined, section: number, event: GestureEvent): void {
+    let item: RenderableItem;
+    
+    if (fragmentIndex !== undefined && task.fragments && task.fragments[fragmentIndex]) {
+        const f = task.fragments[fragmentIndex];
+        item = { type: 'fragment', task, fragmentIndex, start: f.start, end: f.end };
+    } else {
+        item = { type: 'task', task, start: task.start, end: task.end };
+    }
+
+    const originalX = this.getItemX(item, section);
+    const originalWidth = this.getItemWidth(item, section);
+    
+    let newX = originalX;
+    let newWidth = originalWidth;
+
+    if (event.type === 'drag-left' || event.type === 'drag-right') {
+        newX += event.deltaX;
+    } else if (event.type === 'resize-start') {
+        newX += event.deltaX;
+        newWidth -= event.deltaX;
+    } else if (event.type === 'resize-end') {
+        newWidth += event.deltaX;
+    }
+
+    this.previewState = {
+        visible: true,
+        x: newX,
+        y: 20,
+        width: Math.max(5, newWidth),
+        height: 40,
+        section: section
+    };
+    
+    this.cdr.detectChanges();
   }
 
   /**
@@ -318,6 +389,28 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     this.durationTask = task;
     this.durationFragmentIndex = fragmentIndex ?? null;
     this.suggestedAdjustStart = event.type === 'resize-start';
+    
+    // Calcular duración sugerida
+    let currentDuration = 0;
+    if (fragmentIndex !== undefined && task.fragments && task.fragments[fragmentIndex]) {
+        currentDuration = this.taskTimeService.getFragmentDurationMinutes(task, fragmentIndex);
+    } else {
+        currentDuration = this.taskTimeService.getTaskDurationMinutes(task);
+    }
+
+    // Ajustar pixels según dirección de resize
+    let pixels = event.deltaX;
+    if (event.type === 'resize-start') {
+        pixels = -event.deltaX;
+    }
+
+    this.suggestedDurationMinutes = this.gestureService.calculateDurationChange(
+        currentDuration,
+        pixels,
+        this.pixelsPerHour,
+        15
+    );
+
     this.showDurationModal = true;
     this.cdr.detectChanges();
   }
@@ -988,6 +1081,7 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
 
     this.tooltipTask = task;
     this.showTooltip = true;
+    this.cdr.detectChanges();
 
     this.tooltipTimeout = setTimeout(() => {
       this.hideTooltip();
@@ -1001,6 +1095,7 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
       clearTimeout(this.tooltipTimeout);
       this.tooltipTimeout = null;
     }
+    this.cdr.detectChanges();
   }
 
   getNextTask(currentTask: Task): Task | null {

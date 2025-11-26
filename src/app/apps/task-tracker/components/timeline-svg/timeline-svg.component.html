@@ -146,6 +146,19 @@
           </text>
         </g>
         <line *ngIf="isNowInSection(0)" [attr.x1]="getNowX(0)" y1="10" [attr.x2]="getNowX(0)" y2="70" stroke="#f87171" stroke-width="2" stroke-dasharray="4 2" />
+        <!-- Sombra de previsualización -->
+        <rect *ngIf="previewState.visible && previewState.section === 0"
+              [attr.x]="previewState.x"
+              [attr.y]="previewState.y"
+              [attr.width]="previewState.width"
+              [attr.height]="previewState.height"
+              fill="rgba(99, 102, 241, 0.2)"
+              stroke="#6366f1"
+              stroke-width="2"
+              stroke-dasharray="4 4"
+              rx="6" ry="6"
+              class="preview-shadow"
+              pointer-events="none" />
       </g>
 
       <!-- Tercio 2: 08:00 - 16:00 -->
@@ -216,6 +229,19 @@
           </text>
         </g>
         <line *ngIf="isNowInSection(1)" [attr.x1]="getNowX(8)" y1="10" [attr.x2]="getNowX(8)" y2="70" stroke="#f87171" stroke-width="2" stroke-dasharray="4 2" />
+        <!-- Sombra de previsualización -->
+        <rect *ngIf="previewState.visible && previewState.section === 8"
+              [attr.x]="previewState.x"
+              [attr.y]="previewState.y"
+              [attr.width]="previewState.width"
+              [attr.height]="previewState.height"
+              fill="rgba(99, 102, 241, 0.2)"
+              stroke="#6366f1"
+              stroke-width="2"
+              stroke-dasharray="4 4"
+              rx="6" ry="6"
+              class="preview-shadow"
+              pointer-events="none" />
       </g>
 
       <!-- Tercio 3: 16:00 - 24:00 -->
@@ -286,6 +312,19 @@
           </text>
         </g>
         <line *ngIf="isNowInSection(2)" [attr.x1]="getNowX(16)" y1="10" [attr.x2]="getNowX(16)" y2="70" stroke="#f87171" stroke-width="2" stroke-dasharray="4 2" />
+        <!-- Sombra de previsualización -->
+        <rect *ngIf="previewState.visible && previewState.section === 16"
+              [attr.x]="previewState.x"
+              [attr.y]="previewState.y"
+              [attr.width]="previewState.width"
+              [attr.height]="previewState.height"
+              fill="rgba(99, 102, 241, 0.2)"
+              stroke="#6366f1"
+              stroke-width="2"
+              stroke-dasharray="4 4"
+              rx="6" ry="6"
+              class="preview-shadow"
+              pointer-events="none" />
       </g>
     </svg>
   </div>
@@ -354,6 +393,7 @@
   [task]="durationTask"
   [fragmentIndex]="durationFragmentIndex"
   [suggestedAdjustStart]="suggestedAdjustStart"
+  [suggestedDurationMinutes]="suggestedDurationMinutes"
   (confirm)="onDurationConfirm($event)"
   (cancel)="onDurationCancel()">
 </app-duration-edit-modal>

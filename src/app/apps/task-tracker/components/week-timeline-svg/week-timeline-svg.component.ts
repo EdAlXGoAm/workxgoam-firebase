@@ -60,6 +60,16 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   // Modo de coloreado
   colorMode: 'environment' | 'taskType' = 'environment';
 
+  // Estado de previsualización (sombra)
+  previewState = {
+    visible: false,
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+    dayIndex: 0
+  };
+
   constructor(
     private cdr: ChangeDetectorRef,
     private timelineFocusService: TimelineFocusService,
@@ -104,6 +114,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   durationTask: Task | null = null;
   durationFragmentIndex: number | null = null;
   suggestedAdjustStart: boolean = false;
+  suggestedDurationMinutes: number = 0;
 
   // Propiedades de dimensiones
   svgWidth = 1400;
@@ -296,12 +307,14 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
       const rect = rectRef.nativeElement;
       const taskId = rect.getAttribute('data-task-id');
       const fragmentIndexStr = rect.getAttribute('data-fragment-index');
+      const dayIndexStr = rect.getAttribute('data-day-index');
       const fragmentIndex = fragmentIndexStr ? parseInt(fragmentIndexStr, 10) : undefined;
+      const dayIndex = dayIndexStr ? parseInt(dayIndexStr, 10) : 0;
 
       if (taskId) {
         const task = this.tasks.find(t => t.id === taskId);
         if (task) {
-          const data = { task, fragmentIndex };
+          const data = { task, fragmentIndex, dayIndex };
 
           // 1. Registrar tarea PRINCIPAL solo para DRAG (disable resize)
           const cleanupTask = this.gestureService.registerElement(rect, data, {
@@ -344,26 +357,85 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
 
     const task: Task = event.data.task;
     const fragmentIndex: number | undefined = event.data.fragmentIndex;
+    const dayIndex: number = event.data.dayIndex || 0;
 
-    switch (event.type) {
-      case 'drag-up':
-      case 'drag-down':
-        this.openTimeShiftModal(task, fragmentIndex, event);
-        break;
-
-      case 'resize-start':
-      case 'resize-end':
-        this.openDurationModal(task, fragmentIndex, event);
-        break;
-
-      case 'tap':
-        this.showTaskTooltip(task);
-        break;
-
-      case 'long-press':
-        this.showTaskContextMenu(task, event.endX, event.endY);
-        break;
+    // Fase MOVE: Actualizar previsualización (sombra)
+    if (event.phase === 'move') {
+      this.updatePreview(task, fragmentIndex, dayIndex, event);
+      return;
     }
+
+    // Fase END: Ejecutar acción y limpiar
+    if (event.phase === 'end') {
+      this.previewState.visible = false;
+      this.cdr.detectChanges();
+
+      switch (event.type) {
+        case 'drag-up':
+        case 'drag-down':
+          this.openTimeShiftModal(task, fragmentIndex, event);
+          break;
+
+        case 'resize-start':
+        case 'resize-end':
+          this.openDurationModal(task, fragmentIndex, event);
+          break;
+
+        case 'tap':
+          this.showTaskTooltip(task);
+          break;
+
+        case 'double-tap':
+          this.editTask.emit(task);
+          break;
+
+        case 'long-press':
+        case 'contextmenu':
+          this.showTaskContextMenu(task, event.endX, event.endY);
+          break;
+      }
+    }
+  }
+
+  /**
+   * Actualizar la sombra de previsualización durante el gesto
+   */
+  private updatePreview(task: Task, fragmentIndex: number | undefined, dayIndex: number, event: GestureEvent): void {
+    let item: RenderableItem;
+    if (fragmentIndex !== undefined && task.fragments && task.fragments[fragmentIndex]) {
+        const f = task.fragments[fragmentIndex];
+        item = { type: 'fragment', task, fragmentIndex, start: f.start, end: f.end };
+    } else {
+        item = { type: 'task', task, start: task.start, end: task.end };
+    }
+
+    const originalY = this.getTaskY(item, dayIndex);
+    const originalHeight = this.getTaskHeight(item, dayIndex);
+    const width = this.getTaskWidth(item, dayIndex);
+    const x = this.getTaskX(item, dayIndex);
+    
+    let newY = originalY;
+    let newHeight = originalHeight;
+
+    if (event.type === 'drag-up' || event.type === 'drag-down') {
+        newY += event.deltaY;
+    } else if (event.type === 'resize-start') {
+        newY += event.deltaY;
+        newHeight -= event.deltaY;
+    } else if (event.type === 'resize-end') {
+        newHeight += event.deltaY;
+    }
+
+    this.previewState = {
+        visible: true,
+        x: x,
+        y: newY,
+        width: width,
+        height: Math.max(5, newHeight),
+        dayIndex: dayIndex
+    };
+    
+    this.cdr.detectChanges();
   }
 
   /**
@@ -399,6 +471,28 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     this.durationTask = task;
     this.durationFragmentIndex = fragmentIndex ?? null;
     this.suggestedAdjustStart = event.type === 'resize-start';
+    
+    let currentDuration = 0;
+    if (fragmentIndex !== undefined && task.fragments && task.fragments[fragmentIndex]) {
+        currentDuration = this.taskTimeService.getFragmentDurationMinutes(task, fragmentIndex);
+    } else {
+        currentDuration = this.taskTimeService.getTaskDurationMinutes(task);
+    }
+
+    let pixels = event.deltaY;
+    if (event.type === 'resize-start') {
+        pixels = -event.deltaY;
+    }
+
+    const pixelsPerHour = this.hoursAreaHeight / 24;
+
+    this.suggestedDurationMinutes = this.gestureService.calculateDurationChange(
+        currentDuration,
+        pixels,
+        pixelsPerHour,
+        15
+    );
+
     this.showDurationModal = true;
     this.cdr.detectChanges();
   }
@@ -878,6 +972,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
 
     this.tooltipTask = task;
     this.showTooltip = true;
+    this.cdr.detectChanges();
 
     this.tooltipTimeout = setTimeout(() => {
       this.hideTooltip();
@@ -891,6 +986,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
       clearTimeout(this.tooltipTimeout);
       this.tooltipTimeout = null;
     }
+    this.cdr.detectChanges();
   }
 
   // Menú contextual
