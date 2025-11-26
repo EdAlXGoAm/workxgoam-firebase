@@ -12,7 +12,8 @@
     <app-current-task-info 
       [tasks]="tasks" 
       [projects]="projects" 
-      [environments]="environments">
+      [environments]="environments"
+      (createTask)="openNewTaskModal()">
     </app-current-task-info>
 
     <!-- Pending Tasks Bubble -->
@@ -83,6 +84,8 @@
         [orderSyncMessageType]="orderSyncMessageType"
         (editTask)="editTask($event)"
         (deleteTask)="deleteTaskFromTimeline($event)"
+        (toggleHidden)="toggleHidden($event)"
+        (changeStatus)="changeStatus($event.task, $event.status)"
         (moveEnvironmentUp)="moveEnvironmentUp($event)"
         (moveEnvironmentDown)="moveEnvironmentDown($event)"
         (taskContextMenu)="onTaskContextMenu($event.mouseEvent, $event.task)"
@@ -734,7 +737,11 @@
                 [tasks]="getSelectedProjectTasks()" 
                 [environments]="environments" 
                 [taskTypes]="taskTypes" 
-                [projects]="projects">
+                [projects]="projects"
+                (editTask)="editTask($event)"
+                (deleteTask)="deleteTaskFromTimeline($event)"
+                (toggleHidden)="toggleHidden($event)"
+                (changeStatus)="changeStatus($event.task, $event.status)">
               </app-week-timeline-svg>
             </div>
           </div>

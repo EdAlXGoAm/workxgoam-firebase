@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, OnDestroy, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Task } from '../../models/task.model';
 import { Project } from '../../models/project.model';
@@ -12,7 +12,7 @@ import { Environment } from '../../models/environment.model';
     <!-- Burbuja Flotante -->
     <div class="floating-bubble" 
          [class.has-task]="currentTask"
-         [class.no-task]="!currentTask"
+         [class.no-current-task]="!currentTask"
          [class.dragging]="isDragging"
          [style.top.%]="bubbleTopPosition"
          (click)="onBubbleClick($event)"
@@ -34,18 +34,22 @@ import { Environment } from '../../models/environment.model';
           <circle cx="50" cy="12" r="1.5" fill="rgba(255, 255, 255, 0.6)"/>
         </g>
         
-        <!-- Ícono dinámico (play-circle si hay tarea, clock si no) -->
+        <!-- Ícono dinámico (play-circle si hay tarea, !O si no hay actual pero hay próxima, clock si no hay ninguna) -->
         <g *ngIf="currentTask" class="bubble-icon-group" transform="translate(40, 25)">
           <!-- Play circle icon -->
           <circle cx="0" cy="0" r="9" stroke="white" stroke-width="1.5" fill="none"/>
           <polygon points="-2,-4 -2,4 5,0" fill="white"/>
         </g>
         
-        <g *ngIf="!currentTask" class="bubble-icon-group" transform="translate(40, 25)">
-          <!-- Clock icon -->
-          <circle cx="0" cy="0" r="9" stroke="white" stroke-width="1.5" fill="none"/>
-          <line x1="0" y1="0" x2="0" y2="-5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
-          <line x1="0" y1="0" x2="4" y2="0" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+        <g *ngIf="!currentTask" class="bubble-icon-group">
+          <!-- Diseño !O: Signo de admiración a la izquierda y círculo a la derecha -->
+          <!-- Signo de admiración (!) -->
+          <g transform="translate(25, 25)">
+            <line x1="0" y1="-9" x2="0" y2="1" stroke="white" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="0" cy="5" r="2" fill="white"/>
+          </g>
+          <!-- Círculo (O) -->
+          <circle cx="55" cy="25" r="11" stroke="white" stroke-width="2.5" fill="none"/>
         </g>
         
         <!-- Tiempo (dinámico) -->
@@ -235,8 +239,8 @@ import { Environment } from '../../models/environment.model';
       background: linear-gradient(135deg, #10b981 0%, #059669 100%);
     }
     
-    .floating-bubble.no-task {
-      background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+    .floating-bubble.no-current-task {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
     }
     
     .floating-bubble:hover {
@@ -358,6 +362,7 @@ export class CurrentTaskInfoComponent implements OnInit, OnDestroy, OnChanges {
   @Input() tasks: Task[] = [];
   @Input() projects: Project[] = [];
   @Input() environments: Environment[] = [];
+  @Output() createTask = new EventEmitter<void>();
 
   currentTask: Task | null = null;
   nextTask: Task | null = null;
@@ -611,9 +616,9 @@ export class CurrentTaskInfoComponent implements OnInit, OnDestroy, OnChanges {
     if (this.currentTask) {
       return `Tarea actual: ${this.currentTask.name}\nClick para ver detalles`;
     } else if (this.nextTask) {
-      return `Próxima tarea: ${this.nextTask.name}\nClick para ver detalles`;
+      return `No hay tarea actual\nPróxima tarea: ${this.nextTask.name}\nClick para crear nueva tarea`;
     }
-    return 'No hay tareas programadas\nClick para ver detalles';
+    return 'No hay tareas programadas\nClick para crear nueva tarea';
   }
 
   toggleModal(): void {
@@ -644,8 +649,15 @@ export class CurrentTaskInfoComponent implements OnInit, OnDestroy, OnChanges {
     }
     // Fallback: solo abrir si mouseUpHandler no lo manejó (caso raro)
     // Esto es principalmente para móviles donde el evento click puede dispararse sin mouseup
-    console.log('👆 Click en burbuja (fallback), abriendo modal');
-    this.toggleModal();
+    console.log('👆 Click en burbuja (fallback)');
+    // Si no hay tarea actual, abrir modal de nueva tarea
+    if (!this.currentTask) {
+      console.log('⚠️ Sin tarea actual, abriendo modal de nueva tarea');
+      this.createTask.emit();
+    } else {
+      console.log('📋 Abriendo modal de info');
+      this.toggleModal();
+    }
   }
 
   onBubbleMouseDown(event: MouseEvent): void {
@@ -683,13 +695,19 @@ export class CurrentTaskInfoComponent implements OnInit, OnDestroy, OnChanges {
         e.stopPropagation();
         this.lastDragEndTime = Date.now();
       } else if (clickTime < 300) {
-        // Si no hubo movimiento y fue un click rápido, abrir modal
+        // Si no hubo movimiento y fue un click rápido
         // Prevenir el evento click para evitar doble apertura
         e.preventDefault();
         e.stopPropagation();
-        console.log('👆 Click detectado, abriendo modal');
         this.lastDragEndTime = Date.now();
-        this.toggleModal();
+        // Si no hay tarea actual, abrir modal de nueva tarea
+        if (!this.currentTask) {
+          console.log('⚠️ Click detectado, sin tarea actual, abriendo modal de nueva tarea');
+          this.createTask.emit();
+        } else {
+          console.log('👆 Click detectado, abriendo modal de info');
+          this.toggleModal();
+        }
       }
       document.removeEventListener('mousemove', mouseMoveHandler);
       document.removeEventListener('mouseup', mouseUpHandler);
@@ -735,10 +753,16 @@ export class CurrentTaskInfoComponent implements OnInit, OnDestroy, OnChanges {
         this.endDrag();
         this.lastDragEndTime = Date.now();
       } else if (tapTime < 300) {
-        // Fue un tap rápido, abrir modal
-        console.log('👆 Tap detectado, abriendo modal');
+        // Fue un tap rápido
         this.lastDragEndTime = Date.now();
-        this.toggleModal();
+        // Si no hay tarea actual, abrir modal de nueva tarea
+        if (!this.currentTask) {
+          console.log('⚠️ Tap detectado, sin tarea actual, abriendo modal de nueva tarea');
+          this.createTask.emit();
+        } else {
+          console.log('👆 Tap detectado, abriendo modal de info');
+          this.toggleModal();
+        }
       }
       document.removeEventListener('touchmove', touchMoveHandler);
       document.removeEventListener('touchend', touchEndHandler);

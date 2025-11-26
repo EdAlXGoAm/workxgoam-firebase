@@ -113,10 +113,14 @@ interface RenderableItem {
               <line [attr.x1]="getX(hour, 0)" y1="30" [attr.x2]="getX(hour, 0)" y2="50" stroke="#bbb" stroke-width="1" />
               <text [attr.x]="getX(hour, 0)" y="65" [attr.font-size]="hourFontSize" text-anchor="middle" fill="#666">{{ hour }}:00</text>
             </g>
-            <g *ngFor="let item of getRenderableItemsForSection(0)">
+            <g *ngFor="let item of getRenderableItemsForSection(0)"
+               [class.task-overdue]="isTaskOverdue(item.task)"
+               [class.task-running]="isTaskRunning(item.task)"
+               [class.task-hidden]="shouldShowAsHidden(item)">
               <!-- Borde negro exterior -->
               <rect [attr.x]="getItemX(item, 0)" y="20" [attr.width]="getItemWidth(item, 0)" height="40"
-                    [attr.fill]="getTaskColor(item.task)" rx="6" ry="6" fill-opacity="0.8" 
+                    [attr.fill]="getTaskColor(item.task)" rx="6" ry="6" 
+                    [attr.fill-opacity]="shouldShowAsHidden(item) ? '0.4' : '0.8'" 
                     stroke="rgba(0,0,0,0.6)" stroke-width="1.5" 
                     (click)="onTaskClick(item.task, $event)" 
                     (dblclick)="onTaskDoubleClick(item.task, $event)"
@@ -150,7 +154,9 @@ interface RenderableItem {
                       (touchmove)="onTaskTouchMove($event)"
                       (touchend)="onTaskTouchEnd($event)"
                       class="cursor-pointer" />
-              <text [attr.x]="getItemX(item, 0) + (getTaskTypeColor(item.task) ? 14 : 6)" y="45" [attr.font-size]="taskFontSize" fill="#111" alignment-baseline="middle"
+              <text [attr.x]="getItemX(item, 0) + (getTaskTypeColor(item.task) ? 14 : 6)" y="45" [attr.font-size]="taskFontSize" 
+                    [attr.fill]="shouldShowAsHidden(item) ? '#888' : '#111'" 
+                    alignment-baseline="middle"
                     (click)="onTaskClick(item.task, $event)" 
                     (dblclick)="onTaskDoubleClick(item.task, $event)"
                     (contextmenu)="onTaskContextMenu(item.task, $event)"
@@ -173,10 +179,14 @@ interface RenderableItem {
               <line [attr.x1]="getX(hour, 8)" y1="30" [attr.x2]="getX(hour, 8)" y2="50" stroke="#bbb" stroke-width="1" />
               <text [attr.x]="getX(hour, 8)" y="65" [attr.font-size]="hourFontSize" text-anchor="middle" fill="#666">{{ hour }}:00</text>
             </g>
-            <g *ngFor="let item of getRenderableItemsForSection(1)">
+            <g *ngFor="let item of getRenderableItemsForSection(1)"
+               [class.task-overdue]="isTaskOverdue(item.task)"
+               [class.task-running]="isTaskRunning(item.task)"
+               [class.task-hidden]="shouldShowAsHidden(item)">
               <!-- Borde negro exterior -->
               <rect [attr.x]="getItemX(item, 8)" y="20" [attr.width]="getItemWidth(item, 8)" height="40"
-                    [attr.fill]="getTaskColor(item.task)" rx="6" ry="6" fill-opacity="0.8" 
+                    [attr.fill]="getTaskColor(item.task)" rx="6" ry="6" 
+                    [attr.fill-opacity]="shouldShowAsHidden(item) ? '0.4' : '0.8'" 
                     stroke="rgba(0,0,0,0.6)" stroke-width="1.5" 
                     (click)="onTaskClick(item.task, $event)" 
                     (dblclick)="onTaskDoubleClick(item.task, $event)"
@@ -210,7 +220,9 @@ interface RenderableItem {
                       (touchmove)="onTaskTouchMove($event)"
                       (touchend)="onTaskTouchEnd($event)"
                       class="cursor-pointer" />
-              <text [attr.x]="getItemX(item, 8) + (getTaskTypeColor(item.task) ? 14 : 6)" y="45" [attr.font-size]="taskFontSize" fill="#111" alignment-baseline="middle"
+              <text [attr.x]="getItemX(item, 8) + (getTaskTypeColor(item.task) ? 14 : 6)" y="45" [attr.font-size]="taskFontSize" 
+                    [attr.fill]="shouldShowAsHidden(item) ? '#888' : '#111'" 
+                    alignment-baseline="middle"
                     (click)="onTaskClick(item.task, $event)" 
                     (dblclick)="onTaskDoubleClick(item.task, $event)"
                     (contextmenu)="onTaskContextMenu(item.task, $event)"
@@ -233,10 +245,14 @@ interface RenderableItem {
               <line [attr.x1]="getX(hour, 16)" y1="30" [attr.x2]="getX(hour, 16)" y2="50" stroke="#bbb" stroke-width="1" />
               <text [attr.x]="getX(hour, 16)" y="65" [attr.font-size]="hourFontSize" text-anchor="middle" fill="#666">{{ hour }}:00</text>
             </g>
-            <g *ngFor="let item of getRenderableItemsForSection(2)">
+            <g *ngFor="let item of getRenderableItemsForSection(2)"
+               [class.task-overdue]="isTaskOverdue(item.task)"
+               [class.task-running]="isTaskRunning(item.task)"
+               [class.task-hidden]="shouldShowAsHidden(item)">
               <!-- Borde negro exterior -->
               <rect [attr.x]="getItemX(item, 16)" y="20" [attr.width]="getItemWidth(item, 16)" height="40"
-                    [attr.fill]="getTaskColor(item.task)" rx="6" ry="6" fill-opacity="0.8" 
+                    [attr.fill]="getTaskColor(item.task)" rx="6" ry="6" 
+                    [attr.fill-opacity]="shouldShowAsHidden(item) ? '0.4' : '0.8'" 
                     stroke="rgba(0,0,0,0.6)" stroke-width="1.5" 
                     (click)="onTaskClick(item.task, $event)" 
                     (dblclick)="onTaskDoubleClick(item.task, $event)"
@@ -270,7 +286,9 @@ interface RenderableItem {
                       (touchmove)="onTaskTouchMove($event)"
                       (touchend)="onTaskTouchEnd($event)"
                       class="cursor-pointer" />
-              <text [attr.x]="getItemX(item, 16) + (getTaskTypeColor(item.task) ? 14 : 6)" y="45" [attr.font-size]="taskFontSize" fill="#111" alignment-baseline="middle"
+              <text [attr.x]="getItemX(item, 16) + (getTaskTypeColor(item.task) ? 14 : 6)" y="45" [attr.font-size]="taskFontSize" 
+                    [attr.fill]="shouldShowAsHidden(item) ? '#888' : '#111'" 
+                    alignment-baseline="middle"
                     (click)="onTaskClick(item.task, $event)" 
                     (dblclick)="onTaskDoubleClick(item.task, $event)"
                     (contextmenu)="onTaskContextMenu(item.task, $event)"
@@ -296,6 +314,34 @@ interface RenderableItem {
           <span class="text-lg mr-2">{{ contextMenuTask.emoji }}</span>
           <span class="font-semibold text-sm truncate">{{ contextMenuTask.name }}</span>
         </div>
+        <div class="context-menu-divider"></div>
+        <button *ngIf="contextMenuTask.hidden" class="context-menu-item" (click)="toggleHiddenFromContextMenu()">
+          <i class="fas fa-eye mr-2"></i>
+          Mostrar
+        </button>
+        <button *ngIf="!contextMenuTask.hidden" class="context-menu-item" (click)="toggleHiddenFromContextMenu()">
+          <i class="fas fa-eye-slash mr-2"></i>
+          Ocultar
+        </button>
+        <div *ngIf="isTaskOverdue(contextMenuTask) || isTaskRunning(contextMenuTask)" class="context-menu-divider"></div>
+        <button *ngIf="(isTaskOverdue(contextMenuTask) || isTaskRunning(contextMenuTask)) && contextMenuTask.status !== 'completed'" 
+                class="context-menu-item context-menu-item-completed" 
+                (click)="changeStatusFromContextMenu('completed')">
+          <i class="fas fa-check mr-2"></i>
+          Marcar completada
+        </button>
+        <button *ngIf="(isTaskOverdue(contextMenuTask) || isTaskRunning(contextMenuTask)) && contextMenuTask.status !== 'in-progress'" 
+                class="context-menu-item context-menu-item-progress" 
+                (click)="changeStatusFromContextMenu('in-progress')">
+          <i class="fas fa-spinner mr-2"></i>
+          Marcar en progreso
+        </button>
+        <button *ngIf="(isTaskOverdue(contextMenuTask) || isTaskRunning(contextMenuTask)) && contextMenuTask.status !== 'pending'" 
+                class="context-menu-item context-menu-item-pending" 
+                (click)="changeStatusFromContextMenu('pending')">
+          <i class="fas fa-play mr-2"></i>
+          Marcar pendiente
+        </button>
         <div class="context-menu-divider"></div>
         <button class="context-menu-item delete" (click)="deleteTaskFromContextMenu()">
           <i class="fas fa-trash-alt mr-2"></i>
@@ -539,9 +585,81 @@ interface RenderableItem {
       background: #fee2e2;
     }
 
+    .context-menu-item.completed,
+    .context-menu-item-completed {
+      color: #10b981;
+    }
+
+    .context-menu-item.completed:hover,
+    .context-menu-item-completed:hover {
+      background: #ecfdf5;
+      color: #059669;
+    }
+
+    .context-menu-item.progress,
+    .context-menu-item-progress {
+      color: #f59e0b;
+    }
+
+    .context-menu-item.progress:hover,
+    .context-menu-item-progress:hover {
+      background: #fffbeb;
+      color: #d97706;
+    }
+
+    .context-menu-item.pending,
+    .context-menu-item-pending {
+      color: #3b82f6;
+    }
+
+    .context-menu-item.pending:hover,
+    .context-menu-item-pending:hover {
+      background: #eff6ff;
+      color: #2563eb;
+    }
+
     .context-menu-item i {
       width: 20px;
       text-align: center;
+    }
+
+    /* Estilos para tareas ocultas */
+    .task-hidden {
+      opacity: 0.5;
+    }
+
+    .task-hidden text {
+      fill: #888 !important;
+    }
+
+    /* Estilos para resplandor de tareas overdue */
+    .task-overdue {
+      filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.6)) drop-shadow(0 0 4px rgba(239, 68, 68, 0.5)) drop-shadow(0 0 6px rgba(239, 68, 68, 0.4));
+      animation: overdue-pulse 1.5s infinite;
+    }
+
+    @keyframes overdue-pulse {
+      0%, 100% {
+        filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.6)) drop-shadow(0 0 4px rgba(239, 68, 68, 0.5)) drop-shadow(0 0 6px rgba(239, 68, 68, 0.4));
+      }
+      50% {
+        filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 5px rgba(255, 255, 255, 0.7)) drop-shadow(0 0 8px rgba(255, 255, 255, 0.5));
+      }
+    }
+
+    /* Estilos para resplandor de tareas running */
+    .task-running {
+      filter: drop-shadow(0 0 2px rgba(16, 185, 129, 0.6)) drop-shadow(0 0 4px rgba(16, 185, 129, 0.5)) drop-shadow(0 0 6px rgba(16, 185, 129, 0.4));
+      animation: running-pulse 1.5s infinite;
+    }
+
+    @keyframes running-pulse {
+      0%, 100% {
+        filter: drop-shadow(0 0 2px rgba(16, 185, 129, 0.6)) drop-shadow(0 0 4px rgba(16, 185, 129, 0.5)) drop-shadow(0 0 6px rgba(16, 185, 129, 0.4));
+      }
+      50% {
+        filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 5px rgba(255, 255, 255, 0.7)) drop-shadow(0 0 8px rgba(255, 255, 255, 0.5));
+      }
     }
 
     /* Responsive para móviles */
@@ -586,6 +704,12 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
   
   // 🗑️ Output para notificar al componente padre cuando se quiere eliminar una tarea
   @Output() deleteTask = new EventEmitter<Task>();
+  
+  // 👁️ Output para notificar al componente padre cuando se quiere mostrar/ocultar una tarea
+  @Output() toggleHidden = new EventEmitter<Task>();
+  
+  // 🔄 Output para notificar al componente padre cuando se quiere cambiar el estado de una tarea
+  @Output() changeStatus = new EventEmitter<{ task: Task; status: 'pending' | 'in-progress' | 'completed' }>();
 
   @ViewChild('containerRef') containerRef!: ElementRef<HTMLDivElement>;
 
@@ -1212,6 +1336,40 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     }
   }
 
+  isTaskOverdue(task: Task): boolean {
+    if (task.status === 'completed' || task.completed) return false;
+    const endDate = this.parseUTCToLocal(task.end);
+    const now = new Date();
+    return endDate < now;
+  }
+
+  isTaskRunning(task: Task): boolean {
+    if (task.status === 'completed' || task.completed) return false;
+    const startDate = this.parseUTCToLocal(task.start);
+    const endDate = this.parseUTCToLocal(task.end);
+    const now = new Date();
+    return startDate <= now && now <= endDate;
+  }
+
+  // Determina si una tarea es futura (aún no ha comenzado)
+  isFutureTask(task: Task): boolean {
+    const startDate = this.parseUTCToLocal(task.start);
+    const now = new Date();
+    return startDate > now;
+  }
+
+  // Determina si un item (tarea o fragmento) es futuro
+  isFutureItem(item: RenderableItem): boolean {
+    const startDate = this.parseUTCToLocal(item.start);
+    const now = new Date();
+    return startDate > now;
+  }
+
+  // Determina si se debe mostrar como oculta (solo si es futura Y está marcada como hidden)
+  shouldShowAsHidden(item: RenderableItem): boolean {
+    return item.task.hidden === true && this.isFutureItem(item);
+  }
+
   getNowX(sectionStartHour: number): number {
     const now = new Date();
     const currentHourInDay = now.getHours() + now.getMinutes() / 60;
@@ -1698,6 +1856,24 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     if (this.contextMenuTask) {
       console.log('🗑️ Eliminando tarea:', this.contextMenuTask.name);
       this.deleteTask.emit(this.contextMenuTask);
+      this.closeContextMenu();
+    }
+  }
+
+  // Mostrar/Ocultar tarea desde el menú contextual
+  toggleHiddenFromContextMenu(): void {
+    if (this.contextMenuTask) {
+      console.log('👁️ Cambiando visibilidad de tarea:', this.contextMenuTask.name);
+      this.toggleHidden.emit(this.contextMenuTask);
+      this.closeContextMenu();
+    }
+  }
+
+  // Cambiar estado de tarea desde el menú contextual
+  changeStatusFromContextMenu(status: 'pending' | 'in-progress' | 'completed'): void {
+    if (this.contextMenuTask) {
+      console.log('🔄 Cambiando estado de tarea:', this.contextMenuTask.name, 'a', status);
+      this.changeStatus.emit({ task: this.contextMenuTask, status });
       this.closeContextMenu();
     }
   }

@@ -185,7 +185,10 @@ interface WeekDay {
             </g>
             
             <!-- Tareas para este día -->
-            <g *ngFor="let item of getRenderableItemsForDay(dayIndex)">
+            <g *ngFor="let item of getRenderableItemsForDay(dayIndex)"
+               [class.task-overdue]="isTaskOverdue(item.task)"
+               [class.task-running]="isTaskRunning(item.task)"
+               [class.task-hidden]="shouldShowAsHidden(item)">
               <!-- Borde negro exterior -->
               <rect [attr.x]="getTaskX(item, dayIndex)" 
                     [attr.y]="getTaskY(item, dayIndex)" 
@@ -193,7 +196,7 @@ interface WeekDay {
                     [attr.height]="getTaskHeight(item, dayIndex)"
                     [attr.fill]="getTaskColor(item.task)" 
                     rx="4" ry="4" 
-                    fill-opacity="0.8" 
+                    [attr.fill-opacity]="shouldShowAsHidden(item) ? '0.4' : '0.8'" 
                     stroke="rgba(0,0,0,0.6)" 
                     stroke-width="1.5" 
                     (click)="onTaskClick(item.task, $event)" 
@@ -241,7 +244,7 @@ interface WeekDay {
               <text [attr.x]="getTaskX(item, dayIndex) + (getTaskTypeColor(item.task) ? 12 : 6)" 
                     [attr.y]="getTaskY(item, dayIndex) + 12" 
                     [attr.font-size]="taskFontSize" 
-                    fill="#111" 
+                    [attr.fill]="shouldShowAsHidden(item) ? '#888' : '#111'" 
                     alignment-baseline="middle"
                     (click)="onTaskClick(item.task, $event)" 
                     (dblclick)="onTaskDoubleClick(item.task, $event)"
@@ -277,6 +280,34 @@ interface WeekDay {
           <span class="text-lg mr-2">{{ contextMenuTask.emoji }}</span>
           <span class="font-semibold text-sm truncate">{{ contextMenuTask.name }}</span>
         </div>
+        <div class="context-menu-divider"></div>
+        <button *ngIf="contextMenuTask.hidden" class="context-menu-item" (click)="toggleHiddenFromContextMenu()">
+          <i class="fas fa-eye mr-2"></i>
+          Mostrar
+        </button>
+        <button *ngIf="!contextMenuTask.hidden" class="context-menu-item" (click)="toggleHiddenFromContextMenu()">
+          <i class="fas fa-eye-slash mr-2"></i>
+          Ocultar
+        </button>
+        <div *ngIf="isTaskOverdue(contextMenuTask) || isTaskRunning(contextMenuTask)" class="context-menu-divider"></div>
+        <button *ngIf="(isTaskOverdue(contextMenuTask) || isTaskRunning(contextMenuTask)) && contextMenuTask.status !== 'completed'" 
+                class="context-menu-item context-menu-item-completed" 
+                (click)="changeStatusFromContextMenu('completed')">
+          <i class="fas fa-check mr-2"></i>
+          Marcar completada
+        </button>
+        <button *ngIf="(isTaskOverdue(contextMenuTask) || isTaskRunning(contextMenuTask)) && contextMenuTask.status !== 'in-progress'" 
+                class="context-menu-item context-menu-item-progress" 
+                (click)="changeStatusFromContextMenu('in-progress')">
+          <i class="fas fa-spinner mr-2"></i>
+          Marcar en progreso
+        </button>
+        <button *ngIf="(isTaskOverdue(contextMenuTask) || isTaskRunning(contextMenuTask)) && contextMenuTask.status !== 'pending'" 
+                class="context-menu-item context-menu-item-pending" 
+                (click)="changeStatusFromContextMenu('pending')">
+          <i class="fas fa-play mr-2"></i>
+          Marcar pendiente
+        </button>
         <div class="context-menu-divider"></div>
         <button class="context-menu-item delete" (click)="deleteTaskFromContextMenu()">
           <i class="fas fa-trash-alt mr-2"></i>
@@ -549,9 +580,81 @@ interface WeekDay {
       background: #fef2f2;
     }
 
+    .context-menu-item.completed,
+    .context-menu-item-completed {
+      color: #10b981;
+    }
+
+    .context-menu-item.completed:hover,
+    .context-menu-item-completed:hover {
+      background: #ecfdf5;
+      color: #059669;
+    }
+
+    .context-menu-item.progress,
+    .context-menu-item-progress {
+      color: #f59e0b;
+    }
+
+    .context-menu-item.progress:hover,
+    .context-menu-item-progress:hover {
+      background: #fffbeb;
+      color: #d97706;
+    }
+
+    .context-menu-item.pending,
+    .context-menu-item-pending {
+      color: #3b82f6;
+    }
+
+    .context-menu-item.pending:hover,
+    .context-menu-item-pending:hover {
+      background: #eff6ff;
+      color: #2563eb;
+    }
+
     .context-menu-item i {
       width: 20px;
       text-align: center;
+    }
+
+    /* Estilos para tareas ocultas */
+    .task-hidden {
+      opacity: 0.5;
+    }
+
+    .task-hidden text {
+      fill: #888 !important;
+    }
+
+    /* Estilos para resplandor de tareas overdue */
+    .task-overdue {
+      filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.6)) drop-shadow(0 0 4px rgba(239, 68, 68, 0.5)) drop-shadow(0 0 6px rgba(239, 68, 68, 0.4));
+      animation: overdue-pulse 1.5s infinite;
+    }
+
+    @keyframes overdue-pulse {
+      0%, 100% {
+        filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.6)) drop-shadow(0 0 4px rgba(239, 68, 68, 0.5)) drop-shadow(0 0 6px rgba(239, 68, 68, 0.4));
+      }
+      50% {
+        filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 5px rgba(255, 255, 255, 0.7)) drop-shadow(0 0 8px rgba(255, 255, 255, 0.5));
+      }
+    }
+
+    /* Estilos para resplandor de tareas running */
+    .task-running {
+      filter: drop-shadow(0 0 2px rgba(16, 185, 129, 0.6)) drop-shadow(0 0 4px rgba(16, 185, 129, 0.5)) drop-shadow(0 0 6px rgba(16, 185, 129, 0.4));
+      animation: running-pulse 1.5s infinite;
+    }
+
+    @keyframes running-pulse {
+      0%, 100% {
+        filter: drop-shadow(0 0 2px rgba(16, 185, 129, 0.6)) drop-shadow(0 0 4px rgba(16, 185, 129, 0.5)) drop-shadow(0 0 6px rgba(16, 185, 129, 0.4));
+      }
+      50% {
+        filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 5px rgba(255, 255, 255, 0.7)) drop-shadow(0 0 8px rgba(255, 255, 255, 0.5));
+      }
     }
 
     @media (max-width: 640px) {
@@ -584,6 +687,8 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
 
   @Output() editTask = new EventEmitter<Task>();
   @Output() deleteTask = new EventEmitter<Task>();
+  @Output() toggleHidden = new EventEmitter<Task>();
+  @Output() changeStatus = new EventEmitter<{ task: Task; status: 'pending' | 'in-progress' | 'completed' }>();
 
   @ViewChild('containerRef') containerRef!: ElementRef<HTMLDivElement>;
 
@@ -1041,6 +1146,40 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
       default: return '#a3a3a3';
     }
   }
+
+  isTaskOverdue(task: Task): boolean {
+    if (task.status === 'completed' || task.completed) return false;
+    const endDate = this.parseUTCToLocal(task.end);
+    const now = new Date();
+    return endDate < now;
+  }
+
+  isTaskRunning(task: Task): boolean {
+    if (task.status === 'completed' || task.completed) return false;
+    const startDate = this.parseUTCToLocal(task.start);
+    const endDate = this.parseUTCToLocal(task.end);
+    const now = new Date();
+    return startDate <= now && now <= endDate;
+  }
+
+  // Determina si una tarea es futura (aún no ha comenzado)
+  isFutureTask(task: Task): boolean {
+    const startDate = this.parseUTCToLocal(task.start);
+    const now = new Date();
+    return startDate > now;
+  }
+
+  // Determina si un item (tarea o fragmento) es futuro
+  isFutureItem(item: RenderableItem): boolean {
+    const startDate = this.parseUTCToLocal(item.start);
+    const now = new Date();
+    return startDate > now;
+  }
+
+  // Determina si se debe mostrar como oculta (solo si es futura Y está marcada como hidden)
+  shouldShowAsHidden(item: RenderableItem): boolean {
+    return item.task.hidden === true && this.isFutureItem(item);
+  }
   
   toggleColorMode(): void {
     this.colorMode = this.colorMode === 'environment' ? 'taskType' : 'environment';
@@ -1354,6 +1493,22 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   deleteTaskFromContextMenu(): void {
     if (this.contextMenuTask) {
       this.deleteTask.emit(this.contextMenuTask);
+      this.closeContextMenu();
+    }
+  }
+
+  toggleHiddenFromContextMenu(): void {
+    if (this.contextMenuTask) {
+      console.log('👁️ Cambiando visibilidad de tarea:', this.contextMenuTask.name);
+      this.toggleHidden.emit(this.contextMenuTask);
+      this.closeContextMenu();
+    }
+  }
+
+  changeStatusFromContextMenu(status: 'pending' | 'in-progress' | 'completed'): void {
+    if (this.contextMenuTask) {
+      console.log('🔄 Cambiando estado de tarea:', this.contextMenuTask.name, 'a', status);
+      this.changeStatus.emit({ task: this.contextMenuTask, status });
       this.closeContextMenu();
     }
   }
