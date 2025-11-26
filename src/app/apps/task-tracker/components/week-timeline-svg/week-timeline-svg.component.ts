@@ -103,6 +103,16 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   contextMenuX: number = 0;
   contextMenuY: number = 0;
 
+  // 🎯 SISTEMA DE SELECCIÓN DE TAREAS SUPERPUESTAS
+  showTaskSelector: boolean = false;
+  taskSelectorItems: RenderableItem[] = [];
+  taskSelectorX: number = 0;
+  taskSelectorY: number = 0;
+  taskSelectorDayIndex: number = 0;
+  
+  // Mapa para mantener el orden de las tareas "traídas al frente" (clave: task.id, valor: timestamp)
+  private taskZOrderMap: Map<string, number> = new Map();
+
   // 🔄 MODALES DE GESTOS
   showTimeShiftModal: boolean = false;
   timeShiftTask: Task | null = null;
@@ -382,7 +392,21 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
           break;
 
         case 'tap':
-          this.showTaskTooltip(task);
+          // Siempre traer la tarea clickeada al frente
+          const clickedItem: RenderableItem = fragmentIndex !== undefined && task.fragments && task.fragments[fragmentIndex]
+            ? { type: 'fragment', task, fragmentIndex, start: task.fragments[fragmentIndex].start, end: task.fragments[fragmentIndex].end }
+            : { type: 'task', task, start: task.start, end: task.end };
+          this.bringItemToFront(clickedItem);
+          
+          // Verificar si hay múltiples tareas superpuestas en el punto del clic
+          const overlappingItems = this.getOverlappingItemsAtPoint(event.endX, event.endY, dayIndex);
+          if (overlappingItems.length > 1) {
+            // Mostrar menú de selección si hay múltiples tareas superpuestas
+            this.showTaskSelectorMenu(overlappingItems, event.endX, event.endY, dayIndex);
+          } else {
+            // Mostrar tooltip si solo hay una tarea
+            this.showTaskTooltip(task);
+          }
           break;
 
         case 'double-tap':
@@ -668,6 +692,9 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
         }
       }
     }
+
+    // Ordenar items por z-order: los que tienen mayor valor se renderizan al final (arriba)
+    items.sort((a, b) => this.getItemZOrder(a) - this.getItemZOrder(b));
 
     return items;
   }
@@ -992,6 +1019,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   // Menú contextual
   showTaskContextMenu(task: Task, x: number, y: number): void {
     this.hideTooltip();
+    this.closeTaskSelector();
     
     this.contextMenuTask = task;
     this.contextMenuX = x;
@@ -999,9 +1027,181 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     this.showContextMenu = true;
   }
 
+  /**
+   * Obtener todas las tareas/fragmentos que están en un punto específico
+   * Las coordenadas clientX, clientY vienen del evento del gesto (coordenadas de pantalla)
+   */
+  private getOverlappingItemsAtPoint(clientX: number, clientY: number, dayIndex: number): RenderableItem[] {
+    const overlapping: RenderableItem[] = [];
+    
+    // Obtener el rect del SVG para convertir coordenadas
+    const svgElement = this.containerRef?.nativeElement?.querySelector('.week-timeline-svg');
+    if (!svgElement) return [];
+    
+    const svgRect = svgElement.getBoundingClientRect();
+    
+    // Convertir coordenadas de pantalla a coordenadas del SVG
+    const localX = clientX - svgRect.left;
+    const localY = clientY - svgRect.top;
+    
+    // Revisar todos los días de la semana para encontrar tareas superpuestas
+    for (let di = 0; di < 7; di++) {
+      const dayColumnX = this.getDayColumnX(di);
+      const items = this.getRenderableItemsForDay(di);
+      
+      for (const item of items) {
+        const itemX = dayColumnX + this.getTaskX(item, di);
+        const itemY = 60 + this.getTaskY(item, di); // 60px de header
+        const itemWidth = this.getTaskWidth(item, di);
+        const itemHeight = this.getTaskHeight(item, di);
+        
+        // Verificar si el punto está dentro del rectángulo de la tarea
+        if (localX >= itemX && localX <= itemX + itemWidth &&
+            localY >= itemY && localY <= itemY + itemHeight) {
+          overlapping.push(item);
+        }
+      }
+    }
+    
+    return overlapping;
+  }
+
+  /**
+   * Mostrar el menú de selección de tareas superpuestas
+   */
+  showTaskSelectorMenu(items: RenderableItem[], x: number, y: number, dayIndex: number): void {
+    this.hideTooltip();
+    this.closeContextMenu();
+    
+    this.taskSelectorItems = items;
+    this.taskSelectorX = x;
+    this.taskSelectorY = y;
+    this.taskSelectorDayIndex = dayIndex;
+    this.showTaskSelector = true;
+    this.cdr.detectChanges();
+  }
+
+  /**
+   * Cerrar el menú de selección de tareas
+   */
+  closeTaskSelector(): void {
+    this.showTaskSelector = false;
+    this.taskSelectorItems = [];
+  }
+
+  /**
+   * Seleccionar una tarea del menú de selección para traerla al frente
+   */
+  selectTaskFromSelector(item: RenderableItem): void {
+    this.bringItemToFront(item);
+    this.closeTaskSelector();
+  }
+
+  /**
+   * Traer un item (tarea o fragmento) al frente
+   */
+  private bringItemToFront(item: RenderableItem): void {
+    const key = this.getItemKey(item);
+    this.taskZOrderMap.set(key, Date.now());
+    
+    // Forzar actualización del renderizado
+    this.cdr.detectChanges();
+    
+    // Re-registrar gestos después del reordenamiento
+    setTimeout(() => this.registerTaskGestures(), 50);
+  }
+
+  /**
+   * Obtener una clave única para un item (tarea o fragmento)
+   */
+  private getItemKey(item: RenderableItem): string {
+    if (item.type === 'fragment' && item.fragmentIndex !== undefined) {
+      return `${item.task.id}-fragment-${item.fragmentIndex}`;
+    }
+    return item.task.id;
+  }
+
+  /**
+   * Obtener el z-order de un item (para ordenamiento)
+   */
+  private getItemZOrder(item: RenderableItem): number {
+    const key = this.getItemKey(item);
+    return this.taskZOrderMap.get(key) || 0;
+  }
+
+  /**
+   * Obtener el texto corto para mostrar en el selector
+   */
+  getItemShortText(item: RenderableItem): string {
+    const emoji = item.task.emoji || '📋';
+    let name = item.task.name || 'Sin título';
+    
+    if (item.type === 'fragment' && item.fragmentIndex !== undefined) {
+      name = `${name} [F${item.fragmentIndex + 1}]`;
+    }
+    
+    // Limitar a 25 caracteres
+    if (name.length > 25) {
+      name = name.substring(0, 22) + '...';
+    }
+    
+    return `${emoji} ${name}`;
+  }
+
+  /**
+   * Obtener el rango de tiempo de un item
+   */
+  getItemTimeRange(item: RenderableItem): string {
+    return `${this.formatTaskTime(item.start)} - ${this.formatTaskTime(item.end)}`;
+  }
+
+  /**
+   * Verificar si un item tiene intersección con otros items en el mismo día
+   */
+  hasIntersection(item: RenderableItem, dayIndex: number): boolean {
+    const items = this.getRenderableItemsForDay(dayIndex);
+    if (items.length <= 1) return false;
+    
+    const itemStart = this.parseUTCToLocal(item.start).getTime();
+    const itemEnd = this.parseUTCToLocal(item.end).getTime();
+    
+    for (const other of items) {
+      // Saltar si es el mismo item
+      if (this.getItemKey(item) === this.getItemKey(other)) continue;
+      
+      const otherStart = this.parseUTCToLocal(other.start).getTime();
+      const otherEnd = this.parseUTCToLocal(other.end).getTime();
+      
+      // Verificar intersección temporal
+      if (itemStart < otherEnd && itemEnd > otherStart) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Obtener la opacidad de un item (80% si tiene intersección, normal si no)
+   */
+  getItemOpacity(item: RenderableItem, dayIndex: number): string {
+    if (this.shouldShowAsHidden(item)) {
+      return '0.4';
+    }
+    return this.hasIntersection(item, dayIndex) ? '0.8' : '1';
+  }
+
   closeContextMenu(): void {
     this.showContextMenu = false;
     this.contextMenuTask = null;
+  }
+
+  editTaskFromContextMenu(): void {
+    if (this.contextMenuTask) {
+      this.hideTooltip();
+      this.editTask.emit(this.contextMenuTask);
+      this.closeContextMenu();
+    }
   }
 
   deleteTaskFromContextMenu(): void {
@@ -1032,6 +1232,9 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     }
     if (this.showTooltip) {
       this.hideTooltip();
+    }
+    if (this.showTaskSelector) {
+      this.closeTaskSelector();
     }
   }
 

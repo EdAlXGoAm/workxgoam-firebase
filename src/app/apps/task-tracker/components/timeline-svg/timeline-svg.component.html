@@ -96,7 +96,7 @@
           <rect #taskRect
                 [attr.x]="getItemX(item, 0)" y="20" [attr.width]="getItemWidth(item, 0)" height="40"
                 [attr.fill]="getTaskColor(item.task)" rx="6" ry="6" 
-                [attr.fill-opacity]="shouldShowAsHidden(item) ? '0.4' : '0.8'" 
+                [attr.fill-opacity]="getItemOpacity(item, 0)" 
                 stroke="rgba(0,0,0,0.6)" stroke-width="1.5" 
                 [attr.data-task-id]="item.task.id"
                 [attr.data-fragment-index]="item.fragmentIndex"
@@ -179,7 +179,7 @@
           <rect #taskRect
                 [attr.x]="getItemX(item, 8)" y="20" [attr.width]="getItemWidth(item, 8)" height="40"
                 [attr.fill]="getTaskColor(item.task)" rx="6" ry="6" 
-                [attr.fill-opacity]="shouldShowAsHidden(item) ? '0.4' : '0.8'" 
+                [attr.fill-opacity]="getItemOpacity(item, 1)" 
                 stroke="rgba(0,0,0,0.6)" stroke-width="1.5" 
                 [attr.data-task-id]="item.task.id"
                 [attr.data-fragment-index]="item.fragmentIndex"
@@ -262,7 +262,7 @@
           <rect #taskRect
                 [attr.x]="getItemX(item, 16)" y="20" [attr.width]="getItemWidth(item, 16)" height="40"
                 [attr.fill]="getTaskColor(item.task)" rx="6" ry="6" 
-                [attr.fill-opacity]="shouldShowAsHidden(item) ? '0.4' : '0.8'" 
+                [attr.fill-opacity]="getItemOpacity(item, 2)" 
                 stroke="rgba(0,0,0,0.6)" stroke-width="1.5" 
                 [attr.data-task-id]="item.task.id"
                 [attr.data-fragment-index]="item.fragmentIndex"
@@ -340,6 +340,11 @@
       <span class="font-semibold text-sm truncate">{{ contextMenuTask.name }}</span>
     </div>
     <div class="context-menu-divider"></div>
+    <button class="context-menu-item context-menu-item-edit" (click)="editTaskFromContextMenu()">
+      <i class="fas fa-edit mr-2"></i>
+      Editar tarea
+    </button>
+    <div class="context-menu-divider"></div>
     <button *ngIf="contextMenuTask.hidden" class="context-menu-item" (click)="toggleHiddenFromContextMenu()">
       <i class="fas fa-eye mr-2"></i>
       Mostrar
@@ -372,6 +377,34 @@
       <i class="fas fa-trash-alt mr-2"></i>
       Eliminar tarea
     </button>
+  </div>
+
+  <!-- Menú de selección de tareas superpuestas -->
+  <div *ngIf="showTaskSelector && taskSelectorItems.length > 1" 
+       class="task-selector-menu"
+       [style.left.px]="taskSelectorX"
+       [style.top.px]="taskSelectorY"
+       (click)="$event.stopPropagation()">
+    <div class="task-selector-header">
+      <i class="fas fa-layer-group mr-2"></i>
+      <span class="font-semibold text-sm">Tareas superpuestas ({{ taskSelectorItems.length }})</span>
+    </div>
+    <div class="task-selector-subtitle">
+      Selecciona la tarea que deseas traer al frente
+    </div>
+    <div class="task-selector-divider"></div>
+    <div class="task-selector-list">
+      <button *ngFor="let item of taskSelectorItems; let i = index" 
+              class="task-selector-item"
+              [style.border-left-color]="getTaskColor(item.task)"
+              (click)="selectTaskFromSelector(item)">
+        <div class="task-selector-item-content">
+          <div class="task-selector-item-name">{{ getItemShortText(item) }}</div>
+          <div class="task-selector-item-time">{{ getItemTimeRange(item) }}</div>
+        </div>
+        <i class="fas fa-arrow-up task-selector-item-icon" title="Traer al frente"></i>
+      </button>
+    </div>
   </div>
 </div>
 
