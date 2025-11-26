@@ -1861,6 +1861,12 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     }
   }
 
+  // Método para refrescar cuando se actualiza tiempo/duración desde el timeline
+  async onTaskTimeUpdated(task: Task) {
+    console.log('🔄 Tarea actualizada desde timeline:', task.name);
+    await this.loadTasks();
+  }
+
   async toggleHidden(task: Task) {
     try {
       await this.taskService.updateTask(task.id, { hidden: !task.hidden });

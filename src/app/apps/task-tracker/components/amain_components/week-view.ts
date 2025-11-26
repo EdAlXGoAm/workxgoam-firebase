@@ -36,7 +36,8 @@ import { TaskType } from '../../models/task-type.model';
           [taskTypes]="taskTypes" 
           [projects]="projects"
           (editTask)="editTask.emit($event)" 
-          (deleteTask)="deleteTask.emit($event)">
+          (deleteTask)="deleteTask.emit($event)"
+          (taskUpdated)="taskUpdated.emit($event)">
         </app-week-timeline-svg>
       </div>
 
@@ -379,6 +380,7 @@ export class WeekViewComponent {
 
   @Output() editTask = new EventEmitter<Task>();
   @Output() deleteTask = new EventEmitter<Task>();
+  @Output() taskUpdated = new EventEmitter<Task>();
   @Output() taskContextMenu = new EventEmitter<{ mouseEvent: MouseEvent; task: Task }>();
   @Output() taskQuickContextMenu = new EventEmitter<{ mouseEvent: MouseEvent; task: Task }>();
   @Output() environmentContextMenu = new EventEmitter<{ mouseEvent: MouseEvent; environment: Environment }>();

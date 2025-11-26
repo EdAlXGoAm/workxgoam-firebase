@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges, HostListener, ViewChild, ElementRef, AfterViewInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges, HostListener, ViewChild, ElementRef, AfterViewInit, OnDestroy, ChangeDetectorRef, QueryList, ViewChildren } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Task } from '../../models/task.model';
@@ -7,7 +7,11 @@ import { TaskType } from '../../models/task-type.model';
 import { Project } from '../../models/project.model';
 import { TimelineFocusService } from '../../services/timeline-focus.service';
 import { ProjectService } from '../../services/project.service';
+import { GestureService, GestureEvent, GestureConfig } from '../../services/gesture.service';
+import { TaskTimeService } from '../../services/task-time.service';
 import { AndroidDatePickerComponent } from '../android-date-picker/android-date-picker.component';
+import { TimeShiftModalComponent, TimeShiftResult } from '../../modals/time-shift-modal/time-shift-modal.component';
+import { DurationEditModalComponent, DurationEditResult } from '../../modals/duration-edit-modal/duration-edit-modal.component';
 import { Subscription } from 'rxjs';
 
 // Interfaz para elementos renderizables (tareas o fragmentos)
@@ -22,731 +26,80 @@ interface RenderableItem {
 @Component({
   selector: 'app-timeline-svg',
   standalone: true,
-  imports: [CommonModule, FormsModule, AndroidDatePickerComponent],
-  template: `
-    <div #containerRef class="timeline-container w-full overflow-x-auto relative">
-      <!-- Controles de Navegación de Fechas -->
-      <div class="date-navigation mb-4 flex flex-col md:flex-row items-center justify-between bg-white rounded-lg p-3 shadow-sm border gap-3">
-        <!-- Primera fila en móvil: Navegador de días -->
-        <div class="flex items-center space-x-2 w-full md:w-auto justify-center md:justify-start">
-          <button (click)="goToPreviousDay()" 
-                  class="nav-btn flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
-                  title="Día anterior">
-            <i class="fas fa-chevron-left text-sm text-gray-600"></i>
-          </button>
-          
-          <div class="date-display text-sm font-semibold text-gray-700 px-2">
-            {{ formatSelectedDate() }}
-          </div>
-          
-          <button (click)="goToNextDay()" 
-                  class="nav-btn flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
-                  title="Día siguiente">
-            <i class="fas fa-chevron-right text-sm text-gray-600"></i>
-          </button>
-        </div>
-        
-        <!-- Segunda fila en móvil: Selector y botón Hoy -->
-        <div class="flex items-center space-x-3 w-full md:w-auto justify-center md:justify-end">
-          <div class="w-48 flex-shrink-0">
-            <app-android-date-picker
-              [ngModel]="getDateInputValue()"
-              (dateChange)="onDateChange($event)"
-              label="Seleccionar fecha"
-              placeholder="Seleccionar fecha"
-              class="date-picker">
-            </app-android-date-picker>
-          </div>
-          
-          <button (click)="goToToday()" 
-                  [class.bg-indigo-100]="isToday()"
-                  [class.text-indigo-700]="isToday()"
-                  [class.bg-gray-100]="!isToday()"
-                  [class.text-gray-700]="!isToday()"
-                  class="nav-btn px-3 py-1 rounded-md text-sm font-medium hover:bg-indigo-50 transition-colors flex-shrink-0"
-                  title="Ir a hoy">
-            Hoy
-          </button>
-        </div>
-      </div>
-
-      <!-- Tooltip para mostrar información completa de la tarea -->
-      <div *ngIf="showTooltip && tooltipTask" 
-           class="tooltip-container absolute -top-[5px] left-1/2 transform -translate-x-1/2 z-50 bg-gray-900 text-white px-4 py-3 rounded-lg shadow-xl max-w-md">
-        <div class="flex items-center space-x-2">
-          <span class="text-lg">{{ tooltipTask.emoji }}</span>
-          <div *ngIf="getTaskTypeColor(tooltipTask)" 
-               class="w-3 h-3 rounded-full border-2 border-white shadow-sm flex-shrink-0" 
-               [style.background-color]="getTaskTypeColor(tooltipTask)"></div>
-          <div class="flex-1">
-            <div class="font-semibold text-sm">{{ getTaskDisplayName(tooltipTask) }}</div>
-            <div *ngIf="tooltipTask.description" class="text-xs text-gray-300 mt-1">{{ tooltipTask.description }}</div>
-            <div class="text-xs text-gray-400 mt-1">
-              {{ formatTaskTime(tooltipTask.start) }} - {{ formatTaskTime(tooltipTask.end) }}
-            </div>
-            <!-- Duración de la tarea -->
-            <div *ngIf="getTaskDuration(tooltipTask)" class="text-xs text-purple-300 mt-1 flex items-center space-x-1">
-              <i class="fas fa-hourglass-half text-xs"></i>
-              <span>Duración: {{ formatTaskDuration(getTaskDuration(tooltipTask)) }}</span>
-            </div>
-            <!-- Información del tiempo hasta la próxima tarea -->
-            <div class="text-xs text-blue-300 mt-2 flex items-center space-x-1">
-              <i class="fas fa-clock text-xs"></i>
-              <span>{{ getTimeUntilNextTask(tooltipTask) }}</span>
-            </div>
-          </div>
-        </div>
-        <!-- Flecha del tooltip -->
-        <div class="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-gray-900"></div>
-      </div>
-
-      <!-- Contenedor centrado para el SVG -->
-      <div class="svg-container flex justify-center overflow-x-auto">
-        <svg [attr.width]="svgWidth" [attr.height]="svgHeight" [attr.viewBox]="'0 0 ' + svgWidth + ' ' + svgHeight" 
-             class="timeline-svg" [style.min-width.px]="minSvgWidth">
-          <!-- Tercio 1: 00:00 - 08:00 -->
-          <g transform="translate(0, 0)">
-            <rect x="0" y="0" [attr.width]="svgWidth" [attr.height]="sectionHeight" fill="#f0f4f8" rx="6" ry="6"/>
-            <line x1="0" y1="40" [attr.x2]="svgWidth" y2="40" stroke="#888" stroke-width="1.5" />
-            <text x="10" y="15" [attr.font-size]="titleFontSize" fill="#333" font-weight="bold">00:00 - 08:00</text>
-            <g *ngFor="let hour of hoursPerSection[0]">
-              <line [attr.x1]="getX(hour, 0)" y1="30" [attr.x2]="getX(hour, 0)" y2="50" stroke="#bbb" stroke-width="1" />
-              <text [attr.x]="getX(hour, 0)" y="65" [attr.font-size]="hourFontSize" text-anchor="middle" fill="#666">{{ hour }}:00</text>
-            </g>
-            <g *ngFor="let item of getRenderableItemsForSection(0)"
-               [class.task-overdue]="isTaskOverdue(item.task)"
-               [class.task-running]="isTaskRunning(item.task)"
-               [class.task-hidden]="shouldShowAsHidden(item)">
-              <!-- Borde negro exterior -->
-              <rect [attr.x]="getItemX(item, 0)" y="20" [attr.width]="getItemWidth(item, 0)" height="40"
-                    [attr.fill]="getTaskColor(item.task)" rx="6" ry="6" 
-                    [attr.fill-opacity]="shouldShowAsHidden(item) ? '0.4' : '0.8'" 
-                    stroke="rgba(0,0,0,0.6)" stroke-width="1.5" 
-                    (click)="onTaskClick(item.task, $event)" 
-                    (dblclick)="onTaskDoubleClick(item.task, $event)"
-                    (contextmenu)="onTaskContextMenu(item.task, $event)"
-                    (touchstart)="onTaskTouchStart(item.task, $event)"
-                    (touchmove)="onTaskTouchMove($event)"
-                    (touchend)="onTaskTouchEnd($event)"
-                    class="cursor-pointer" />
-              <!-- Borde blanco interior -->
-              <rect [attr.x]="getItemX(item, 0)" y="20" [attr.width]="getItemWidth(item, 0)" height="40"
-                    fill="none" rx="6" ry="6" 
-                    stroke="rgba(255,255,255,0.8)" stroke-width="1" 
-                    (click)="onTaskClick(item.task, $event)" 
-                    (dblclick)="onTaskDoubleClick(item.task, $event)"
-                    (contextmenu)="onTaskContextMenu(item.task, $event)"
-                    (touchstart)="onTaskTouchStart(item.task, $event)"
-                    (touchmove)="onTaskTouchMove($event)"
-                    (touchend)="onTaskTouchEnd($event)"
-                    class="cursor-pointer" />
-              <circle *ngIf="getTaskTypeColor(item.task)" 
-                      [attr.cx]="getItemX(item, 0) + 8" 
-                      cy="35" 
-                      r="4" 
-                      [attr.fill]="getTaskTypeColor(item.task)"
-                      stroke="white" 
-                      stroke-width="1"
-                      (click)="onTaskClick(item.task, $event)" 
-                      (dblclick)="onTaskDoubleClick(item.task, $event)"
-                      (contextmenu)="onTaskContextMenu(item.task, $event)"
-                      (touchstart)="onTaskTouchStart(item.task, $event)"
-                      (touchmove)="onTaskTouchMove($event)"
-                      (touchend)="onTaskTouchEnd($event)"
-                      class="cursor-pointer" />
-              <text [attr.x]="getItemX(item, 0) + (getTaskTypeColor(item.task) ? 14 : 6)" y="45" [attr.font-size]="taskFontSize" 
-                    [attr.fill]="shouldShowAsHidden(item) ? '#888' : '#111'" 
-                    alignment-baseline="middle"
-                    (click)="onTaskClick(item.task, $event)" 
-                    (dblclick)="onTaskDoubleClick(item.task, $event)"
-                    (contextmenu)="onTaskContextMenu(item.task, $event)"
-                    (touchstart)="onTaskTouchStart(item.task, $event)"
-                    (touchmove)="onTaskTouchMove($event)"
-                    (touchend)="onTaskTouchEnd($event)"
-                    class="cursor-pointer">
-                {{ getItemText(item, 0) }}
-              </text>
-            </g>
-            <line *ngIf="isNowInSection(0)" [attr.x1]="getNowX(0)" y1="10" [attr.x2]="getNowX(0)" y2="70" stroke="#f87171" stroke-width="2" stroke-dasharray="4 2" />
-          </g>
-
-          <!-- Tercio 2: 08:00 - 16:00 -->
-          <g [attr.transform]="'translate(0, ' + sectionHeight + ')'">
-            <rect x="0" y="0" [attr.width]="svgWidth" [attr.height]="sectionHeight" fill="#e9eff5" rx="6" ry="6"/>
-            <line x1="0" y1="40" [attr.x2]="svgWidth" y2="40" stroke="#888" stroke-width="1.5" />
-            <text x="10" y="15" [attr.font-size]="titleFontSize" fill="#333" font-weight="bold">08:00 - 16:00</text>
-            <g *ngFor="let hour of hoursPerSection[1]">
-              <line [attr.x1]="getX(hour, 8)" y1="30" [attr.x2]="getX(hour, 8)" y2="50" stroke="#bbb" stroke-width="1" />
-              <text [attr.x]="getX(hour, 8)" y="65" [attr.font-size]="hourFontSize" text-anchor="middle" fill="#666">{{ hour }}:00</text>
-            </g>
-            <g *ngFor="let item of getRenderableItemsForSection(1)"
-               [class.task-overdue]="isTaskOverdue(item.task)"
-               [class.task-running]="isTaskRunning(item.task)"
-               [class.task-hidden]="shouldShowAsHidden(item)">
-              <!-- Borde negro exterior -->
-              <rect [attr.x]="getItemX(item, 8)" y="20" [attr.width]="getItemWidth(item, 8)" height="40"
-                    [attr.fill]="getTaskColor(item.task)" rx="6" ry="6" 
-                    [attr.fill-opacity]="shouldShowAsHidden(item) ? '0.4' : '0.8'" 
-                    stroke="rgba(0,0,0,0.6)" stroke-width="1.5" 
-                    (click)="onTaskClick(item.task, $event)" 
-                    (dblclick)="onTaskDoubleClick(item.task, $event)"
-                    (contextmenu)="onTaskContextMenu(item.task, $event)"
-                    (touchstart)="onTaskTouchStart(item.task, $event)"
-                    (touchmove)="onTaskTouchMove($event)"
-                    (touchend)="onTaskTouchEnd($event)"
-                    class="cursor-pointer" />
-              <!-- Borde blanco interior -->
-              <rect [attr.x]="getItemX(item, 8)" y="20" [attr.width]="getItemWidth(item, 8)" height="40"
-                    fill="none" rx="6" ry="6" 
-                    stroke="rgba(255,255,255,0.8)" stroke-width="1" 
-                    (click)="onTaskClick(item.task, $event)" 
-                    (dblclick)="onTaskDoubleClick(item.task, $event)"
-                    (contextmenu)="onTaskContextMenu(item.task, $event)"
-                    (touchstart)="onTaskTouchStart(item.task, $event)"
-                    (touchmove)="onTaskTouchMove($event)"
-                    (touchend)="onTaskTouchEnd($event)"
-                    class="cursor-pointer" />
-              <circle *ngIf="getTaskTypeColor(item.task)" 
-                      [attr.cx]="getItemX(item, 8) + 8" 
-                      cy="35" 
-                      r="4" 
-                      [attr.fill]="getTaskTypeColor(item.task)"
-                      stroke="white" 
-                      stroke-width="1"
-                      (click)="onTaskClick(item.task, $event)" 
-                      (dblclick)="onTaskDoubleClick(item.task, $event)"
-                      (contextmenu)="onTaskContextMenu(item.task, $event)"
-                      (touchstart)="onTaskTouchStart(item.task, $event)"
-                      (touchmove)="onTaskTouchMove($event)"
-                      (touchend)="onTaskTouchEnd($event)"
-                      class="cursor-pointer" />
-              <text [attr.x]="getItemX(item, 8) + (getTaskTypeColor(item.task) ? 14 : 6)" y="45" [attr.font-size]="taskFontSize" 
-                    [attr.fill]="shouldShowAsHidden(item) ? '#888' : '#111'" 
-                    alignment-baseline="middle"
-                    (click)="onTaskClick(item.task, $event)" 
-                    (dblclick)="onTaskDoubleClick(item.task, $event)"
-                    (contextmenu)="onTaskContextMenu(item.task, $event)"
-                    (touchstart)="onTaskTouchStart(item.task, $event)"
-                    (touchmove)="onTaskTouchMove($event)"
-                    (touchend)="onTaskTouchEnd($event)"
-                    class="cursor-pointer">
-                {{ getItemText(item, 8) }}
-              </text>
-            </g>
-            <line *ngIf="isNowInSection(1)" [attr.x1]="getNowX(8)" y1="10" [attr.x2]="getNowX(8)" y2="70" stroke="#f87171" stroke-width="2" stroke-dasharray="4 2" />
-          </g>
-
-          <!-- Tercio 3: 16:00 - 24:00 -->
-          <g [attr.transform]="'translate(0, ' + (sectionHeight * 2) + ')'">
-            <rect x="0" y="0" [attr.width]="svgWidth" [attr.height]="sectionHeight" fill="#e2eaf0" rx="6" ry="6"/>
-            <line x1="0" y1="40" [attr.x2]="svgWidth" y2="40" stroke="#888" stroke-width="1.5" />
-            <text x="10" y="15" [attr.font-size]="titleFontSize" fill="#333" font-weight="bold">16:00 - 24:00</text>
-            <g *ngFor="let hour of hoursPerSection[2]">
-              <line [attr.x1]="getX(hour, 16)" y1="30" [attr.x2]="getX(hour, 16)" y2="50" stroke="#bbb" stroke-width="1" />
-              <text [attr.x]="getX(hour, 16)" y="65" [attr.font-size]="hourFontSize" text-anchor="middle" fill="#666">{{ hour }}:00</text>
-            </g>
-            <g *ngFor="let item of getRenderableItemsForSection(2)"
-               [class.task-overdue]="isTaskOverdue(item.task)"
-               [class.task-running]="isTaskRunning(item.task)"
-               [class.task-hidden]="shouldShowAsHidden(item)">
-              <!-- Borde negro exterior -->
-              <rect [attr.x]="getItemX(item, 16)" y="20" [attr.width]="getItemWidth(item, 16)" height="40"
-                    [attr.fill]="getTaskColor(item.task)" rx="6" ry="6" 
-                    [attr.fill-opacity]="shouldShowAsHidden(item) ? '0.4' : '0.8'" 
-                    stroke="rgba(0,0,0,0.6)" stroke-width="1.5" 
-                    (click)="onTaskClick(item.task, $event)" 
-                    (dblclick)="onTaskDoubleClick(item.task, $event)"
-                    (contextmenu)="onTaskContextMenu(item.task, $event)"
-                    (touchstart)="onTaskTouchStart(item.task, $event)"
-                    (touchmove)="onTaskTouchMove($event)"
-                    (touchend)="onTaskTouchEnd($event)"
-                    class="cursor-pointer" />
-              <!-- Borde blanco interior -->
-              <rect [attr.x]="getItemX(item, 16)" y="20" [attr.width]="getItemWidth(item, 16)" height="40"
-                    fill="none" rx="6" ry="6" 
-                    stroke="rgba(255,255,255,0.8)" stroke-width="1" 
-                    (click)="onTaskClick(item.task, $event)" 
-                    (dblclick)="onTaskDoubleClick(item.task, $event)"
-                    (contextmenu)="onTaskContextMenu(item.task, $event)"
-                    (touchstart)="onTaskTouchStart(item.task, $event)"
-                    (touchmove)="onTaskTouchMove($event)"
-                    (touchend)="onTaskTouchEnd($event)"
-                    class="cursor-pointer" />
-              <circle *ngIf="getTaskTypeColor(item.task)" 
-                      [attr.cx]="getItemX(item, 16) + 8" 
-                      cy="35" 
-                      r="4" 
-                      [attr.fill]="getTaskTypeColor(item.task)"
-                      stroke="white" 
-                      stroke-width="1"
-                      (click)="onTaskClick(item.task, $event)" 
-                      (dblclick)="onTaskDoubleClick(item.task, $event)"
-                      (contextmenu)="onTaskContextMenu(item.task, $event)"
-                      (touchstart)="onTaskTouchStart(item.task, $event)"
-                      (touchmove)="onTaskTouchMove($event)"
-                      (touchend)="onTaskTouchEnd($event)"
-                      class="cursor-pointer" />
-              <text [attr.x]="getItemX(item, 16) + (getTaskTypeColor(item.task) ? 14 : 6)" y="45" [attr.font-size]="taskFontSize" 
-                    [attr.fill]="shouldShowAsHidden(item) ? '#888' : '#111'" 
-                    alignment-baseline="middle"
-                    (click)="onTaskClick(item.task, $event)" 
-                    (dblclick)="onTaskDoubleClick(item.task, $event)"
-                    (contextmenu)="onTaskContextMenu(item.task, $event)"
-                    (touchstart)="onTaskTouchStart(item.task, $event)"
-                    (touchmove)="onTaskTouchMove($event)"
-                    (touchend)="onTaskTouchEnd($event)"
-                    class="cursor-pointer">
-                {{ getItemText(item, 16) }}
-              </text>
-            </g>
-            <line *ngIf="isNowInSection(2)" [attr.x1]="getNowX(16)" y1="10" [attr.x2]="getNowX(16)" y2="70" stroke="#f87171" stroke-width="2" stroke-dasharray="4 2" />
-          </g>
-        </svg>
-      </div>
-
-      <!-- Menú contextual -->
-      <div *ngIf="showContextMenu && contextMenuTask" 
-           class="context-menu"
-           [style.left.px]="contextMenuX"
-           [style.top.px]="contextMenuY"
-           (click)="$event.stopPropagation()">
-        <div class="context-menu-header">
-          <span class="text-lg mr-2">{{ contextMenuTask.emoji }}</span>
-          <span class="font-semibold text-sm truncate">{{ contextMenuTask.name }}</span>
-        </div>
-        <div class="context-menu-divider"></div>
-        <button *ngIf="contextMenuTask.hidden" class="context-menu-item" (click)="toggleHiddenFromContextMenu()">
-          <i class="fas fa-eye mr-2"></i>
-          Mostrar
-        </button>
-        <button *ngIf="!contextMenuTask.hidden" class="context-menu-item" (click)="toggleHiddenFromContextMenu()">
-          <i class="fas fa-eye-slash mr-2"></i>
-          Ocultar
-        </button>
-        <div *ngIf="isTaskOverdue(contextMenuTask) || isTaskRunning(contextMenuTask)" class="context-menu-divider"></div>
-        <button *ngIf="(isTaskOverdue(contextMenuTask) || isTaskRunning(contextMenuTask)) && contextMenuTask.status !== 'completed'" 
-                class="context-menu-item context-menu-item-completed" 
-                (click)="changeStatusFromContextMenu('completed')">
-          <i class="fas fa-check mr-2"></i>
-          Marcar completada
-        </button>
-        <button *ngIf="(isTaskOverdue(contextMenuTask) || isTaskRunning(contextMenuTask)) && contextMenuTask.status !== 'in-progress'" 
-                class="context-menu-item context-menu-item-progress" 
-                (click)="changeStatusFromContextMenu('in-progress')">
-          <i class="fas fa-spinner mr-2"></i>
-          Marcar en progreso
-        </button>
-        <button *ngIf="(isTaskOverdue(contextMenuTask) || isTaskRunning(contextMenuTask)) && contextMenuTask.status !== 'pending'" 
-                class="context-menu-item context-menu-item-pending" 
-                (click)="changeStatusFromContextMenu('pending')">
-          <i class="fas fa-play mr-2"></i>
-          Marcar pendiente
-        </button>
-        <div class="context-menu-divider"></div>
-        <button class="context-menu-item delete" (click)="deleteTaskFromContextMenu()">
-          <i class="fas fa-trash-alt mr-2"></i>
-          Eliminar tarea
-        </button>
-      </div>
-    </div>
-  `,
-  styles: [`
-    .timeline-container {
-      padding: 8px;
-      background: #f9fafb;
-      border-radius: 12px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-      position: relative; /* Asegurar que sea el contenedor de referencia */
-      user-select: none;
-      -webkit-user-select: none;
-      -moz-user-select: none;
-      -ms-user-select: none;
-    }
-    
-    .timeline-svg {
-      display: block;
-      background: #f9fafb;
-      border-radius: 12px;
-      user-select: none;
-      -webkit-user-select: none;
-      -moz-user-select: none;
-      -ms-user-select: none;
-    }
-    
-    /* Deshabilitar selección de texto en todos los elementos del SVG */
-    .timeline-svg text {
-      user-select: none;
-      -webkit-user-select: none;
-      -moz-user-select: none;
-      -ms-user-select: none;
-    }
-    
-    /* Deshabilitar selección en los rectángulos de tareas también */
-    .timeline-svg rect {
-      user-select: none;
-      -webkit-user-select: none;
-      -moz-user-select: none;
-      -ms-user-select: none;
-    }
-    
-    .timeline-svg circle {
-      user-select: none;
-      -webkit-user-select: none;
-      -moz-user-select: none;
-      -ms-user-select: none;
-    }
-
-    /* Controles de navegación de fechas */
-    .date-navigation {
-      backdrop-filter: blur(10px);
-    }
-    
-    .nav-btn {
-      user-select: none;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-    
-    .nav-btn:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-    
-    .nav-btn:active {
-      transform: translateY(0);
-    }
-    
-    .date-display {
-      min-width: 120px;
-      text-align: center;
-      user-select: text !important;
-      -webkit-user-select: text !important;
-      -moz-user-select: text !important;
-      -ms-user-select: text !important;
-    }
-    
-    .date-picker {
-      min-width: 120px;
-      user-select: text !important;
-      -webkit-user-select: text !important;
-      -moz-user-select: text !important;
-      -ms-user-select: text !important;
-    }
-    
-    .date-picker:focus {
-      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-    }
-    
-    /* Personalización del scroll horizontal para móviles */
-    .timeline-container::-webkit-scrollbar {
-      height: 6px;
-    }
-    
-    .timeline-container::-webkit-scrollbar-track {
-      background: #f1f1f1;
-      border-radius: 3px;
-    }
-    
-    .timeline-container::-webkit-scrollbar-thumb {
-      background: #c1c1c1;
-      border-radius: 3px;
-    }
-    
-    .timeline-container::-webkit-scrollbar-thumb:hover {
-      background: #a8a8a8;
-    }
-    
-    /* Para Firefox */
-    .timeline-container {
-      scrollbar-width: thin;
-      scrollbar-color: #c1c1c1 #f1f1f1;
-    }
-
-    /* Estilos para el tooltip */
-    .tooltip-container {
-      animation: fadeIn 0.2s ease-in-out;
-      pointer-events: none;
-      z-index: 1000;
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateX(-50%) translateY(-5px); }
-      to { opacity: 1; transform: translateX(-50%) translateY(0); }
-    }
-
-    /* Cursor pointer para elementos clickeables */
-    .cursor-pointer {
-      cursor: pointer;
-    }
-
-    /* Efecto hover para las tareas */
-    .cursor-pointer:hover {
-      opacity: 0.9;
-      filter: brightness(1.1);
-    }
-
-    /* Contenedor centrado para el SVG */
-    .svg-container {
-      /* Permitir scroll horizontal cuando sea necesario pero centrar cuando no */
-      width: 100%;
-    }
-    
-    /* En dispositivos grandes, cuando el SVG es más pequeño que el contenedor */
-    @media (min-width: 1280px) {
-      .svg-container {
-        /* Centrar el contenido */
-        display: flex;
-        justify-content: center;
-      }
-      
-      .timeline-svg {
-        /* Permitir que se centre naturalmente */
-        flex-shrink: 0;
-      }
-    }
-
-    /* Estilos del menú contextual */
-    .context-menu {
-      position: fixed;
-      background: white;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
-      z-index: 10000;
-      min-width: 200px;
-      max-width: 280px;
-      overflow: hidden;
-      animation: contextMenuFadeIn 0.15s ease-out;
-    }
-
-    @keyframes contextMenuFadeIn {
-      from {
-        opacity: 0;
-        transform: scale(0.95);
-      }
-      to {
-        opacity: 1;
-        transform: scale(1);
-      }
-    }
-
-    .context-menu-header {
-      padding: 12px 16px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      display: flex;
-      align-items: center;
-      font-size: 14px;
-      max-width: 100%;
-    }
-
-    .context-menu-header .truncate {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      flex: 1;
-    }
-
-    .context-menu-divider {
-      height: 1px;
-      background: #e5e7eb;
-    }
-
-    .context-menu-item {
-      width: 100%;
-      padding: 12px 16px;
-      text-align: left;
-      border: none;
-      background: white;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      font-size: 14px;
-      color: #374151;
-      transition: background-color 0.15s ease;
-    }
-
-    .context-menu-item:hover {
-      background: #f3f4f6;
-    }
-
-    .context-menu-item:active {
-      background: #e5e7eb;
-    }
-
-    .context-menu-item.delete {
-      color: #ef4444;
-    }
-
-    .context-menu-item.delete:hover {
-      background: #fef2f2;
-    }
-
-    .context-menu-item.delete:active {
-      background: #fee2e2;
-    }
-
-    .context-menu-item.completed,
-    .context-menu-item-completed {
-      color: #10b981;
-    }
-
-    .context-menu-item.completed:hover,
-    .context-menu-item-completed:hover {
-      background: #ecfdf5;
-      color: #059669;
-    }
-
-    .context-menu-item.progress,
-    .context-menu-item-progress {
-      color: #f59e0b;
-    }
-
-    .context-menu-item.progress:hover,
-    .context-menu-item-progress:hover {
-      background: #fffbeb;
-      color: #d97706;
-    }
-
-    .context-menu-item.pending,
-    .context-menu-item-pending {
-      color: #3b82f6;
-    }
-
-    .context-menu-item.pending:hover,
-    .context-menu-item-pending:hover {
-      background: #eff6ff;
-      color: #2563eb;
-    }
-
-    .context-menu-item i {
-      width: 20px;
-      text-align: center;
-    }
-
-    /* Estilos para tareas ocultas */
-    .task-hidden {
-      opacity: 0.5;
-    }
-
-    .task-hidden text {
-      fill: #888 !important;
-    }
-
-    /* Estilos para resplandor de tareas overdue */
-    .task-overdue {
-      filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.6)) drop-shadow(0 0 4px rgba(239, 68, 68, 0.5)) drop-shadow(0 0 6px rgba(239, 68, 68, 0.4));
-      animation: overdue-pulse 1.5s infinite;
-    }
-
-    @keyframes overdue-pulse {
-      0%, 100% {
-        filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.6)) drop-shadow(0 0 4px rgba(239, 68, 68, 0.5)) drop-shadow(0 0 6px rgba(239, 68, 68, 0.4));
-      }
-      50% {
-        filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 5px rgba(255, 255, 255, 0.7)) drop-shadow(0 0 8px rgba(255, 255, 255, 0.5));
-      }
-    }
-
-    /* Estilos para resplandor de tareas running */
-    .task-running {
-      filter: drop-shadow(0 0 2px rgba(16, 185, 129, 0.6)) drop-shadow(0 0 4px rgba(16, 185, 129, 0.5)) drop-shadow(0 0 6px rgba(16, 185, 129, 0.4));
-      animation: running-pulse 1.5s infinite;
-    }
-
-    @keyframes running-pulse {
-      0%, 100% {
-        filter: drop-shadow(0 0 2px rgba(16, 185, 129, 0.6)) drop-shadow(0 0 4px rgba(16, 185, 129, 0.5)) drop-shadow(0 0 6px rgba(16, 185, 129, 0.4));
-      }
-      50% {
-        filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 5px rgba(255, 255, 255, 0.7)) drop-shadow(0 0 8px rgba(255, 255, 255, 0.5));
-      }
-    }
-
-    /* Responsive para móviles */
-    @media (max-width: 640px) {
-      .context-menu {
-        min-width: 180px;
-        max-width: calc(100vw - 32px);
-      }
-
-      .context-menu-header {
-        padding: 10px 14px;
-        font-size: 13px;
-      }
-
-      .context-menu-item {
-        padding: 10px 14px;
-        font-size: 13px;
-      }
-    }
-  `]
+  imports: [
+    CommonModule, 
+    FormsModule, 
+    AndroidDatePickerComponent,
+    TimeShiftModalComponent,
+    DurationEditModalComponent
+  ],
+  templateUrl: './timeline-svg.component.html',
+  styleUrls: ['./timeline-svg.component.css']
 })
 export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, OnDestroy {
   @Input() tasks: Task[] = [];
   @Input() environments: Environment[] = [];
   @Input() taskTypes: TaskType[] = [];
-  @Input() projects: Project[] = []; // Mantener el input por si se pasa desde el padre
+  @Input() projects: Project[] = [];
   
-  // Proyectos cargados directamente desde el servicio
   private loadedProjects: Project[] = [];
   
   focusedEnvironmentId: string | null = null;
   private focusSubscription?: Subscription;
+  private gestureSubscription?: Subscription;
+  private gestureCleanups: (() => void)[] = [];
 
   constructor(
     private cdr: ChangeDetectorRef,
     private timelineFocusService: TimelineFocusService,
-    private projectService: ProjectService
+    private projectService: ProjectService,
+    private gestureService: GestureService,
+    private taskTimeService: TaskTimeService
   ) {}
 
-  // 🎯 Output para notificar al componente padre cuando se quiere editar una tarea
   @Output() editTask = new EventEmitter<Task>();
-  
-  // 🗑️ Output para notificar al componente padre cuando se quiere eliminar una tarea
   @Output() deleteTask = new EventEmitter<Task>();
-  
-  // 👁️ Output para notificar al componente padre cuando se quiere mostrar/ocultar una tarea
   @Output() toggleHidden = new EventEmitter<Task>();
-  
-  // 🔄 Output para notificar al componente padre cuando se quiere cambiar el estado de una tarea
   @Output() changeStatus = new EventEmitter<{ task: Task; status: 'pending' | 'in-progress' | 'completed' }>();
+  @Output() taskUpdated = new EventEmitter<Task>();
 
   @ViewChild('containerRef') containerRef!: ElementRef<HTMLDivElement>;
+  @ViewChildren('taskRect') taskRects!: QueryList<ElementRef<SVGRectElement>>;
+  @ViewChildren('resizeHandleStart') resizeHandlesStart!: QueryList<ElementRef<SVGRectElement>>;
+  @ViewChildren('resizeHandleEnd') resizeHandlesEnd!: QueryList<ElementRef<SVGRectElement>>;
 
   // 📅 NAVEGACIÓN DE FECHAS
-  selectedDate: Date = new Date(); // Fecha actualmente seleccionada
+  selectedDate: Date = new Date();
   
   // 💡 SISTEMA DE TOOLTIP
   showTooltip: boolean = false;
   tooltipTask: Task | null = null;
   tooltipTimeout: any = null;
 
-  // 🖱️ SISTEMA DE DOBLE CLICK
-  private clickTimeout: any = null;
-  private clickCount = 0;
-  private lastClickedTask: Task | null = null;
-  
-  // 📱 SISTEMA DE MENÚ CONTEXTUAL (Click derecho / Long press)
+  // 📱 SISTEMA DE MENÚ CONTEXTUAL
   showContextMenu: boolean = false;
   contextMenuTask: Task | null = null;
   contextMenuX: number = 0;
   contextMenuY: number = 0;
-  private longPressTimeout: any = null;
-  private longPressStartX: number = 0;
-  private longPressStartY: number = 0;
-  private isTouchActive: boolean = false; // Bandera para rastrear si el toque está activo
-  private readonly LONG_PRESS_DURATION = 500; // 500ms para activar long press
-  private readonly LONG_PRESS_MOVE_THRESHOLD = 10; // 10px de movimiento permitido
+
+  // 🔄 MODALES DE GESTOS
+  showTimeShiftModal: boolean = false;
+  timeShiftTask: Task | null = null;
+  timeShiftFragmentIndex: number | null = null;
+  suggestedShiftDirection: 'forward' | 'backward' = 'forward';
+  suggestedShiftMinutes: number = 0;
+
+  showDurationModal: boolean = false;
+  durationTask: Task | null = null;
+  durationFragmentIndex: number | null = null;
+  suggestedAdjustStart: boolean = false;
 
   // Propiedades de dimensiones responsive
-  svgWidth = 600; // Ancho inicial por defecto
-  minSvgWidth = 320; // Ancho mínimo para móviles muy pequeños
-  sectionHeight = 100; // Altura de cada sección de 8 horas
-  svgHeight = this.sectionHeight * 3; // Altura total del SVG
+  svgWidth = 600;
+  minSvgWidth = 320;
+  sectionHeight = 100;
+  svgHeight = this.sectionHeight * 3;
 
-  // 🎯 VARIABLE DE CALIBRACIÓN GLOBAL
-  // Ajusta este valor para cambiar el tamaño general del timeline
-  // 1.0 = 100%, 0.8 = 80%, 1.2 = 120%, etc.
   private widthScale: number = 0.7;
 
   // Tamaños de fuente responsivos
@@ -754,30 +107,42 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
   hourFontSize = 10;
   taskFontSize = 12;
 
-  // Observer para cambios de tamaño del contenedor
   private resizeObserver?: ResizeObserver;
-  private containerPadding = 16; // Padding del contenedor
+  private containerPadding = 16;
 
-  // 📏 OFFSETS HORIZONTALES PARA LAS HORAS
-  // Espaciado adicional al inicio y final para que las horas se vean completas
-  private hourOffsetStart = 25; // Offset al inicio (primera hora)
-  private hourOffsetEnd = 25;   // Offset al final (última hora)
+  private hourOffsetStart = 25;
+  private hourOffsetEnd = 25;
 
   hoursPerSection: number[][] = [
-    Array.from({length: 9}, (_, i) => i),       // 0-8 (incluye hora final)
-    Array.from({length: 9}, (_, i) => i + 8),   // 8-16 (incluye hora final)
-    Array.from({length: 9}, (_, i) => i + 16)   // 16-24 (incluye hora final)
+    Array.from({length: 9}, (_, i) => i),
+    Array.from({length: 9}, (_, i) => i + 8),
+    Array.from({length: 9}, (_, i) => i + 16)
   ];
+
+  // Configuración de gestos para este timeline (horizontal)
+  private gestureConfig: Partial<GestureConfig> = {
+    direction: 'horizontal',
+    enableResize: true,
+    dragThreshold: 15,
+    resizeZoneWidth: 12
+  };
+
+  // Píxeles por hora (calculado dinámicamente)
+  get pixelsPerHour(): number {
+    const effectiveWidth = this.svgWidth - this.hourOffsetStart - this.hourOffsetEnd;
+    return effectiveWidth / 8; // 8 horas por sección
+  }
   
-  // Método utilitario para convertir fechas UTC de la base de datos a hora local
   private parseUTCToLocal(dateTimeString: string): Date {
-    // Asegurar que el string se interprete como UTC añadiendo 'Z' si no lo tiene
     const utcString = dateTimeString + (dateTimeString.includes('Z') ? '' : 'Z');
     return new Date(utcString);
   }
 
+  trackByRenderableItem(index: number, item: RenderableItem): string {
+    return item.task.id + '-' + (item.fragmentIndex ?? 'main') + '-' + item.start;
+  }
+
   async ngOnInit() {
-    // Cargar proyectos directamente desde el servicio
     try {
       this.loadedProjects = await this.projectService.getProjects();
     } catch (error) {
@@ -785,12 +150,10 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
       this.loadedProjects = [];
     }
     
-    // Usar proyectos del input si están disponibles, sino usar los cargados del servicio
     if (this.projects.length > 0) {
       this.loadedProjects = this.projects;
     }
     
-    // Suscribirse al servicio para recibir cambios en el ambiente enfocado
     this.focusedEnvironmentId = this.timelineFocusService.getCurrentFocusedEnvironmentId();
     this.focusSubscription = this.timelineFocusService.getFocusedEnvironmentId().subscribe(envId => {
       const changed = this.focusedEnvironmentId !== envId;
@@ -801,27 +164,235 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
         this.updateSvgDimensions();
       }
     });
+
+    // Suscribirse a eventos de gestos
+    this.gestureSubscription = this.gestureService.gestures$.subscribe(event => {
+      this.handleGestureEvent(event);
+    });
     
     this.updateSvgDimensions();
   }
   
   ngOnChanges(changes: SimpleChanges) {
-    // Actualizar proyectos cargados si vienen del input
     if (changes['projects'] && this.projects.length > 0) {
       this.loadedProjects = this.projects;
       this.cdr.markForCheck();
       this.cdr.detectChanges();
       this.updateSvgDimensions();
     }
+    
+    // Re-registrar gestos cuando cambian las tareas
+    if (changes['tasks']) {
+      setTimeout(() => this.registerTaskGestures(), 100);
+    }
   }
-
 
   ngAfterViewInit() {
     this.initializeResizeObserver();
-    // Pequeño delay para asegurar que el contenedor esté completamente renderizado
     setTimeout(() => {
       this.updateSvgDimensions();
+      this.registerTaskGestures();
     }, 100);
+
+    // Observar cambios en los rectángulos de tareas
+    this.taskRects.changes.subscribe(() => {
+      this.registerTaskGestures();
+    });
+  }
+
+  /**
+   * Registrar gestos en todos los rectángulos de tareas
+   */
+  private registerTaskGestures(): void {
+    // Limpiar registros anteriores
+    this.gestureCleanups.forEach(cleanup => cleanup());
+    this.gestureCleanups = [];
+
+    const handlesStart = this.resizeHandlesStart ? this.resizeHandlesStart.toArray() : [];
+    const handlesEnd = this.resizeHandlesEnd ? this.resizeHandlesEnd.toArray() : [];
+
+    // Registrar gestos en cada rectángulo de tarea
+    this.taskRects.forEach((rectRef, index) => {
+      const rect = rectRef.nativeElement;
+      const taskId = rect.getAttribute('data-task-id');
+      const fragmentIndexStr = rect.getAttribute('data-fragment-index');
+      const fragmentIndex = fragmentIndexStr ? parseInt(fragmentIndexStr, 10) : undefined;
+
+      if (taskId) {
+        const task = this.tasks.find(t => t.id === taskId);
+        if (task) {
+          const data = { task, fragmentIndex };
+          
+          // 1. Registrar tarea PRINCIPAL solo para DRAG (disable resize detection on edges)
+          const cleanupTask = this.gestureService.registerElement(rect, data, {
+            ...this.gestureConfig,
+            enableResize: false // Deshabilitar detección automática de resize en la tarea
+          });
+          this.gestureCleanups.push(cleanupTask);
+
+          // 2. Registrar Handle Inicio (Resize Start)
+          const handleStart = handlesStart[index]?.nativeElement;
+          if (handleStart) {
+            const cleanupStart = this.gestureService.registerElement(handleStart, data, {
+              ...this.gestureConfig,
+              enableResize: true,
+              fixedResizeEdge: 'start'
+            });
+            this.gestureCleanups.push(cleanupStart);
+          }
+
+          // 3. Registrar Handle Fin (Resize End)
+          const handleEnd = handlesEnd[index]?.nativeElement;
+          if (handleEnd) {
+            const cleanupEnd = this.gestureService.registerElement(handleEnd, data, {
+              ...this.gestureConfig,
+              enableResize: true,
+              fixedResizeEdge: 'end'
+            });
+            this.gestureCleanups.push(cleanupEnd);
+          }
+        }
+      }
+    });
+  }
+
+  /**
+   * Manejar eventos de gestos
+   */
+  private handleGestureEvent(event: GestureEvent): void {
+    if (!event.data?.task) return;
+
+    const task: Task = event.data.task;
+    const fragmentIndex: number | undefined = event.data.fragmentIndex;
+
+    switch (event.type) {
+      case 'drag-left':
+      case 'drag-right':
+        this.openTimeShiftModal(task, fragmentIndex, event);
+        break;
+
+      case 'resize-start':
+      case 'resize-end':
+        this.openDurationModal(task, fragmentIndex, event);
+        break;
+
+      case 'tap':
+        this.showTaskTooltip(task);
+        break;
+
+      case 'long-press':
+        this.showTaskContextMenu(task, event.endX, event.endY);
+        break;
+    }
+  }
+
+  /**
+   * Abrir modal de desplazamiento de tiempo
+   */
+  private openTimeShiftModal(task: Task, fragmentIndex: number | undefined, event: GestureEvent): void {
+    this.hideTooltip();
+    this.closeContextMenu();
+
+    const direction = event.type === 'drag-right' ? 'forward' : 'backward';
+    const suggestedMinutes = this.gestureService.calculateTimeShift(
+      Math.abs(event.deltaX),
+      this.pixelsPerHour,
+      15
+    );
+
+    this.timeShiftTask = task;
+    this.timeShiftFragmentIndex = fragmentIndex ?? null;
+    this.suggestedShiftDirection = direction;
+    this.suggestedShiftMinutes = Math.max(15, suggestedMinutes);
+    this.showTimeShiftModal = true;
+    this.cdr.detectChanges();
+  }
+
+  /**
+   * Abrir modal de edición de duración
+   */
+  private openDurationModal(task: Task, fragmentIndex: number | undefined, event: GestureEvent): void {
+    this.hideTooltip();
+    this.closeContextMenu();
+
+    this.durationTask = task;
+    this.durationFragmentIndex = fragmentIndex ?? null;
+    this.suggestedAdjustStart = event.type === 'resize-start';
+    this.showDurationModal = true;
+    this.cdr.detectChanges();
+  }
+
+  /**
+   * Confirmar desplazamiento de tiempo
+   */
+  async onTimeShiftConfirm(result: TimeShiftResult): Promise<void> {
+    if (!result.confirmed || !this.timeShiftTask || !result.minutes) {
+      this.onTimeShiftCancel();
+      return;
+    }
+
+    const minutes = result.direction === 'backward' ? -result.minutes : result.minutes;
+    
+    const updateResult = await this.taskTimeService.shiftTask(this.timeShiftTask, {
+      minutes,
+      fragmentOnly: result.fragmentIndex !== undefined,
+      fragmentIndex: result.fragmentIndex
+    });
+
+    if (updateResult.success) {
+      console.log('✅ Tarea desplazada:', updateResult.message);
+      this.taskUpdated.emit(this.timeShiftTask);
+    } else {
+      console.error('❌ Error al desplazar:', updateResult.message);
+    }
+
+    this.onTimeShiftCancel();
+  }
+
+  /**
+   * Cancelar desplazamiento de tiempo
+   */
+  onTimeShiftCancel(): void {
+    this.showTimeShiftModal = false;
+    this.timeShiftTask = null;
+    this.timeShiftFragmentIndex = null;
+    this.cdr.detectChanges();
+  }
+
+  /**
+   * Confirmar cambio de duración
+   */
+  async onDurationConfirm(result: DurationEditResult): Promise<void> {
+    if (!result.confirmed || !this.durationTask || !result.newDurationMinutes) {
+      this.onDurationCancel();
+      return;
+    }
+
+    const updateResult = await this.taskTimeService.changeDuration(this.durationTask, {
+      newDurationMinutes: result.newDurationMinutes,
+      adjustStart: result.adjustStart ?? false,
+      fragmentOnly: result.fragmentIndex !== undefined,
+      fragmentIndex: result.fragmentIndex
+    });
+
+    if (updateResult.success) {
+      console.log('✅ Duración cambiada:', updateResult.message);
+      this.taskUpdated.emit(this.durationTask);
+    } else {
+      console.error('❌ Error al cambiar duración:', updateResult.message);
+    }
+
+    this.onDurationCancel();
+  }
+
+  /**
+   * Cancelar cambio de duración
+   */
+  onDurationCancel(): void {
+    this.showDurationModal = false;
+    this.durationTask = null;
+    this.durationFragmentIndex = null;
+    this.cdr.detectChanges();
   }
 
   @HostListener('window:resize', ['$event'])
@@ -840,86 +411,66 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
 
   private updateSvgDimensions() {
     if (typeof window === 'undefined') {
-      // Fallback para SSR
       this.svgWidth = Math.floor(600 * this.widthScale);
-      this.updateFontSizes();
       return;
     }
 
     const screenWidth = window.innerWidth;
     let containerWidth = screenWidth;
 
-    // Si tenemos acceso al contenedor, usar su ancho real
     if (this.containerRef?.nativeElement) {
       const rect = this.containerRef.nativeElement.getBoundingClientRect();
       containerWidth = rect.width;
     }
 
-    // Calcular ancho disponible restando padding
     const availableWidth = Math.max(containerWidth - this.containerPadding, this.minSvgWidth);
 
-    // Sistema de breakpoints más granular y responsivo (con escala aplicada)
     if (screenWidth <= 375) {
-      // Móviles muy pequeños (iPhone SE, etc.)
       this.svgWidth = Math.floor(Math.max(availableWidth, this.minSvgWidth) * this.widthScale);
       this.titleFontSize = 10;
       this.hourFontSize = 8;
       this.taskFontSize = 10;
     } else if (screenWidth <= 480) {
-      // Móviles pequeños
       this.svgWidth = Math.floor(Math.max(availableWidth * 1.2, 400) * this.widthScale);
       this.titleFontSize = 11;
       this.hourFontSize = 9;
       this.taskFontSize = 11;
     } else if (screenWidth <= 640) {
-      // Móviles medianos / landscape
       this.svgWidth = Math.floor(Math.max(availableWidth * 1.4, 500) * this.widthScale);
       this.titleFontSize = 12;
       this.hourFontSize = 10;
       this.taskFontSize = 12;
     } else if (screenWidth <= 768) {
-      // Tablets verticales
       this.svgWidth = Math.floor(Math.max(availableWidth * 0.9, 600) * this.widthScale);
       this.titleFontSize = 12;
       this.hourFontSize = 10;
       this.taskFontSize = 12;
     } else if (screenWidth <= 1024) {
-      // Tablets horizontales / laptops pequeños
       this.svgWidth = Math.floor(Math.max(availableWidth * 0.95, 800) * this.widthScale);
       this.titleFontSize = 13;
       this.hourFontSize = 11;
       this.taskFontSize = 13;
     } else if (screenWidth <= 1280) {
-      // Laptops
       this.svgWidth = Math.floor(Math.max(availableWidth * 0.98, 1000) * this.widthScale);
       this.titleFontSize = 14;
       this.hourFontSize = 12;
       this.taskFontSize = 14;
     } else {
-      // Monitores grandes / escritorio
       this.svgWidth = Math.floor(Math.min(availableWidth * 0.98, 1400) * this.widthScale);
       this.titleFontSize = 14;
       this.hourFontSize = 12;
       this.taskFontSize = 14;
     }
 
-    // Asegurar que el ancho no sea menor que el mínimo (también escalado)
     const scaledMinWidth = Math.floor(this.minSvgWidth * this.widthScale);
     this.svgWidth = Math.max(this.svgWidth, scaledMinWidth);
   }
 
-  private updateFontSizes() {
-    // Los tamaños de fuente ya se actualizan en updateSvgDimensions
-    // Este método existe por si necesitamos lógica adicional en el futuro
-  }
-
-  // Método para truncar texto de tareas según el ancho disponible
   getTaskText(task: Task, sectionStartHour: number): string {
-    const taskWidth = this.getTaskWidth(task, sectionStartHour); // Usar la sección correcta
+    const taskWidth = this.getTaskWidth(task, sectionStartHour);
     const emoji = task.emoji || '📋';
     let name = task.name || 'Sin título';
     
-    // Si hay un ambiente enfocado, modificar el formato del nombre
     if (this.focusedEnvironmentId && task.project) {
       const projectsToUse = this.loadedProjects.length > 0 ? this.loadedProjects : this.projects;
       const project = projectsToUse.find(p => p.id === task.project);
@@ -930,79 +481,56 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
       }
     }
     
-    // Ser MUCHO más generoso con el cálculo de caracteres disponibles
-    const availableChars = Math.floor(taskWidth / (this.taskFontSize * 0.35)); // Factor más generoso aún
+    const availableChars = Math.floor(taskWidth / (this.taskFontSize * 0.35));
     
-    // Umbrales más bajos para mostrar texto
     if (taskWidth < 20) {
-      // Solo para tareas realmente diminutas
       return emoji;
     }
     
-    // Calcular cuántos caracteres del nombre podemos mostrar
-    const emojiSpace = 2; // Espacio que ocupa el emoji
-    const ellipsisSpace = 3; // Espacio para "..."
+    const emojiSpace = 2;
+    const ellipsisSpace = 3;
     const availableForName = Math.max(availableChars - emojiSpace, 1);
     
     if (availableForName >= name.length) {
-      // Cabe completo
       return `${emoji} ${name}`;
     } else if (availableForName >= 3) {
-      // Truncar con puntos suspensivos (umbral más bajo)
       const truncatedLength = Math.max(availableForName - ellipsisSpace, 1);
       return `${emoji} ${name.substring(0, truncatedLength)}...`;
     } else if (availableForName >= 1) {
-      // Mostrar al menos una letra
       return `${emoji} ${name.charAt(0)}`;
     } else {
-      // Solo emoji
       return emoji;
     }
   }
 
-  // Función helper para obtener las primeras 3 iniciales del proyecto (sin espacios)
   getProjectInitials(projectName: string): string {
     if (!projectName) return '';
-    // Eliminar espacios en blanco y tomar las primeras 3 letras
     const withoutSpaces = projectName.replace(/\s+/g, '');
     return withoutSpaces.substring(0, 3).toUpperCase();
   }
 
-  // Devuelve la posición X para una hora dentro de una sección (0-23)
-  // sectionStartHour es la hora de inicio de la sección (0, 8, o 16)
   getX(hourInDay: number, sectionStartHour: number): number {
     const hourInSection = hourInDay - sectionStartHour;
-    // Ancho efectivo sin los offsets
     const effectiveWidth = this.svgWidth - this.hourOffsetStart - this.hourOffsetEnd;
-    // Cada sección representa 8 horas (aunque mostramos 9 incluyendo la final)
     return this.hourOffsetStart + (hourInSection / 8) * effectiveWidth;
   }
 
   getTaskX(task: Task, sectionStartHour: number): number {
     const taskActualStart = this.parseUTCToLocal(task.start);
-    const taskActualEnd = this.parseUTCToLocal(task.end);
     
-    // Crear fechas del día seleccionado
     const selectedDayStart = new Date(this.selectedDate);
     selectedDayStart.setHours(0, 0, 0, 0);
     
-    // Determinar el inicio efectivo de la tarea en el día seleccionado
     let effectiveStartHour;
     
-    // Si la tarea comenzó antes del día seleccionado, usar el inicio del día
     if (taskActualStart < selectedDayStart) {
       effectiveStartHour = 0;
     } else {
       effectiveStartHour = taskActualStart.getHours() + taskActualStart.getMinutes() / 60;
     }
 
-    // Determinar el inicio de la porción visible de la tarea dentro de esta sección
     const visiblePortionStartHourInDay = Math.max(effectiveStartHour, sectionStartHour);
-    
-    // Convertir este inicio visible a un desplazamiento desde el inicio de la sección
     const offsetFromSectionStart = visiblePortionStartHourInDay - sectionStartHour;
-    
-    // Ancho efectivo sin los offsets
     const effectiveWidth = this.svgWidth - this.hourOffsetStart - this.hourOffsetEnd;
     
     return this.hourOffsetStart + (offsetFromSectionStart / 8) * effectiveWidth;
@@ -1012,39 +540,33 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     const start = this.parseUTCToLocal(task.start);
     const end = this.parseUTCToLocal(task.end);
     
-    // Crear fechas del día seleccionado
     const selectedDayStart = new Date(this.selectedDate);
     selectedDayStart.setHours(0, 0, 0, 0);
     
     const selectedDayEnd = new Date(this.selectedDate);
     selectedDayEnd.setHours(23, 59, 59, 999);
     
-    // Determinar las horas efectivas de inicio y fin en el día seleccionado
     let taskStartHour, taskEndHour;
     
-    // Si la tarea comenzó antes del día seleccionado, usar el inicio del día
     if (start < selectedDayStart) {
       taskStartHour = 0;
     } else {
       taskStartHour = start.getHours() + start.getMinutes() / 60;
     }
     
-    // Si la tarea termina después del día seleccionado, usar el final del día
     if (end > selectedDayEnd) {
       taskEndHour = 24;
     } else {
       taskEndHour = end.getHours() + end.getMinutes() / 60;
     }
 
-    // Ajustar las horas de inicio y fin para que estén dentro de los límites de la sección
     taskStartHour = Math.max(taskStartHour, sectionStartHour);
     taskEndHour = Math.min(taskEndHour, sectionStartHour + 8);
     
     const durationInSection = taskEndHour - taskStartHour;
     
-    if (durationInSection <= 0) return 0; // La tarea no está en esta parte de la sección o es inválida
+    if (durationInSection <= 0) return 0;
 
-    // Ancho efectivo sin los offsets
     const effectiveWidth = this.svgWidth - this.hourOffsetStart - this.hourOffsetEnd;
     
     return Math.max(8, (durationInSection / 8) * effectiveWidth);
@@ -1054,7 +576,6 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     const sectionStartHour = sectionIndex * 8;
     const sectionEndHour = sectionStartHour + 8;
 
-    // Filtrar por ambiente enfocado si hay uno enfocado
     let filteredTasks = this.tasks;
     if (this.focusedEnvironmentId) {
       filteredTasks = this.tasks.filter(task => task.environment === this.focusedEnvironmentId);
@@ -1064,60 +585,46 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
       const taskStart = this.parseUTCToLocal(task.start);
       const taskEnd = this.parseUTCToLocal(task.end);
       
-      // Crear fechas del día seleccionado (inicio y fin del día)
       const selectedDayStart = new Date(this.selectedDate);
       selectedDayStart.setHours(0, 0, 0, 0);
       
       const selectedDayEnd = new Date(this.selectedDate);
       selectedDayEnd.setHours(23, 59, 59, 999);
       
-      // Verificar si la tarea se superpone con el día seleccionado
-      // Una tarea se superpone si:
-      // - Su inicio es antes del final del día seleccionado Y
-      // - Su fin es después del inicio del día seleccionado
       const taskOverlapsSelectedDay = taskStart <= selectedDayEnd && taskEnd >= selectedDayStart;
       
       if (!taskOverlapsSelectedDay) {
-        return false; // La tarea no se superpone con la fecha seleccionada
+        return false;
       }
       
-      // Para calcular las horas, necesitamos determinar qué parte de la tarea
-      // está realmente en el día seleccionado
       let taskStartHour, taskEndHour;
       
-      // Si la tarea comenzó en un día anterior, usar el inicio del día seleccionado
       if (taskStart < selectedDayStart) {
-        taskStartHour = 0; // Comenzar desde las 00:00 del día seleccionado
+        taskStartHour = 0;
       } else {
         taskStartHour = taskStart.getHours() + taskStart.getMinutes() / 60;
       }
       
-      // Si la tarea termina después del día seleccionado, usar el final del día
       if (taskEnd > selectedDayEnd) {
-        taskEndHour = 24; // Terminar a las 24:00 del día seleccionado
+        taskEndHour = 24;
       } else {
         taskEndHour = taskEnd.getHours() + taskEnd.getMinutes() / 60;
       }
 
-      // La tarea se superpone con la sección si:
-      // Su inicio es antes del fin de la sección Y su fin es después del inicio de la sección
       return taskStartHour < sectionEndHour && taskEndHour > sectionStartHour;
     });
   }
   
-  // Obtener elementos renderizables (tareas y fragmentos) para una sección
   getRenderableItemsForSection(sectionIndex: 0 | 1 | 2): RenderableItem[] {
     const sectionStartHour = sectionIndex * 8;
     const sectionEndHour = sectionStartHour + 8;
     const items: RenderableItem[] = [];
 
-    // Filtrar por ambiente enfocado si hay uno enfocado
     let filteredTasks = this.tasks;
     if (this.focusedEnvironmentId) {
       filteredTasks = this.tasks.filter(task => task.environment === this.focusedEnvironmentId);
     }
 
-    // Crear fechas del día seleccionado
     const selectedDayStart = new Date(this.selectedDate);
     selectedDayStart.setHours(0, 0, 0, 0);
     
@@ -1125,7 +632,6 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     selectedDayEnd.setHours(23, 59, 59, 999);
 
     for (const task of filteredTasks) {
-      // Si la tarea tiene fragmentos, renderizar solo los fragmentos (no la tarea principal)
       if (task.fragments && task.fragments.length > 0) {
         for (let i = 0; i < task.fragments.length; i++) {
           const fragment = task.fragments[i];
@@ -1133,14 +639,12 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
             const fragmentStart = this.parseUTCToLocal(fragment.start);
             const fragmentEnd = this.parseUTCToLocal(fragment.end);
             
-            // Verificar si el fragmento se superpone con el día seleccionado
             const fragmentOverlapsSelectedDay = fragmentStart <= selectedDayEnd && fragmentEnd >= selectedDayStart;
             
             if (!fragmentOverlapsSelectedDay) {
               continue;
             }
             
-            // Calcular horas del fragmento en el día seleccionado
             let fragmentStartHour, fragmentEndHour;
             
             if (fragmentStart < selectedDayStart) {
@@ -1155,7 +659,6 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
               fragmentEndHour = fragmentEnd.getHours() + fragmentEnd.getMinutes() / 60;
             }
             
-            // Verificar si el fragmento se superpone con la sección
             if (fragmentStartHour < sectionEndHour && fragmentEndHour > sectionStartHour) {
               items.push({
                 type: 'fragment',
@@ -1168,7 +671,6 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
           }
         }
       } else {
-        // Si no hay fragmentos, renderizar la tarea principal normalmente
         const taskStart = this.parseUTCToLocal(task.start);
         const taskEnd = this.parseUTCToLocal(task.end);
         
@@ -1206,7 +708,6 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     return items;
   }
   
-  // Obtener posición X para un elemento renderizable
   getItemX(item: RenderableItem, sectionStartHour: number): number {
     const itemStart = this.parseUTCToLocal(item.start);
     
@@ -1228,7 +729,6 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     return this.hourOffsetStart + (offsetFromSectionStart / 8) * effectiveWidth;
   }
   
-  // Obtener ancho para un elemento renderizable
   getItemWidth(item: RenderableItem, sectionStartHour: number): number {
     const start = this.parseUTCToLocal(item.start);
     const end = this.parseUTCToLocal(item.end);
@@ -1265,13 +765,11 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     return Math.max(8, (durationInSection / 8) * effectiveWidth);
   }
   
-  // Obtener texto para un elemento renderizable
   getItemText(item: RenderableItem, sectionStartHour: number): string {
     const itemWidth = this.getItemWidth(item, sectionStartHour);
     const emoji = item.task.emoji || '📋';
     let name = item.task.name || 'Sin título';
     
-    // Si hay un ambiente enfocado, modificar el formato del nombre
     if (this.focusedEnvironmentId && item.task.project) {
       const projectsToUse = this.loadedProjects.length > 0 ? this.loadedProjects : this.projects;
       const project = projectsToUse.find(p => p.id === item.task.project);
@@ -1282,7 +780,6 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
       }
     }
     
-    // Si es un fragmento, agregar indicador visual
     if (item.type === 'fragment' && item.fragmentIndex !== undefined) {
       name = `${name} [F${item.fragmentIndex + 1}]`;
     }
@@ -1310,7 +807,6 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
   }
   
   getTaskColor(task: Task): string {
-    // Si hay un ambiente enfocado, usar el color del tipo de tarea
     if (this.focusedEnvironmentId) {
       const typeColor = this.getTaskTypeColor(task);
       if (typeColor) {
@@ -1318,7 +814,6 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
       }
     }
     
-    // Si no hay enfoque o no hay tipo, usar el color del ambiente
     if (task.environment && this.environments.length > 0) {
       const environment = this.environments.find(env => env.id === task.environment);
       if (environment && environment.color) {
@@ -1326,13 +821,12 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
       }
     }
     
-    // Fallback a colores por prioridad si no hay environment o color
     switch (task.priority) {
-      case 'low': return '#4ade80'; // Verde
-      case 'medium': return '#60a5fa'; // Azul
-      case 'high': return '#f87171'; // Rojo
-      case 'critical': return '#f472b6'; // Rosa
-      default: return '#a3a3a3'; // Gris
+      case 'low': return '#4ade80';
+      case 'medium': return '#60a5fa';
+      case 'high': return '#f87171';
+      case 'critical': return '#f472b6';
+      default: return '#a3a3a3';
     }
   }
 
@@ -1351,21 +845,18 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     return startDate <= now && now <= endDate;
   }
 
-  // Determina si una tarea es futura (aún no ha comenzado)
   isFutureTask(task: Task): boolean {
     const startDate = this.parseUTCToLocal(task.start);
     const now = new Date();
     return startDate > now;
   }
 
-  // Determina si un item (tarea o fragmento) es futuro
   isFutureItem(item: RenderableItem): boolean {
     const startDate = this.parseUTCToLocal(item.start);
     const now = new Date();
     return startDate > now;
   }
 
-  // Determina si se debe mostrar como oculta (solo si es futura Y está marcada como hidden)
   shouldShowAsHidden(item: RenderableItem): boolean {
     return item.task.hidden === true && this.isFutureItem(item);
   }
@@ -1375,14 +866,12 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     const currentHourInDay = now.getHours() + now.getMinutes() / 60;
     const hourInSection = currentHourInDay - sectionStartHour;
     
-    // Ancho efectivo sin los offsets
     const effectiveWidth = this.svgWidth - this.hourOffsetStart - this.hourOffsetEnd;
     
     return this.hourOffsetStart + (hourInSection / 8) * effectiveWidth;
   }
 
   isNowInSection(sectionIndex: 0 | 1 | 2): boolean {
-    // Solo mostrar la línea de "ahora" si estamos viendo el día de hoy
     if (!this.isToday()) {
       return false;
     }
@@ -1394,50 +883,24 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     return currentHour >= sectionStartHour && currentHour < sectionEndHour;
   }
 
-  /**
-   * 🎯 Método público para cambiar la escala del timeline
-   * @param scale Escala del timeline (ej: 0.8 = 80%, 1.2 = 120%)
-   * @example
-   * // Reducir al 70%
-   * timelineComponent.setWidthScale(0.7);
-   * 
-   * // Aumentar al 110%
-   * timelineComponent.setWidthScale(1.1);
-   */
   public setWidthScale(scale: number): void {
-    if (scale > 0 && scale <= 3) { // Límites razonables
+    if (scale > 0 && scale <= 3) {
       this.widthScale = scale;
       this.updateSvgDimensions();
-    } else {
-      console.warn('Timeline scale debe estar entre 0.1 y 3.0');
     }
   }
 
-  /**
-   * 🎯 Obtener la escala actual del timeline
-   */
   public getWidthScale(): number {
     return this.widthScale;
   }
 
-  /**
-   * 📏 Configurar los offsets horizontales para las horas
-   * @param startOffset Offset al inicio (por defecto 25px)
-   * @param endOffset Offset al final (por defecto 25px)
-   */
   public setHourOffsets(startOffset: number, endOffset: number): void {
     if (startOffset >= 0 && endOffset >= 0) {
       this.hourOffsetStart = startOffset;
       this.hourOffsetEnd = endOffset;
-      // No es necesario llamar updateSvgDimensions ya que solo afecta las posiciones
-    } else {
-      console.warn('Los offsets deben ser valores positivos');
     }
   }
 
-  /**
-   * 📏 Obtener los offsets actuales
-   */
   public getHourOffsets(): { start: number, end: number } {
     return {
       start: this.hourOffsetStart,
@@ -1470,7 +933,6 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
   }
 
   getDateInputValue() {
-    // Evitar problemas de zona horaria construyendo la fecha manualmente
     const year = this.selectedDate.getFullYear();
     const month = String(this.selectedDate.getMonth() + 1).padStart(2, '0');
     const day = String(this.selectedDate.getDate()).padStart(2, '0');
@@ -1479,9 +941,8 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
 
   onDateChange(dateString: string) {
     if (dateString) {
-      // Crear fecha en zona horaria local para evitar desfases
       const [year, month, day] = dateString.split('-').map(Number);
-      this.selectedDate = new Date(year, month - 1, day); // month - 1 porque los meses en JS son 0-indexados
+      this.selectedDate = new Date(year, month - 1, day);
       this.updateSvgDimensions();
     }
   }
@@ -1501,69 +962,26 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     });
   }
 
-  /**
-   * 🎯 Métodos públicos para navegación de fechas
-   */
-  
-  /**
-   * Ir a una fecha específica
-   * @param date Fecha a la que navegar
-   */
   public goToDate(date: Date): void {
     this.selectedDate = new Date(date);
     this.updateSvgDimensions();
   }
 
-  /**
-   * Obtener la fecha actualmente seleccionada
-   */
   public getSelectedDate(): Date {
     return new Date(this.selectedDate);
   }
 
-  /**
-   * Navegar por semanas
-   * @param direction 1 para siguiente semana, -1 para semana anterior
-   */
   public navigateByWeek(direction: 1 | -1): void {
     this.selectedDate.setDate(this.selectedDate.getDate() + (7 * direction));
     this.updateSvgDimensions();
   }
 
-  /**
-   * Navegar por meses
-   * @param direction 1 para siguiente mes, -1 para mes anterior
-   */
   public navigateByMonth(direction: 1 | -1): void {
     this.selectedDate.setMonth(this.selectedDate.getMonth() + direction);
     this.updateSvgDimensions();
   }
 
-  // 💡 Métodos para el sistema de tooltip
-  onTaskClick(task: Task, event: MouseEvent): void {
-    event.stopPropagation();
-    
-    // Cancelar cualquier long press pendiente cuando se hace click (toque normal)
-    // Esto evita que el menú contextual aparezca después de mostrar el tooltip
-    this.cancelLongPress();
-    
-    // Cerrar el menú contextual si está abierto
-    if (this.showContextMenu) {
-      this.closeContextMenu();
-    }
-    
-    // Si el tooltip ya está visible para la misma tarea, ocultarlo
-    if (this.showTooltip && this.tooltipTask && this.tooltipTask.id === task.id) {
-      this.hideTooltip();
-      return;
-    }
-    
-    // Si el tooltip está visible para otra tarea o no está visible, mostrarlo
-    this.showTaskTooltip(task);
-  }
-
   showTaskTooltip(task: Task): void {
-    // Limpiar timeout previo si existe
     if (this.tooltipTimeout) {
       clearTimeout(this.tooltipTimeout);
     }
@@ -1571,7 +989,6 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     this.tooltipTask = task;
     this.showTooltip = true;
 
-    // Auto-ocultar después de 4 segundos
     this.tooltipTimeout = setTimeout(() => {
       this.hideTooltip();
     }, 4000);
@@ -1586,12 +1003,10 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     }
   }
 
-  // 🕒 Métodos para calcular tiempo hasta la próxima tarea
   getNextTask(currentTask: Task): Task | null {
     const currentEnd = this.parseUTCToLocal(currentTask.end);
     const currentDate = currentEnd.toDateString();
     
-    // Filtrar tareas: mismo día, después de la actual, y del mismo ambiente si hay uno enfocado
     let tasksToSearch = this.tasks;
     if (this.focusedEnvironmentId) {
       tasksToSearch = this.tasks.filter(task => task.environment === this.focusedEnvironmentId);
@@ -1603,14 +1018,12 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
       return taskDate === currentDate && task.id !== currentTask.id;
     });
 
-    // Encontrar la próxima tarea (la que empiece más pronto después del final de la tarea actual)
     let nextTask: Task | null = null;
     let earliestStart: Date | null = null;
 
     for (const task of tasksOnSameDay) {
       const taskStart = this.parseUTCToLocal(task.start);
       
-      // Solo considerar tareas que empiecen después de que termine la actual
       if (taskStart >= currentEnd) {
         if (!earliestStart || taskStart < earliestStart) {
           earliestStart = taskStart;
@@ -1670,26 +1083,16 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     return `${hours} horas y ${minutes} min de descanso`;
   }
 
-  onTaskDoubleClick(task: Task, event: MouseEvent): void {
-    event.stopPropagation();
-    // Ocultar el tooltip cuando se hace doble click para editar
-    this.hideTooltip();
-    this.editTask.emit(task);
-  }
-
   getTaskTypeColor(task: Task): string | null {
     if (!task.type || !this.taskTypes.length) return null;
     const taskType = this.taskTypes.find(t => t.id === task.type);
     return taskType?.color || null;
   }
 
-  // Obtener el nombre de la tarea con formato según si hay ambiente enfocado
   getTaskDisplayName(task: Task): string {
     let name = task.name || 'Sin título';
     
-    // Si hay un ambiente enfocado, agregar las iniciales del proyecto
     if (this.focusedEnvironmentId && task.project) {
-      // Usar proyectos cargados del servicio o del input
       const projectsToUse = this.loadedProjects.length > 0 ? this.loadedProjects : this.projects;
       const project = projectsToUse.find(p => p.id === task.project);
       if (project) {
@@ -1701,9 +1104,7 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     return name;
   }
   
-  // Calcular la duración de una tarea (suma de fragmentos si existen, sino usar duration o calcular)
   getTaskDuration(task: Task): number | null {
-    // Si hay fragmentos, sumar la duración de todos
     if (task.fragments && task.fragments.length > 0) {
       let totalDuration = 0;
       for (const fragment of task.fragments) {
@@ -1718,12 +1119,10 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
       return totalDuration > 0 ? totalDuration : null;
     }
     
-    // Si no hay fragmentos pero hay duration definida, usarla
     if (task.duration && task.duration > 0) {
       return task.duration;
     }
     
-    // Si no hay fragmentos ni duration, calcular desde start y end
     if (task.start && task.end) {
       const start = this.parseUTCToLocal(task.start);
       const end = this.parseUTCToLocal(task.end);
@@ -1735,7 +1134,6 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     return null;
   }
   
-  // Formatear la duración de una tarea
   formatTaskDuration(hours: number | null): string {
     if (!hours || hours === 0) return '0 horas';
     
@@ -1750,163 +1148,67 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
       return `${wholeHours} hora${wholeHours !== 1 ? 's' : ''} y ${minutes} minutos`;
     }
   }
-
-  // 📱 MÉTODOS PARA MENÚ CONTEXTUAL
   
-  // Click derecho (desktop)
-  onTaskContextMenu(task: Task, event: MouseEvent): void {
-    event.preventDefault();
-    event.stopPropagation();
-    console.log('🖱️ Click derecho en tarea:', task.name);
-    this.showTaskContextMenu(task, event.clientX, event.clientY);
-  }
-
-  // Touch start para long press (móvil)
-  onTaskTouchStart(task: Task, event: TouchEvent): void {
-    if (event.touches.length !== 1) return;
-    
-    // Cancelar cualquier long press previo que pueda estar pendiente
-    this.cancelLongPress();
-    
-    // Marcar que el toque está activo
-    this.isTouchActive = true;
-    
-    const touch = event.touches[0];
-    this.longPressStartX = touch.clientX;
-    this.longPressStartY = touch.clientY;
-    
-    console.log('👆 Touch start en tarea:', task.name);
-    
-    // Guardar referencia a la tarea para el long press
-    const taskForLongPress = task;
-    
-    // Iniciar timer para long press
-    this.longPressTimeout = setTimeout(() => {
-      // Solo mostrar el menú si el toque aún está activo (el dedo sigue presionado)
-      if (this.longPressTimeout && this.isTouchActive) {
-        console.log('⏱️ Long press detectado en tarea:', taskForLongPress.name);
-        this.showTaskContextMenu(taskForLongPress, this.longPressStartX, this.longPressStartY);
-        // Vibración opcional en dispositivos móviles
-        if ('vibrate' in navigator) {
-          navigator.vibrate(50);
-        }
-        // Marcar que el toque ya no está activo después de mostrar el menú
-        this.isTouchActive = false;
-      }
-    }, this.LONG_PRESS_DURATION);
-  }
-
-  // Touch move - cancelar long press si se mueve mucho
-  onTaskTouchMove(event: TouchEvent): void {
-    if (!this.longPressTimeout) return;
-    
-    if (event.touches.length === 1) {
-      const touch = event.touches[0];
-      const deltaX = Math.abs(touch.clientX - this.longPressStartX);
-      const deltaY = Math.abs(touch.clientY - this.longPressStartY);
-      
-      // Si se movió más del threshold, cancelar long press
-      if (deltaX > this.LONG_PRESS_MOVE_THRESHOLD || deltaY > this.LONG_PRESS_MOVE_THRESHOLD) {
-        console.log('↔️ Movimiento detectado, cancelando long press (deltaX:', deltaX, 'deltaY:', deltaY, ')');
-        this.cancelLongPress();
-      }
-    }
-  }
-
-  // Touch end - cancelar long press si no se completó
-  onTaskTouchEnd(event: TouchEvent): void {
-    // Marcar que el toque ya no está activo
-    this.isTouchActive = false;
-    // Cancelar el long press timeout
-    this.cancelLongPress();
-  }
-
-  // Cancelar long press
-  private cancelLongPress(): void {
-    if (this.longPressTimeout) {
-      clearTimeout(this.longPressTimeout);
-      this.longPressTimeout = null;
-    }
-    // También marcar que el toque ya no está activo cuando se cancela
-    this.isTouchActive = false;
-  }
-
-  // Mostrar menú contextual
   showTaskContextMenu(task: Task, x: number, y: number): void {
-    // Ocultar tooltip si está visible
     this.hideTooltip();
     
     this.contextMenuTask = task;
     this.contextMenuX = x;
     this.contextMenuY = y;
     this.showContextMenu = true;
-    
-    console.log('📋 Menú contextual abierto para:', task.name);
   }
 
-  // Cerrar menú contextual
   closeContextMenu(): void {
     this.showContextMenu = false;
     this.contextMenuTask = null;
-    console.log('✖️ Menú contextual cerrado');
   }
 
-  // Eliminar tarea desde el menú contextual
   deleteTaskFromContextMenu(): void {
     if (this.contextMenuTask) {
-      console.log('🗑️ Eliminando tarea:', this.contextMenuTask.name);
       this.deleteTask.emit(this.contextMenuTask);
       this.closeContextMenu();
     }
   }
 
-  // Mostrar/Ocultar tarea desde el menú contextual
   toggleHiddenFromContextMenu(): void {
     if (this.contextMenuTask) {
-      console.log('👁️ Cambiando visibilidad de tarea:', this.contextMenuTask.name);
       this.toggleHidden.emit(this.contextMenuTask);
       this.closeContextMenu();
     }
   }
 
-  // Cambiar estado de tarea desde el menú contextual
   changeStatusFromContextMenu(status: 'pending' | 'in-progress' | 'completed'): void {
     if (this.contextMenuTask) {
-      console.log('🔄 Cambiando estado de tarea:', this.contextMenuTask.name, 'a', status);
       this.changeStatus.emit({ task: this.contextMenuTask, status });
       this.closeContextMenu();
     }
   }
 
-  // Listener global para cerrar el menú y tooltip al hacer click fuera
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent): void {
-    // Cerrar menú contextual si está abierto
     if (this.showContextMenu) {
       this.closeContextMenu();
     }
-    // Cerrar tooltip si está abierto
     if (this.showTooltip) {
       this.hideTooltip();
     }
   }
 
-  // Limpiar timeouts y listeners en destroy
   ngOnDestroy(): void {
     if (this.tooltipTimeout) {
       clearTimeout(this.tooltipTimeout);
     }
-    if (this.clickTimeout) {
-      clearTimeout(this.clickTimeout);
-    }
-    if (this.longPressTimeout) {
-      clearTimeout(this.longPressTimeout);
-    }
     if (this.focusSubscription) {
       this.focusSubscription.unsubscribe();
+    }
+    if (this.gestureSubscription) {
+      this.gestureSubscription.unsubscribe();
     }
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
     }
+    // Limpiar registros de gestos
+    this.gestureCleanups.forEach(cleanup => cleanup());
+    this.gestureCleanups = [];
   }
-} 
+}

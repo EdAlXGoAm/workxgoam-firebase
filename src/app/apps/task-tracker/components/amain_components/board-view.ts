@@ -30,7 +30,7 @@ import { TaskType } from '../../models/task-type.model';
 
       <div class="mb-4 md:mb-6">
         <h3 class="text-base md:text-lg font-semibold mb-2 text-center w-full">Línea del Tiempo</h3>
-        <app-timeline-svg [tasks]="tasks" [environments]="environments" [taskTypes]="taskTypes" (editTask)="editTask.emit($event)" (deleteTask)="deleteTask.emit($event)" (toggleHidden)="toggleHidden.emit($event)" (changeStatus)="changeStatus.emit($event)"></app-timeline-svg>
+        <app-timeline-svg [tasks]="tasks" [environments]="environments" [taskTypes]="taskTypes" (editTask)="editTask.emit($event)" (deleteTask)="deleteTask.emit($event)" (toggleHidden)="toggleHidden.emit($event)" (changeStatus)="changeStatus.emit($event)" (taskUpdated)="taskUpdated.emit($event)"></app-timeline-svg>
       </div>
 
       <!-- Sincronización Compacta -->
@@ -378,6 +378,7 @@ export class BoardViewComponent {
   @Output() deleteTask = new EventEmitter<Task>();
   @Output() toggleHidden = new EventEmitter<Task>();
   @Output() changeStatus = new EventEmitter<{ task: Task; status: 'pending' | 'in-progress' | 'completed' }>();
+  @Output() taskUpdated = new EventEmitter<Task>();
   @Output() taskContextMenu = new EventEmitter<{ mouseEvent: MouseEvent; task: Task }>();
   @Output() taskQuickContextMenu = new EventEmitter<{ mouseEvent: MouseEvent; task: Task }>();
   @Output() environmentContextMenu = new EventEmitter<{ mouseEvent: MouseEvent; environment: Environment }>();

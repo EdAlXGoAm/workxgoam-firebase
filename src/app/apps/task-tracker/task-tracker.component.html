@@ -86,6 +86,7 @@
         (deleteTask)="deleteTaskFromTimeline($event)"
         (toggleHidden)="toggleHidden($event)"
         (changeStatus)="changeStatus($event.task, $event.status)"
+        (taskUpdated)="onTaskTimeUpdated($event)"
         (moveEnvironmentUp)="moveEnvironmentUp($event)"
         (moveEnvironmentDown)="moveEnvironmentDown($event)"
         (taskContextMenu)="onTaskContextMenu($event.mouseEvent, $event.task)"
@@ -116,6 +117,7 @@
         [orderSyncMessageType]="orderSyncMessageType"
         (editTask)="editTask($event)"
         (deleteTask)="deleteTaskFromTimeline($event)"
+        (taskUpdated)="onTaskTimeUpdated($event)"
         (moveEnvironmentUp)="moveEnvironmentUp($event)"
         (moveEnvironmentDown)="moveEnvironmentDown($event)"
         (taskContextMenu)="onTaskContextMenu($event.mouseEvent, $event.task)"
@@ -741,7 +743,8 @@
                 (editTask)="editTask($event)"
                 (deleteTask)="deleteTaskFromTimeline($event)"
                 (toggleHidden)="toggleHidden($event)"
-                (changeStatus)="changeStatus($event.task, $event.status)">
+                (changeStatus)="changeStatus($event.task, $event.status)"
+                (taskUpdated)="onTaskTimeUpdated($event)">
               </app-week-timeline-svg>
             </div>
           </div>

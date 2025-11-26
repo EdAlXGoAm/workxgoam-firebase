@@ -1,0 +1,429 @@
+.week-timeline-container {
+  padding: 8px;
+  background: #f9fafb;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  position: relative;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Estilos para el toggle de modo de coloreado */
+.color-mode-toggle {
+  backdrop-filter: blur(10px);
+}
+
+.toggle-button {
+  background: linear-gradient(135deg, #e5e7eb 0%, #f3f4f6 100%);
+  color: #6b7280;
+  border: 2px solid transparent;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.toggle-button:active {
+  transform: translateY(0);
+}
+
+.toggle-button.active-environment {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  color: #1e40af;
+  border-color: #3b82f6;
+}
+
+.toggle-button.active-tasktype {
+  background: linear-gradient(135deg, #ddd6fe 0%, #c4b5fd 100%);
+  color: #5b21b6;
+  border-color: #8b5cf6;
+}
+
+.toggle-button i {
+  font-size: 14px;
+}
+
+@media (max-width: 640px) {
+  .toggle-button {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  
+  .toggle-button span {
+    font-size: 11px;
+  }
+  
+  .toggle-button i {
+    font-size: 12px;
+  }
+}
+
+.week-timeline-svg {
+  display: block;
+  background: #f9fafb;
+  border-radius: 12px;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.week-timeline-svg text,
+.week-timeline-svg rect,
+.week-timeline-svg circle {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.week-timeline-svg text {
+  pointer-events: none;
+}
+
+/* Estilos para rectángulos de tareas con gestos */
+.task-rect {
+  transition: filter 0.15s ease;
+}
+
+.task-rect:hover {
+  filter: brightness(1.05);
+}
+
+/* Elementos internos de tarea - no capturan eventos */
+.task-inner,
+.task-type-indicator,
+.task-text {
+  pointer-events: none;
+}
+
+/* ========================================
+   CLASES DE CURSOR (aplicadas por GestureService)
+   ======================================== */
+
+/* Cursor grab (mano abierta) - por defecto para mover */
+.task-rect.cursor-grab {
+  cursor: grab !important;
+}
+
+/* Cursor grabbing (mano cerrada) - durante arrastre */
+.task-rect.cursor-grabbing {
+  cursor: grabbing !important;
+}
+
+/* Cursor resize horizontal (flechas izq/der) */
+.task-rect.cursor-resize-h {
+  cursor: ew-resize !important;
+}
+
+/* Cursor resize vertical (flechas arriba/abajo) - para cambiar duración */
+.task-rect.cursor-resize-v {
+  cursor: ns-resize !important;
+}
+
+/* ========================================
+   HANDLES VISUALES DE RESIZE
+   ======================================== */
+
+/* Handles en los bordes de las tareas */
+.resize-handle {
+  pointer-events: auto;
+  cursor: ns-resize;
+  opacity: 0.3;
+  transition: opacity 0.2s ease, fill 0.2s ease;
+}
+
+.resize-handle:hover {
+  opacity: 1 !important;
+  fill: rgba(99, 102, 241, 0.6) !important;
+}
+
+.resize-handle-line {
+  pointer-events: none;
+  opacity: 0.3;
+  transition: opacity 0.2s ease, stroke 0.2s ease;
+}
+
+/* Cuando el mouse está sobre el grupo de tarea, hacer líneas más visibles */
+.task-group:hover .resize-handle-line {
+  opacity: 0.6;
+  stroke: rgba(0,0,0,0.5);
+}
+
+/* Cuando se hace hover en el handle, la línea también se resalta */
+.resize-handle:hover + .resize-handle-line {
+  opacity: 1 !important;
+  stroke: rgba(99, 102, 241, 0.9) !important;
+  stroke-width: 2px !important;
+}
+
+.week-navigation {
+  backdrop-filter: blur(10px);
+}
+
+.nav-btn {
+  user-select: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.nav-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.nav-btn:active {
+  transform: translateY(0);
+}
+
+.week-display {
+  min-width: 200px;
+  text-align: center;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+}
+
+.date-picker {
+  min-width: 120px;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+}
+
+.week-timeline-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.week-timeline-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.week-timeline-container::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.week-timeline-container::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+.week-timeline-container {
+  scrollbar-width: thin;
+  scrollbar-color: #c1c1c1 #f1f1f1;
+}
+
+.tooltip-container {
+  animation: fadeIn 0.3s ease-in-out;
+  pointer-events: none;
+  z-index: 1000;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* Cursor pointer para elementos clickeables (NO tareas) */
+.cursor-pointer:not(.task-rect):not(.task-inner) {
+  cursor: pointer;
+}
+
+/* Efecto hover para elementos clickeables (NO tareas - tienen su propio efecto) */
+.cursor-pointer:not(.task-rect):not(.task-inner):hover {
+  opacity: 0.9;
+  filter: brightness(1.1);
+}
+
+.svg-container {
+  width: 100%;
+  display: flex;
+  justify-content: flex-start;
+  min-width: fit-content;
+}
+
+.week-timeline-svg {
+  flex-shrink: 0;
+  display: block;
+}
+
+@media (min-width: 1280px) {
+  .svg-container {
+    justify-content: center;
+  }
+}
+
+/* Asegurar que en pantallas pequeñas el scroll funcione desde el inicio */
+@media (max-width: 1279px) {
+  .svg-container {
+    justify-content: flex-start;
+  }
+}
+
+.context-menu {
+  position: fixed;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 10000;
+  min-width: 200px;
+  max-width: 280px;
+  overflow: hidden;
+  animation: contextMenuFadeIn 0.15s ease-out;
+}
+
+@keyframes contextMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.context-menu-header {
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  max-width: 100%;
+}
+
+.context-menu-header .truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.context-menu-divider {
+  height: 1px;
+  background: #e5e7eb;
+}
+
+.context-menu-item {
+  width: 100%;
+  padding: 12px 16px;
+  text-align: left;
+  border: none;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  color: #374151;
+  transition: background-color 0.15s ease;
+}
+
+.context-menu-item:hover {
+  background: #f3f4f6;
+}
+
+.context-menu-item.delete {
+  color: #ef4444;
+}
+
+.context-menu-item.delete:hover {
+  background: #fef2f2;
+}
+
+.context-menu-item.completed,
+.context-menu-item-completed {
+  color: #10b981;
+}
+
+.context-menu-item.completed:hover,
+.context-menu-item-completed:hover {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.context-menu-item.progress,
+.context-menu-item-progress {
+  color: #f59e0b;
+}
+
+.context-menu-item.progress:hover,
+.context-menu-item-progress:hover {
+  background: #fffbeb;
+  color: #d97706;
+}
+
+.context-menu-item.pending,
+.context-menu-item-pending {
+  color: #3b82f6;
+}
+
+.context-menu-item.pending:hover,
+.context-menu-item-pending:hover {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.context-menu-item i {
+  width: 20px;
+  text-align: center;
+}
+
+/* Estilos para tareas ocultas */
+.task-hidden {
+  opacity: 0.5;
+}
+
+.task-hidden text {
+  fill: #888 !important;
+}
+
+/* Estilos para resplandor de tareas overdue */
+.task-overdue {
+  filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.6)) drop-shadow(0 0 4px rgba(239, 68, 68, 0.5)) drop-shadow(0 0 6px rgba(239, 68, 68, 0.4));
+  animation: overdue-pulse 1.5s infinite;
+}
+
+@keyframes overdue-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.6)) drop-shadow(0 0 4px rgba(239, 68, 68, 0.5)) drop-shadow(0 0 6px rgba(239, 68, 68, 0.4));
+  }
+  50% {
+    filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 5px rgba(255, 255, 255, 0.7)) drop-shadow(0 0 8px rgba(255, 255, 255, 0.5));
+  }
+}
+
+/* Estilos para resplandor de tareas running */
+.task-running {
+  filter: drop-shadow(0 0 2px rgba(16, 185, 129, 0.6)) drop-shadow(0 0 4px rgba(16, 185, 129, 0.5)) drop-shadow(0 0 6px rgba(16, 185, 129, 0.4));
+  animation: running-pulse 1.5s infinite;
+}
+
+@keyframes running-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 2px rgba(16, 185, 129, 0.6)) drop-shadow(0 0 4px rgba(16, 185, 129, 0.5)) drop-shadow(0 0 6px rgba(16, 185, 129, 0.4));
+  }
+  50% {
+    filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 5px rgba(255, 255, 255, 0.7)) drop-shadow(0 0 8px rgba(255, 255, 255, 0.5));
+  }
+}
+
+@media (max-width: 640px) {
+  .context-menu {
+    min-width: 180px;
+    max-width: calc(100vw - 32px);
+  }
+}
+
