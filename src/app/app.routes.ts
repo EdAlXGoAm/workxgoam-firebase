@@ -52,6 +52,11 @@ export const routes: Routes = [
     canActivate: [authGuard]
   },
   { 
+    path: 'apps/reel-downloader', 
+    loadComponent: () => import('./apps/reel-downloader/reel-downloader.component').then(m => m.ReelDownloaderComponent),
+    canActivate: [authGuard]
+  },
+  { 
     path: '', 
     canActivate: [rootRedirectGuard],
     component: HomeComponent

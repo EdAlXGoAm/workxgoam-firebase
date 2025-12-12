@@ -405,7 +405,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
             this.showTaskSelectorMenu(overlappingItems, event.endX, event.endY, dayIndex);
           } else {
             // Mostrar tooltip si solo hay una tarea
-            this.showTaskTooltip(task);
+          this.showTaskTooltip(task);
           }
           break;
 
@@ -1188,7 +1188,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     if (this.shouldShowAsHidden(item)) {
       return '0.4';
     }
-    return this.hasIntersection(item, dayIndex) ? '0.8' : '1';
+    return this.hasIntersection(item, dayIndex) ? '0.6' : '1';
   }
 
   closeContextMenu(): void {

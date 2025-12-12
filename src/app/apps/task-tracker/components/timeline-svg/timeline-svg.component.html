@@ -91,6 +91,7 @@
            [class.task-overdue]="isTaskOverdue(item.task)"
            [class.task-running]="isTaskRunning(item.task)"
            [class.task-hidden]="shouldShowAsHidden(item)"
+           [class.task-overlapping]="hasIntersection(item, 0)"
            class="task-group">
           <!-- Borde negro exterior -->
           <rect #taskRect
@@ -174,6 +175,7 @@
            [class.task-overdue]="isTaskOverdue(item.task)"
            [class.task-running]="isTaskRunning(item.task)"
            [class.task-hidden]="shouldShowAsHidden(item)"
+           [class.task-overlapping]="hasIntersection(item, 1)"
            class="task-group">
           <!-- Borde negro exterior -->
           <rect #taskRect
@@ -257,6 +259,7 @@
            [class.task-overdue]="isTaskOverdue(item.task)"
            [class.task-running]="isTaskRunning(item.task)"
            [class.task-hidden]="shouldShowAsHidden(item)"
+           [class.task-overlapping]="hasIntersection(item, 2)"
            class="task-group">
           <!-- Borde negro exterior -->
           <rect #taskRect

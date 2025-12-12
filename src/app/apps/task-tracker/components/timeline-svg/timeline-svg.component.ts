@@ -325,7 +325,7 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
             this.showTaskSelectorMenu(overlappingItems, event.endX, event.endY, section);
           } else {
             // Mostrar tooltip si solo hay una tarea
-            this.showTaskTooltip(task);
+          this.showTaskTooltip(task);
           }
           break;
 
@@ -1443,7 +1443,7 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     if (this.shouldShowAsHidden(item)) {
       return '0.4';
     }
-    return this.hasIntersection(item, sectionIndex) ? '0.8' : '1';
+    return this.hasIntersection(item, sectionIndex) ? '0.6' : '1';
   }
 
   closeContextMenu(): void {
