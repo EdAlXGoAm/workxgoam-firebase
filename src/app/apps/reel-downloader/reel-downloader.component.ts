@@ -148,27 +148,53 @@ interface Platform {
               />
             </div>
 
-            <!-- Botón de descarga -->
-            <button 
-              (click)="downloadVideo()"
-              [disabled]="isLoading || !videoUrl.trim()"
-              class="w-full py-4 px-6 bg-white font-bold text-lg rounded-2xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-3"
-              [style.color]="getButtonTextColor()"
-            >
-              <ng-container *ngIf="!isLoading">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                </svg>
-                Descargar Video
-              </ng-container>
-              <ng-container *ngIf="isLoading">
-                <svg class="w-6 h-6 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                {{ statusMessage }}
-              </ng-container>
-            </button>
+            <!-- Botones: Guardar en la nube + Descargar -->
+            <div class="flex gap-3">
+              <button
+                (click)="saveToCloud()"
+                [disabled]="isLoading || !videoUrl.trim()"
+                class="flex-1 py-4 px-4 bg-white/20 hover:bg-white/30 border border-white/30 text-white font-bold text-base rounded-2xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-3"
+                title="Guarda el video y el link en tu cuenta (no lo descarga al dispositivo)"
+              >
+                <ng-container *ngIf="!isLoading">
+                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h10a4 4 0 000-8 5 5 0 00-9.9-1A4 4 0 003 15z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 13v6"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.5 16.5L12 13l3.5 3.5"></path>
+                  </svg>
+                  Guardar en la nube
+                </ng-container>
+                <ng-container *ngIf="isLoading">
+                  <svg class="w-6 h-6 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  {{ statusMessage }}
+                </ng-container>
+              </button>
+
+              <button 
+                (click)="downloadVideo()"
+                [disabled]="isLoading || !videoUrl.trim()"
+                class="flex-1 py-4 px-4 bg-white font-bold text-base rounded-2xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-3"
+                [style.color]="getButtonTextColor()"
+                title="Descarga el video al dispositivo (no lo guarda en la nube)"
+              >
+                <ng-container *ngIf="!isLoading">
+                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                  </svg>
+                  Descargar
+                </ng-container>
+                <ng-container *ngIf="isLoading">
+                  <svg class="w-6 h-6 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  {{ statusMessage }}
+                </ng-container>
+              </button>
+            </div>
 
             <!-- Progress bar -->
             <div *ngIf="isLoading" class="mt-4">
@@ -933,18 +959,8 @@ export class ReelDownloaderComponent {
       this.progress = 100;
       this.successMessage = `¡Video descargado! (${(blob.size / 1024 / 1024).toFixed(2)} MB)`;
 
-      // Guardado por usuario (si hay sesión ZonaYummy)
-      if (this.isZyLoggedIn) {
-        this.statusMessage = 'Guardando en tu cuenta...';
-        try {
-          await this.saveToZonayummyAccount(blob, originalUrl, this.selectedPlatform);
-          this.successMessage = `¡Video descargado y guardado! (${(blob.size / 1024 / 1024).toFixed(2)} MB)`;
-        } catch (saveErr: any) {
-          console.warn('No se pudo guardar en ZonaYummy:', saveErr);
-          this.successMessage = `¡Video descargado! (No se pudo guardar en tu cuenta)`;
-        }
-      } else {
-        // Modo invitado: historial local
+      // Historial local (solo invitado). En sesión, el guardado se hace con "Guardar en la nube".
+      if (!this.isZyLoggedIn) {
         this.addToHistory(originalUrl, this.selectedPlatform);
       }
       
@@ -955,6 +971,85 @@ export class ReelDownloaderComponent {
     } catch (error: any) {
       console.error('Error:', error);
       this.errorMessage = error.message || 'Error descargando el video. Intenta de nuevo.';
+    } finally {
+      this.isLoading = false;
+      this.progress = 0;
+      this.statusMessage = '';
+    }
+  }
+
+  /**
+   * Descarga el video (como blob) y lo guarda en la nube (Blob + Cosmos),
+   * sin descargarlo al dispositivo.
+   */
+  async saveToCloud() {
+    const originalUrl = (this.videoUrl || '').trim();
+    if (!originalUrl) {
+      this.errorMessage = 'Por favor ingresa una URL válida';
+      return;
+    }
+
+    if (!this.currentPlatform.urlPattern.test(originalUrl)) {
+      this.errorMessage = `URL inválida para ${this.currentPlatform.name}. Ejemplo: ${this.currentPlatform.placeholder}`;
+      return;
+    }
+
+    if (!this.isZyLoggedIn) {
+      // En modo invitado no guardamos en backend
+      this.openLogin();
+      return;
+    }
+
+    this.isLoading = true;
+    this.progress = 0;
+    this.errorMessage = '';
+    this.successMessage = '';
+    this.statusMessage = 'Conectando...';
+
+    try {
+      this.simulateProgress(0, 30, `Obteniendo video de ${this.currentPlatform.name}...`);
+
+      const apiUrl = `${this.BASE_API_URL}/${this.currentPlatform.endpoint}`;
+      console.log(`☁️🚀 Enviando petición a: ${apiUrl}`, { url: originalUrl });
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: originalUrl }),
+      });
+
+      console.log(`☁️📥 Respuesta recibida: ${response.status} ${response.statusText}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData: any = {};
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText };
+        }
+        throw new Error(errorData.error || 'Error descargando el video');
+      }
+
+      this.progress = 60;
+      this.statusMessage = 'Descargando en memoria...';
+
+      const blob = await response.blob();
+      console.log(`☁️📦 Blob recibido: ${blob.size} bytes, type: ${blob.type}`);
+
+      this.progress = 75;
+      this.statusMessage = 'Subiendo a la nube...';
+
+      await this.saveToZonayummyAccount(blob, originalUrl, this.selectedPlatform);
+
+      this.progress = 100;
+      this.successMessage = `✅ Guardado en la nube (${(blob.size / 1024 / 1024).toFixed(2)} MB)`;
+
+      setTimeout(() => {
+        this.videoUrl = '';
+      }, 1500);
+    } catch (error: any) {
+      console.error('Error:', error);
+      this.errorMessage = error.message || 'Error guardando en la nube. Intenta de nuevo.';
     } finally {
       this.isLoading = false;
       this.progress = 0;
