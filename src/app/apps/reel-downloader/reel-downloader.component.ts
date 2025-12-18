@@ -605,6 +605,31 @@ export class ReelDownloaderComponent {
   // Modal de edición
   editingItem: ZonayummyReelHistoryItem | null = null;
   isEditModalOpen = false;
+  
+  private bumpLabelUsage(labelId: string, delta: number) {
+    if (!labelId) return;
+    const idx = this.zyLabels.findIndex(l => l.id === labelId);
+    if (idx < 0) return;
+    const current = Number(this.zyLabels[idx]?.usageCount ?? 0);
+    const next = Math.max(0, current + delta);
+    this.zyLabels[idx] = { ...this.zyLabels[idx], usageCount: next };
+    // Trigger change detection
+    this.zyLabels = [...this.zyLabels];
+  }
+
+  private applyLabelUsageDiff(prevLabelIds: string[] = [], nextLabelIds: string[] = []) {
+    const prev = new Set((prevLabelIds || []).filter(Boolean));
+    const next = new Set((nextLabelIds || []).filter(Boolean));
+
+    // Added
+    for (const id of next) {
+      if (!prev.has(id)) this.bumpLabelUsage(id, +1);
+    }
+    // Removed
+    for (const id of prev) {
+      if (!next.has(id)) this.bumpLabelUsage(id, -1);
+    }
+  }
 
   platforms: Platform[] = [
     {
@@ -757,6 +782,9 @@ export class ReelDownloaderComponent {
     // Actualizar el item en la lista local
     const idx = this.zyHistory.findIndex(h => h.id === updatedItem.id);
     if (idx >= 0) {
+      const prevLabelIds = this.zyHistory[idx]?.labelIds || [];
+      const nextLabelIds = updatedItem?.labelIds || [];
+      this.applyLabelUsageDiff(prevLabelIds, nextLabelIds);
       this.zyHistory[idx] = { ...this.zyHistory[idx], ...updatedItem };
       this.zyHistory = [...this.zyHistory]; // Trigger change detection
     }
@@ -814,6 +842,7 @@ export class ReelDownloaderComponent {
     if (!this.deleteConfirmItem) return;
 
     const downloadId = this.deleteConfirmItem.id;
+    const prevLabelIds = this.deleteConfirmItem.labelIds || [];
     this.deletingId = downloadId;
     this.deleteError = '';
 
@@ -822,6 +851,8 @@ export class ReelDownloaderComponent {
       if (result.ok) {
         // Eliminar de la lista local
         this.zyHistory = this.zyHistory.filter(h => h.id !== downloadId);
+        // Ajustar usageCount de etiquetas por eliminación de item
+        for (const id of prevLabelIds) this.bumpLabelUsage(id, -1);
         this.deleteConfirmItem = null;
       } else {
         this.deleteError = result.error || 'Error al eliminar';
