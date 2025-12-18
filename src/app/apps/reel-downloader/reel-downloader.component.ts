@@ -1003,6 +1003,27 @@ export class ReelDownloaderComponent {
       throw new Error(created.error || 'Error guardando el registro');
     }
 
+    // Generar thumbnail en background (no esperar)
+    this.zyHistoryService.generateThumbnail(upload.downloadId)
+      .then((res: { ok: boolean; thumbnailPath?: string; thumbnailUrlWithSas?: string | null; existed?: boolean; error?: string }) => {
+        if (!res.ok || !res.thumbnailPath) {
+          console.warn('⚠️ No se pudo generar thumbnail:', res.error);
+          return;
+        }
+        console.log('📸 Thumbnail generado:', res.thumbnailPath);
+        // Actualizar el item en la lista local si ya está cargada
+        const idx = this.zyHistory.findIndex(h => h.id === upload.downloadId);
+        if (idx >= 0) {
+          this.zyHistory[idx] = { 
+            ...this.zyHistory[idx], 
+            thumbnailPath: res.thumbnailPath,
+            thumbnailUrlWithSas: res.thumbnailUrlWithSas || undefined
+          };
+          this.zyHistory = [...this.zyHistory]; // Trigger change detection
+        }
+      })
+      .catch(err => console.warn('⚠️ Error generando thumbnail:', err));
+
     this.isHistoryOpen = true;
     await this.refreshZyHistory();
   }

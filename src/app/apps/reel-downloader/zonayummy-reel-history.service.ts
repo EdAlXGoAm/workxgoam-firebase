@@ -152,7 +152,7 @@ export class ZonayummyReelHistoryService {
     }
   }
 
-  async generateThumbnail(downloadId: string): Promise<{ ok: true; thumbnailPath: string; existed: boolean } | { ok: false; error: string }> {
+  async generateThumbnail(downloadId: string): Promise<{ ok: true; thumbnailPath: string; thumbnailUrlWithSas: string | null; existed: boolean } | { ok: false; error: string }> {
     try {
       const res = await fetch(`${this.auth.apiBaseUrl}/reel-downloader/user-links/${encodeURIComponent(downloadId)}/thumbnail`, {
         method: 'POST',
@@ -160,7 +160,7 @@ export class ZonayummyReelHistoryService {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) return { ok: false, error: json?.error || `Error (${res.status})` };
-      return { ok: true, thumbnailPath: json.thumbnailPath, existed: json.existed };
+      return { ok: true, thumbnailPath: json.thumbnailPath, thumbnailUrlWithSas: json.thumbnailUrlWithSas || null, existed: json.existed };
     } catch (e: any) {
       return { ok: false, error: e?.message || 'Error generando thumbnail' };
     }
