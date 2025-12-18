@@ -2,7 +2,11 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environments/environment';
+import { ZonayummyAuthService } from './zonayummy-auth.service';
+import { ZonayummyReelHistoryItem, ZonayummyReelHistoryService, ZonayummyFolder, ZonayummyLabel } from './zonayummy-reel-history.service';
+import { ZonayummyLoginModalComponent } from './zonayummy-login-modal.component';
+import { ReelItemEditModalComponent } from './reel-item-edit-modal.component';
 
 interface Platform {
   id: string;
@@ -18,7 +22,7 @@ interface Platform {
 @Component({
   selector: 'app-reel-downloader',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, ZonayummyLoginModalComponent, ReelItemEditModalComponent],
   template: `
     <div 
       class="min-h-screen relative overflow-hidden transition-all duration-500"
@@ -53,6 +57,41 @@ interface Platform {
             <p class="text-white/80 text-base font-light">
               Descarga videos de tus redes favoritas
             </p>
+
+            <!-- Login ZonaYummy / modo invitado -->
+            <div class="mt-4 flex flex-col items-center gap-2">
+              <div *ngIf="!isZyLoggedIn" class="text-white/80 text-sm">
+                Modo invitado: puedes descargar, pero no se guardará el link ni el video.
+              </div>
+              <div *ngIf="isZyLoggedIn" class="text-white/80 text-sm">
+                Sesión ZonaYummy: <span class="font-semibold text-white">{{ zyUsername || 'Usuario' }}</span>
+              </div>
+              <div class="flex flex-wrap items-center justify-center gap-2">
+                <button
+                  *ngIf="!isZyLoggedIn"
+                  (click)="openLogin()"
+                  class="px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 border border-white/30 text-white text-sm font-semibold transition"
+                >
+                  Iniciar sesión para guardar
+                </button>
+
+                <button
+                  *ngIf="isZyLoggedIn"
+                  (click)="toggleHistory()"
+                  class="px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 border border-white/30 text-white text-sm font-semibold transition"
+                >
+                  {{ isHistoryOpen ? 'Ocultar historial' : 'Ver historial' }}
+                </button>
+
+                <button
+                  *ngIf="isZyLoggedIn"
+                  (click)="logoutZy()"
+                  class="px-4 py-2 rounded-xl bg-black/30 hover:bg-black/40 border border-white/20 text-white text-sm font-semibold transition"
+                >
+                  Cerrar sesión
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </header>
@@ -188,10 +227,10 @@ interface Platform {
             </div>
           </div>
 
-          <!-- Historial de descargas -->
-          <div *ngIf="downloadHistory.length > 0" class="mt-6">
+          <!-- Historial de descargas (modo invitado) -->
+          <div *ngIf="!isZyLoggedIn && downloadHistory.length > 0" class="mt-6">
             <div class="flex items-center justify-between mb-3">
-              <h3 class="text-white font-semibold">Descargas recientes</h3>
+              <h3 class="text-white font-semibold">Descargas recientes (invitado)</h3>
               <button 
                 (click)="clearHistory()"
                 class="text-white/50 hover:text-white text-xs transition"
@@ -235,6 +274,233 @@ interface Platform {
           Solo funciona con videos públicos • Usa con responsabilidad
         </p>
       </footer>
+
+      <!-- Panel lateral: historial ZonaYummy -->
+      <div *ngIf="isZyLoggedIn && isHistoryOpen" class="fixed inset-0 z-20 md:hidden bg-black/40" (click)="isHistoryOpen = false"></div>
+      <aside
+        *ngIf="isZyLoggedIn"
+        class="fixed top-0 left-0 bottom-0 z-30 w-[340px] max-w-[90vw] bg-white/95 backdrop-blur-xl shadow-2xl border-r border-white/40 transition-transform duration-300"
+        [class.-translate-x-full]="!isHistoryOpen"
+      >
+        <div class="p-4 border-b flex items-center justify-between">
+          <div>
+            <div class="text-sm font-black text-gray-900">Historial</div>
+            <div class="text-xs text-gray-500">Links + videos guardados</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              class="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-xs font-bold"
+              (click)="refreshZyHistory()"
+              [disabled]="zyHistoryLoading"
+            >
+              {{ zyHistoryLoading ? '...' : 'Actualizar' }}
+            </button>
+            <button class="text-gray-500 hover:text-gray-900 text-xl leading-none" (click)="isHistoryOpen = false" aria-label="Cerrar panel">×</button>
+          </div>
+        </div>
+
+        <!-- Carpetas -->
+        <div class="px-4 py-2 border-b bg-gray-50/50" *ngIf="zyFolders.length > 0 || !zyHistoryLoading">
+          <div class="text-xs font-semibold text-gray-500 mb-2">CARPETAS</div>
+          <div class="flex flex-wrap gap-1">
+            <button
+              class="px-2 py-1 rounded-lg text-xs font-medium transition"
+              [class.bg-indigo-100]="selectedFolderId === null"
+              [class.text-indigo-700]="selectedFolderId === null"
+              [class.bg-gray-100]="selectedFolderId !== null"
+              [class.text-gray-600]="selectedFolderId !== null"
+              [class.hover:bg-gray-200]="selectedFolderId !== null"
+              (click)="selectFolder(null)"
+            >
+              📋 Todos ({{ zyHistory.length }})
+            </button>
+            <button
+              *ngFor="let folder of zyFolders"
+              class="px-2 py-1 rounded-lg text-xs font-medium transition"
+              [class.bg-indigo-100]="selectedFolderId === folder.id"
+              [class.text-indigo-700]="selectedFolderId === folder.id"
+              [class.bg-gray-100]="selectedFolderId !== folder.id"
+              [class.text-gray-600]="selectedFolderId !== folder.id"
+              [class.hover:bg-gray-200]="selectedFolderId !== folder.id"
+              (click)="selectFolder(folder.id)"
+            >
+              {{ folder.icon || '📁' }} {{ folder.name }}
+            </button>
+          </div>
+        </div>
+
+        <div class="p-4 overflow-y-auto" style="max-height: calc(100vh - 180px);">
+          <div *ngIf="zyHistoryError" class="mb-3 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
+            {{ zyHistoryError }}
+          </div>
+          <div *ngIf="zyHistoryLoading" class="text-sm text-gray-500">Cargando historial...</div>
+
+          <div *ngIf="!zyHistoryLoading && filteredZyHistory.length === 0" class="text-sm text-gray-500">
+            {{ zyHistory.length === 0 ? 'Aún no tienes descargas guardadas.' : 'No hay descargas en esta carpeta.' }}
+          </div>
+
+          <div class="space-y-2" *ngIf="filteredZyHistory.length > 0">
+            <div *ngFor="let it of filteredZyHistory" class="p-3 rounded-2xl bg-gray-50 border border-gray-200 hover:border-gray-300 transition">
+              <div class="flex items-start gap-3">
+                <!-- Thumbnail o ícono de plataforma -->
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden" [style.background]="getPlatformGradient(it.platform)">
+                  <img *ngIf="it.thumbnailUrlWithSas" [src]="it.thumbnailUrlWithSas" class="w-full h-full object-cover" alt="Thumbnail" />
+                  <div *ngIf="!it.thumbnailUrlWithSas" class="w-5 h-5 text-white" [innerHTML]="getPlatformIcon(it.platform)"></div>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <!-- Título o URL -->
+                  <div class="text-sm font-medium text-gray-900 truncate">
+                    {{ it.title || it.url }}
+                  </div>
+                  <div *ngIf="it.title" class="text-xs text-gray-500 truncate">{{ it.url }}</div>
+                  <div class="text-xs text-gray-400 mt-0.5">{{ it.createdAt | date:'short' }}</div>
+
+                  <!-- Etiquetas -->
+                  <div class="flex flex-wrap gap-1 mt-1" *ngIf="getItemLabels(it).length > 0">
+                    <span
+                      *ngFor="let label of getItemLabels(it)"
+                      class="px-1.5 py-0.5 rounded text-[10px] font-medium"
+                      [style.backgroundColor]="label.color"
+                      [style.color]="getContrastColor(label.color)"
+                    >
+                      {{ label.name }}
+                    </span>
+                  </div>
+
+                  <!-- Descripción -->
+                  <div *ngIf="it.description" class="text-xs text-gray-600 mt-1 line-clamp-2">
+                    {{ it.description }}
+                  </div>
+
+                  <!-- Acciones -->
+                  <div class="mt-2 flex items-center gap-1.5 flex-wrap">
+                    <button
+                      class="px-2 py-1.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-100 text-xs font-medium flex items-center gap-1"
+                      (click)="copyToClipboard(it.url)"
+                      title="Copiar link"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                      </svg>
+                      Copiar
+                    </button>
+                    <button
+                      class="px-2 py-1.5 rounded-lg bg-gray-900 hover:bg-black text-white text-xs font-medium"
+                      [disabled]="!it.downloadUrlWithSas"
+                      (click)="downloadFromHistory(it)"
+                      title="Descargar video"
+                    >
+                      Descargar
+                    </button>
+                    <button
+                      class="p-1.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-100 text-gray-600 transition"
+                      (click)="openEditModal(it)"
+                      title="Editar"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                      </svg>
+                    </button>
+                    <button
+                      class="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 hover:text-red-700 transition"
+                      (click)="confirmDeleteItem(it)"
+                      title="Eliminar"
+                      [disabled]="deletingId === it.id"
+                    >
+                      <svg *ngIf="deletingId !== it.id" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                      </svg>
+                      <svg *ngIf="deletingId === it.id" class="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Modal de confirmación de eliminación -->
+      <div
+        *ngIf="deleteConfirmItem"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+        (click)="cancelDelete()"
+      >
+        <div
+          class="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4"
+          (click)="$event.stopPropagation()"
+        >
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+              <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="font-bold text-gray-900">¿Eliminar descarga?</h3>
+              <p class="text-sm text-gray-500">Esta acción no se puede deshacer</p>
+            </div>
+          </div>
+
+          <div class="bg-gray-50 rounded-xl p-3 mb-4">
+            <p class="text-xs text-gray-500 mb-1">{{ getPlatformName(deleteConfirmItem.platform) }}</p>
+            <p class="text-sm text-gray-700 break-all line-clamp-2">{{ deleteConfirmItem.url }}</p>
+          </div>
+
+          <p class="text-sm text-gray-600 mb-4">
+            Se eliminará el registro y el archivo de video del servidor.
+          </p>
+
+          <div class="flex gap-3">
+            <button
+              class="flex-1 px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-sm transition"
+              (click)="cancelDelete()"
+            >
+              Cancelar
+            </button>
+            <button
+              class="flex-1 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-sm transition flex items-center justify-center gap-2"
+              (click)="executeDelete()"
+              [disabled]="deletingId"
+            >
+              <svg *ngIf="deletingId" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
+              {{ deletingId ? 'Eliminando...' : 'Eliminar' }}
+            </button>
+          </div>
+
+          <div *ngIf="deleteError" class="mt-3 p-2 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+            {{ deleteError }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Login ZonaYummy -->
+      <app-zonayummy-login-modal
+        [isOpen]="isLoginOpen"
+        (closed)="isLoginOpen = false"
+        (loggedIn)="onZyLoggedIn()"
+      />
+
+      <!-- Modal de edición de item -->
+      <app-reel-item-edit-modal
+        [isOpen]="isEditModalOpen"
+        [item]="editingItem"
+        [folders]="zyFolders"
+        [labels]="zyLabels"
+        (closed)="closeEditModal()"
+        (saved)="onItemSaved($event)"
+        (folderCreated)="onFolderCreated($event)"
+        (labelsCreated)="onLabelsCreated($event)"
+      />
     </div>
   `,
   styles: [`
@@ -290,7 +556,29 @@ export class ReelDownloaderComponent {
   selectedPlatform = 'instagram';
   downloadHistory: { url: string; date: Date; platform: string }[] = [];
 
-  private readonly BASE_API_URL = 'https://functions.zonayummy.com/api';
+  private readonly BASE_API_URL = environment.zonayummyFunctionsUrl || 'https://functions.zonayummy.com/api';
+
+  // Auth + historial ZonaYummy
+  isLoginOpen = false;
+  isHistoryOpen = false;
+  zyHistory: ZonayummyReelHistoryItem[] = [];
+  zyHistoryLoading = false;
+  zyHistoryError = '';
+  zyUsername: string = '';
+
+  // Eliminación
+  deleteConfirmItem: ZonayummyReelHistoryItem | null = null;
+  deletingId: string | null = null;
+  deleteError = '';
+
+  // Carpetas y etiquetas
+  zyFolders: ZonayummyFolder[] = [];
+  zyLabels: ZonayummyLabel[] = [];
+  selectedFolderId: string | null = null; // Carpeta seleccionada para filtrar
+
+  // Modal de edición
+  editingItem: ZonayummyReelHistoryItem | null = null;
+  isEditModalOpen = false;
 
   platforms: Platform[] = [
     {
@@ -335,8 +623,199 @@ export class ReelDownloaderComponent {
     }
   ];
 
-  constructor(private http: HttpClient) {
+  constructor(
+    private zyAuth: ZonayummyAuthService,
+    private zyHistoryService: ZonayummyReelHistoryService
+  ) {
     this.loadHistory();
+    this.zyUsername = this.zyAuth.getUsername() || '';
+    if (this.isZyLoggedIn) {
+      this.isHistoryOpen = true;
+      this.refreshZyHistory();
+    }
+  }
+
+  get isZyLoggedIn(): boolean {
+    return this.zyAuth.isLoggedIn();
+  }
+
+  openLogin() {
+    this.isLoginOpen = true;
+  }
+
+  toggleHistory() {
+    this.isHistoryOpen = !this.isHistoryOpen;
+    if (this.isHistoryOpen) this.refreshZyHistory();
+  }
+
+  onZyLoggedIn() {
+    this.zyUsername = this.zyAuth.getUsername() || 'Usuario';
+    this.isHistoryOpen = true;
+    this.refreshZyHistory();
+  }
+
+  logoutZy() {
+    this.zyAuth.logout();
+    this.zyUsername = '';
+    this.zyHistory = [];
+    this.zyHistoryError = '';
+    this.isHistoryOpen = false;
+  }
+
+  async refreshZyHistory() {
+    if (!this.isZyLoggedIn) return;
+    this.zyHistoryLoading = true;
+    this.zyHistoryError = '';
+    
+    // Cargar historial, carpetas y etiquetas en paralelo
+    const [historyRes, foldersRes, labelsRes] = await Promise.all([
+      this.zyHistoryService.list(),
+      this.zyHistoryService.listFolders(),
+      this.zyHistoryService.listLabels(),
+    ]);
+
+    if (historyRes.ok) {
+      this.zyHistory = historyRes.items || [];
+    } else {
+      this.zyHistoryError = historyRes.error || 'No se pudo cargar el historial';
+    }
+
+    if (foldersRes.ok) {
+      this.zyFolders = foldersRes.folders || [];
+    }
+
+    if (labelsRes.ok) {
+      this.zyLabels = labelsRes.labels || [];
+    }
+
+    this.zyHistoryLoading = false;
+  }
+
+  // Items filtrados por carpeta seleccionada
+  get filteredZyHistory(): ZonayummyReelHistoryItem[] {
+    if (this.selectedFolderId === null) {
+      return this.zyHistory;
+    }
+    return this.zyHistory.filter(it => it.folderId === this.selectedFolderId);
+  }
+
+  selectFolder(folderId: string | null) {
+    this.selectedFolderId = folderId;
+  }
+
+  // Obtener nombre de carpeta por ID
+  getFolderName(folderId: string | null): string {
+    if (!folderId) return 'Sin carpeta';
+    const folder = this.zyFolders.find(f => f.id === folderId);
+    return folder ? folder.name : 'Carpeta';
+  }
+
+  // Obtener etiquetas de un item
+  getItemLabels(item: ZonayummyReelHistoryItem): ZonayummyLabel[] {
+    if (!item.labelIds || item.labelIds.length === 0) return [];
+    return this.zyLabels.filter(l => item.labelIds?.includes(l.id));
+  }
+
+  // Abrir modal de edición
+  openEditModal(item: ZonayummyReelHistoryItem) {
+    this.editingItem = item;
+    this.isEditModalOpen = true;
+  }
+
+  closeEditModal() {
+    this.isEditModalOpen = false;
+    this.editingItem = null;
+  }
+
+  onItemSaved(updatedItem: ZonayummyReelHistoryItem) {
+    // Actualizar el item en la lista local
+    const idx = this.zyHistory.findIndex(h => h.id === updatedItem.id);
+    if (idx >= 0) {
+      this.zyHistory[idx] = { ...this.zyHistory[idx], ...updatedItem };
+      this.zyHistory = [...this.zyHistory]; // Trigger change detection
+    }
+  }
+
+  onFolderCreated(folder: ZonayummyFolder) {
+    this.zyFolders = [...this.zyFolders, folder];
+  }
+
+  onLabelsCreated(labels: ZonayummyLabel[]) {
+    this.zyLabels = [...this.zyLabels, ...labels];
+  }
+
+  // Color de contraste para etiquetas
+  getContrastColor(hexColor: string): string {
+    if (!hexColor || !hexColor.startsWith('#')) return '#000000';
+    const hex = hexColor.replace('#', '');
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.5 ? '#374151' : '#ffffff';
+  }
+
+  async copyToClipboard(text: string) {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch (e) {
+      console.warn('No se pudo copiar al portapapeles', e);
+    }
+  }
+
+  confirmDeleteItem(item: ZonayummyReelHistoryItem) {
+    this.deleteConfirmItem = item;
+    this.deleteError = '';
+  }
+
+  cancelDelete() {
+    this.deleteConfirmItem = null;
+    this.deleteError = '';
+  }
+
+  async executeDelete() {
+    if (!this.deleteConfirmItem) return;
+
+    const downloadId = this.deleteConfirmItem.id;
+    this.deletingId = downloadId;
+    this.deleteError = '';
+
+    try {
+      const result = await this.zyHistoryService.delete(downloadId, true);
+      if (result.ok) {
+        // Eliminar de la lista local
+        this.zyHistory = this.zyHistory.filter(h => h.id !== downloadId);
+        this.deleteConfirmItem = null;
+      } else {
+        this.deleteError = result.error || 'Error al eliminar';
+      }
+    } catch (e: any) {
+      this.deleteError = e?.message || 'Error inesperado';
+    } finally {
+      this.deletingId = null;
+    }
+  }
+
+  downloadFromHistory(it: ZonayummyReelHistoryItem) {
+    if (!it.downloadUrlWithSas) return;
+    const a = document.createElement('a');
+    a.href = it.downloadUrlWithSas;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   }
 
   get currentPlatform(): Platform {
@@ -375,13 +854,14 @@ export class ReelDownloaderComponent {
   }
 
   async downloadVideo() {
-    if (!this.videoUrl.trim()) {
+    const originalUrl = (this.videoUrl || '').trim();
+    if (!originalUrl) {
       this.errorMessage = 'Por favor ingresa una URL válida';
       return;
     }
 
     // Validar URL según la plataforma seleccionada
-    if (!this.currentPlatform.urlPattern.test(this.videoUrl)) {
+    if (!this.currentPlatform.urlPattern.test(originalUrl)) {
       this.errorMessage = `URL inválida para ${this.currentPlatform.name}. Ejemplo: ${this.currentPlatform.placeholder}`;
       return;
     }
@@ -396,14 +876,14 @@ export class ReelDownloaderComponent {
       this.simulateProgress(0, 30, `Obteniendo información de ${this.currentPlatform.name}...`);
 
       const apiUrl = `${this.BASE_API_URL}/${this.currentPlatform.endpoint}`;
-      console.log(`🚀 Enviando petición a: ${apiUrl}`, { url: this.videoUrl });
+      console.log(`🚀 Enviando petición a: ${apiUrl}`, { url: originalUrl });
 
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url: this.videoUrl }),
+        body: JSON.stringify({ url: originalUrl }),
       });
 
       console.log(`📥 Respuesta recibida: ${response.status} ${response.statusText}`);
@@ -452,8 +932,21 @@ export class ReelDownloaderComponent {
 
       this.progress = 100;
       this.successMessage = `¡Video descargado! (${(blob.size / 1024 / 1024).toFixed(2)} MB)`;
-      
-      this.addToHistory(this.videoUrl, this.selectedPlatform);
+
+      // Guardado por usuario (si hay sesión ZonaYummy)
+      if (this.isZyLoggedIn) {
+        this.statusMessage = 'Guardando en tu cuenta...';
+        try {
+          await this.saveToZonayummyAccount(blob, originalUrl, this.selectedPlatform);
+          this.successMessage = `¡Video descargado y guardado! (${(blob.size / 1024 / 1024).toFixed(2)} MB)`;
+        } catch (saveErr: any) {
+          console.warn('No se pudo guardar en ZonaYummy:', saveErr);
+          this.successMessage = `¡Video descargado! (No se pudo guardar en tu cuenta)`;
+        }
+      } else {
+        // Modo invitado: historial local
+        this.addToHistory(originalUrl, this.selectedPlatform);
+      }
       
       setTimeout(() => {
         this.videoUrl = '';
@@ -467,6 +960,51 @@ export class ReelDownloaderComponent {
       this.progress = 0;
       this.statusMessage = '';
     }
+  }
+
+  private async saveToZonayummyAccount(videoBlob: Blob, url: string, platform: string) {
+    const contentType = videoBlob.type || 'video/mp4';
+
+    const upload = await this.zyHistoryService.getUploadUrl({
+      platform,
+      url,
+      contentType,
+    });
+
+    if (!upload.ok) {
+      throw new Error(upload.error || 'Error obteniendo URL de subida');
+    }
+
+    // Subir directo a Blob Storage usando SAS (evita pasar el video por Azure Function)
+    const putRes = await fetch(upload.uploadUrlWithSas, {
+      method: 'PUT',
+      headers: {
+        'x-ms-blob-type': 'BlockBlob',
+        'Content-Type': contentType,
+      },
+      body: videoBlob,
+    });
+
+    if (!putRes.ok) {
+      const t = await putRes.text().catch(() => '');
+      throw new Error(`Error subiendo a Blob: ${putRes.status} ${putRes.statusText} ${t}`.trim());
+    }
+
+    const created = await this.zyHistoryService.createRecord({
+      downloadId: upload.downloadId,
+      platform,
+      url,
+      blobPath: upload.blobPath,
+      contentType,
+      size: videoBlob.size,
+    });
+
+    if (!created.ok) {
+      throw new Error(created.error || 'Error guardando el registro');
+    }
+
+    this.isHistoryOpen = true;
+    await this.refreshZyHistory();
   }
 
   redownload(item: { url: string; platform: string }) {
