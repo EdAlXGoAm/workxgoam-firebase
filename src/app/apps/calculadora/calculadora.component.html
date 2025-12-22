@@ -1,43 +1,113 @@
-<div class="container mx-auto px-4 py-8 max-w-7xl">
-  <!-- Botón de Gestión de Ingredientes -->
+<div class="container mx-auto px-4 py-8 max-w-7xl relative">
+  <!-- Burbuja flotante para mostrar cálculos guardados (derecha, arrastrable verticalmente) -->
+  <div
+    (click)="onSavedCalcBubbleClick($event)"
+    (mousedown)="onSavedCalcBubbleMouseDown($event)"
+    (touchstart)="onSavedCalcBubbleTouchStart($event)"
+    class="fixed right-3 z-40 w-14 h-14 rounded-full bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 active:bg-indigo-800 flex items-center justify-center select-none overflow-visible"
+    [class.scale-110]="isSavedCalcBubbleDragging"
+    [class.cursor-grabbing]="isSavedCalcBubbleDragging"
+    [class.cursor-grab]="!isSavedCalcBubbleDragging"
+    [style.top.%]="savedCalcBubbleTop"
+    [style.transform]="'translateY(-50%)'"
+    [title]="showSavedCalculations ? 'Ocultar cálculos guardados' : 'Mostrar cálculos guardados (arrastrar para mover)'"
+    style="touch-action: none; transition: box-shadow 0.2s;"
+  >
+    <!-- Indicador de drag (puntos) - pointer-events: none para que no intercepte clicks -->
+    <div class="absolute top-1 left-1/2 -translate-x-1/2 flex gap-0.5 opacity-50 pointer-events-none">
+      <span class="w-1 h-1 bg-white rounded-full"></span>
+      <span class="w-1 h-1 bg-white rounded-full"></span>
+      <span class="w-1 h-1 bg-white rounded-full"></span>
+    </div>
+    <span class="text-xl pointer-events-none">📋</span>
+    <!-- Badge de notificaciones - pointer-events: none para que no intercepte clicks -->
+    <span *ngIf="savedCalculations.length > 0" 
+      class="absolute w-6 h-6 bg-red-500 rounded-full text-xs font-bold flex items-center justify-center shadow-md border-2 border-white pointer-events-none"
+      style="top: -4px; left: -4px;">
+      {{ savedCalculations.length }}
+    </span>
+  </div>
+
+  <!-- Botones de Gestión de Ingredientes -->
   <div class="mb-6 text-right">
     <button (click)="openIngredientsModal()" class="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600">Gestionar Ingredientes</button>
     <button (click)="openCompareModal()" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 ml-2">Comparar Cálculos</button>
   </div>
-  <!-- Lista de cálculos guardados -->
-  <div class="bg-white rounded-lg shadow-md p-4 mb-6">
-    <h2 class="text-xl font-bold text-gray-800 mb-2">Cálculos Guardados</h2>
-    <div *ngIf="savedCalculations.length > 0; else noSaved">
-      <table class="w-full text-left">
-        <thead>
-          <tr>
-            <th class="py-2 px-4">Título</th>
-            <th class="py-2 px-4">Fecha</th>
-            <th class="py-2 px-4">Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let calc of savedCalculations" class="border-t">
-            <td class="py-2 px-4">{{ calc.title }}</td>
-            <td class="py-2 px-4">{{ calc.createdAt | date:'short' }}</td>
-            <td class="py-2 px-4 space-x-2">
-              <button (click)="loadCalculation(calc)" class="text-indigo-600 hover:underline">Cargar</button>
-              <button (click)="deleteSavedCalculation(calc)" class="text-red-600 hover:underline">Eliminar</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <ng-template #noSaved>
-      <p class="text-gray-500">No hay cálculos guardados.</p>
-    </ng-template>
-  </div>
   <!-- Encabezado -->
-  <header class="mb-8 text-center">
+  <header class="mb-6 text-center">
     <h1 class="text-4xl font-bold text-indigo-700 mb-2">Calculadora de Costos</h1>
     <p class="text-gray-600">Calcula precios para comerciantes y público con ganancias automáticas</p>
-    <h3 class="text-lg font-semibold text-gray-800 mb-4">"{{ calculationTitle || 'Cálculo Nuevo' }}"</h3>
   </header>
+
+  <!-- Información Extra (movido arriba) -->
+  <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+    <div class="flex flex-wrap items-center gap-4">
+      <!-- Título del cálculo -->
+      <div class="flex-1 min-w-[200px]">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Título del cálculo</label>
+        <input [(ngModel)]="calculationTitle" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Nombre de la receta..." />
+      </div>
+      <!-- Botones de acción -->
+      <div class="flex flex-wrap gap-2 items-end">
+        <ng-container *ngIf="!currentLoadedId">
+          <button (click)="saveCalculation()" class="bg-gray-100 text-gray-700 px-3 py-2 text-sm rounded-md font-medium hover:bg-gray-200 transition whitespace-nowrap">Guardar</button>
+          <button (click)="openSaveAsIngredientModal()" class="bg-indigo-600 text-white px-3 py-2 text-sm rounded-md font-medium hover:bg-indigo-700 transition whitespace-nowrap">
+            <span class="hidden sm:inline">Como ingrediente</span>
+            <span class="sm:hidden">Ingrediente</span>
+          </button>
+          <button (click)="clearForm()" class="bg-red-500 text-white px-3 py-2 text-sm rounded-md font-medium hover:bg-red-600 transition whitespace-nowrap">Limpiar</button>
+        </ng-container>
+        <ng-container *ngIf="currentLoadedId">
+          <button (click)="saveCalculation()" class="bg-gray-100 text-gray-700 px-3 py-2 text-sm rounded-md font-medium hover:bg-gray-200 transition whitespace-nowrap">Guardar nuevo</button>
+          <button (click)="editCalculation()" class="bg-green-500 text-white px-3 py-2 text-sm rounded-md font-medium hover:bg-green-600 transition whitespace-nowrap">Actualizar</button>
+          <button (click)="openSaveAsIngredientModal()" class="bg-indigo-600 text-white px-3 py-2 text-sm rounded-md font-medium hover:bg-indigo-700 transition whitespace-nowrap">
+            <span class="hidden sm:inline">Como ingrediente</span>
+            <span class="sm:hidden">Ingrediente</span>
+          </button>
+          <button (click)="clearForm()" class="bg-red-500 text-white px-3 py-2 text-sm rounded-md font-medium hover:bg-red-600 transition whitespace-nowrap">Limpiar</button>
+        </ng-container>
+      </div>
+    </div>
+    <!-- Links e imágenes (colapsable) -->
+    <details class="mt-4">
+      <summary class="text-sm text-gray-600 cursor-pointer hover:text-indigo-600">Más opciones (links, imágenes)...</summary>
+      <div class="mt-3 space-y-3">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Links relacionados (uno por línea)</label>
+          <textarea [(ngModel)]="calculationLinksText" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"></textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Imágenes (máx 3)</label>
+          <!-- Input oculto para galería -->
+          <input #imageFileInput type="file" accept="image/*" class="hidden" (change)="onImageFileSelected($event)" />
+          <div class="grid grid-cols-3 gap-2">
+            <div *ngFor="let img of images; let i = index"
+              class="image-placeholder border-2 border-dashed border-gray-300 rounded-md h-20 flex flex-col items-center justify-center cursor-pointer overflow-hidden relative group"
+              (click)="handleImageClick(i)">
+              <ng-container *ngIf="!img">
+                <span class="text-gray-400 text-xs">Pegar</span>
+                <button type="button" 
+                  class="text-xs text-indigo-500 hover:text-indigo-700 mt-1"
+                  (click)="openGalleryForImage(i, $event)">
+                  📷 Galería
+                </button>
+              </ng-container>
+              <ng-container *ngIf="img">
+                <img [src]="img" class="w-full h-full object-cover" />
+                <!-- Botón de galería sobre la imagen -->
+                <button type="button"
+                  class="absolute bottom-0 right-0 bg-white bg-opacity-80 text-xs px-1 py-0.5 rounded-tl text-indigo-600 hover:bg-indigo-100 opacity-0 group-hover:opacity-100 transition-opacity"
+                  (click)="openGalleryForImage(i, $event)"
+                  title="Reemplazar desde galería">
+                  📷
+                </button>
+              </ng-container>
+            </div>
+          </div>
+        </div>
+      </div>
+    </details>
+  </div>
 
   <!-- Grid principal -->
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -47,8 +117,11 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <!-- Sin ganancia -->
         <div class="bg-white rounded-lg shadow-md p-4">
-          <div class="flex justify-between items-center mb-4">
-            <h2 class="text-lg font-semibold text-gray-800">Costos sin ganancia</h2>
+          <div class="flex justify-between items-center mb-2">
+            <div>
+              <h2 class="text-lg font-semibold text-gray-800">Costos + ganancia</h2>
+              <p class="text-xs text-gray-500">Se les suma el % de ganancia</p>
+            </div>
             <button (click)="addCostWithoutProfit()" class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-md text-sm font-medium hover:bg-indigo-200 transition">+ Nuevo</button>
           </div>
           <div class="space-y-2 mb-4 max-h-60 overflow-y-auto custom-scrollbar">
@@ -64,8 +137,11 @@
         </div>
         <!-- Con ganancia -->
         <div class="bg-white rounded-lg shadow-md p-4">
-          <div class="flex justify-between items-center mb-4">
-            <h2 class="text-lg font-semibold text-gray-800">Costos con ganancia</h2>
+          <div class="flex justify-between items-center mb-2">
+            <div>
+              <h2 class="text-lg font-semibold text-gray-800">Costos fijos</h2>
+              <p class="text-xs text-gray-500">No se les agrega ganancia</p>
+            </div>
             <button (click)="addCostWithProfit()" class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-md text-sm font-medium hover:bg-indigo-200 transition">+ Nuevo</button>
           </div>
           <div class="space-y-2 mb-4 max-h-60 overflow-y-auto custom-scrollbar">
@@ -88,20 +164,75 @@
           <button (click)="addIngredient()" class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-md text-sm font-medium hover:bg-indigo-200 transition">+ Agregar</button>
         </div>
         <div class="space-y-2 mb-4">
-          <div *ngFor="let sel of selectedIngredients; let i = index" class="flex items-center space-x-2">
-            <select [(ngModel)]="sel.ingredientId" (ngModelChange)="calculatePrices()" class="px-2 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 flex-1">
-              <option value="" disabled>Seleccione ingrediente</option>
-              <option *ngFor="let ing of sortedIngredients" [value]="ing.id">{{ ing.name }}</option>
+          <div *ngFor="let sel of selectedIngredients; let i = index" class="flex flex-wrap items-center gap-1">
+            <!-- Porciones -->
+            <div class="flex items-center gap-1">
+              <input
+                type="number"
+                [(ngModel)]="sel.portions"
+                (ngModelChange)="calculatePrices()"
+                class="w-12 px-1 py-1 border rounded text-center text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                min="1"
+                placeholder="1"
+                title="Número de porciones"
+              />
+              <span class="text-gray-500 text-sm">×</span>
+            </div>
+            <!-- Ingrediente -->
+            <div class="relative flex-1 min-w-[150px]">
+              <input
+                #ingInput
+                [ngModel]="ingredientSearchText[i] || ''"
+                (ngModelChange)="onIngredientSearchChange(i, $event, ingInput)"
+                (focus)="openIngredientDropdown(i, ingInput)"
+                (blur)="closeIngredientDropdown(i)"
+                (keydown)="onIngredientSearchKeydown(i, $event)"
+                class="w-full px-2 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                placeholder="Buscar ingrediente..."
+                autocomplete="off"
+              />
+            </div>
+            <!-- Cantidad -->
+            <input type="number" [(ngModel)]="sel.quantity" (ngModelChange)="calculatePrices()" class="w-16 px-2 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 text-sm" min="0" placeholder="Cant" />
+            <!-- Unidad -->
+            <select
+              *ngIf="getAllowedQuantityUnits(sel.ingredientId).length > 0"
+              [ngModel]="getSelectedQuantityUnit(sel)"
+              (ngModelChange)="onQuantityUnitChange(i, $event)"
+              class="w-16 px-1 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 text-sm"
+            >
+              <option *ngFor="let u of getAllowedQuantityUnits(sel.ingredientId)" [ngValue]="u">
+                {{ formatQtyUnitLabel(u) }}
+              </option>
             </select>
-            <input type="number" [(ngModel)]="sel.quantity" (ngModelChange)="calculatePrices()" class="w-20 px-2 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-indigo-500" min="0" />
-            <span class="font-semibold">
-              {{ getIngredientUnit(sel.ingredientId) }}
+            <!-- Info del ingrediente (colapsado en móvil) -->
+            <span class="hidden sm:inline text-xs text-gray-500">
               <ng-container *ngIf="getIngredientById(sel.ingredientId) as ing">
-                ({{ ing.packageSize }} {{ ing.unit }}, {{ ing.unitValue | currency:'USD':'symbol':'1.0-0' }})
+                ({{ ing.packageSize }}{{ ing.unit }}, {{ ing.unitValue | currency:'USD':'symbol':'1.0-0' }})
               </ng-container>
             </span>
-            <span class="flex-1 text-right font-semibold">Costo: {{ getIngredientCost(sel) | currency:'USD':'symbol':'1.2-2' }}</span>
-            <button (click)="removeIngredient(i)" class="text-red-500 hover:text-red-700">✕</button>
+            <!-- Costo -->
+            <span class="text-sm font-semibold text-indigo-700">{{ getIngredientCost(sel) | currency:'USD':'symbol':'1.2-2' }}</span>
+            <!-- Botones de reordenar y eliminar -->
+            <div class="flex items-center gap-1">
+              <button
+                (click)="moveIngredientUp(i)"
+                [disabled]="i === 0"
+                class="w-8 h-8 flex items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-indigo-100 hover:text-indigo-700 active:bg-indigo-200 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                title="Subir"
+              >↑</button>
+              <button
+                (click)="moveIngredientDown(i)"
+                [disabled]="i === selectedIngredients.length - 1"
+                class="w-8 h-8 flex items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-indigo-100 hover:text-indigo-700 active:bg-indigo-200 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                title="Bajar"
+              >↓</button>
+              <button
+                (click)="removeIngredient(i)"
+                class="w-8 h-8 flex items-center justify-center rounded bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-700 active:bg-red-200 transition"
+                title="Eliminar"
+              >✕</button>
+            </div>
           </div>
         </div>
         <div class="border-t pt-3">
@@ -109,20 +240,57 @@
         </div>
       </div>
 
+      <!-- Overlay (fixed) del autocomplete de ingredientes, para evitar clipping por contenedores -->
+      <div
+        *ngIf="activeIngredientDropdownIndex !== null"
+        class="fixed z-50 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto"
+        [style.top.px]="ingredientDropdownTop"
+        [style.left.px]="ingredientDropdownLeft"
+        [style.width.px]="ingredientDropdownWidth"
+      >
+        <ng-container *ngIf="getFilteredIngredients(activeIngredientDropdownIndex) as filtered">
+          <div
+            *ngFor="let ing of filtered"
+            class="px-2 py-1 cursor-pointer hover:bg-indigo-50"
+            (mousedown)="$event.preventDefault(); selectIngredientFromAutocomplete(activeIngredientDropdownIndex!, ing)"
+          >
+            {{ ing.name }}
+          </div>
+          <div *ngIf="filtered.length === 0" class="px-2 py-2 text-sm text-gray-500">
+            Sin resultados
+          </div>
+        </ng-container>
+      </div>
+
       <!-- Mano de obra -->
       <div class="bg-white rounded-lg shadow-md p-4">
-        <h2 class="text-lg font-semibold text-gray-800 mb-4">Mano de obra</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Horas</label>
-            <input [(ngModel)]="laborHours" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Minutos</label>
-            <input [(ngModel)]="laborMinutes" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-semibold text-gray-800">Mano de obra</h2>
+          <div class="flex gap-2">
+            <button (click)="addLaborEntry('default')" class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-xs font-medium hover:bg-indigo-200" title="Agregar con tarifa por defecto ($34.85/hr)">+ Normal</button>
+            <button (click)="addLaborEntry('fixed50')" class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-medium hover:bg-green-200" title="Agregar con tarifa fija ($50/hr)">+ $50/hr</button>
           </div>
         </div>
-        <div class="mt-3"><p class="text-sm text-gray-600">Tarifa: $34.85 por hora</p></div>
+        <div class="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
+          <div *ngFor="let entry of laborEntries; let i = index" class="flex items-center gap-2 p-2 bg-gray-50 rounded">
+            <div class="flex-1 space-y-1">
+              <input [(ngModel)]="entry.description" class="w-full px-2 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" placeholder="Concepto (ej: Preparación, Horneado...)" />
+              <div class="grid grid-cols-3 gap-2">
+                <input [(ngModel)]="entry.hours" class="px-2 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" placeholder="Hrs" />
+                <input [(ngModel)]="entry.minutes" class="px-2 py-1 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" placeholder="Min" />
+                <select [(ngModel)]="entry.rateType" class="px-2 py-1 border rounded text-sm bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                  <option value="default">$34.85/hr</option>
+                  <option value="fixed50">$50/hr</option>
+                </select>
+              </div>
+            </div>
+            <button (click)="removeLaborEntry(i)" class="text-red-500 hover:text-red-700 text-sm">✕</button>
+          </div>
+          <p *ngIf="laborEntries.length === 0" class="text-gray-400 text-sm text-center py-2">Sin mano de obra agregada</p>
+        </div>
+        <div *ngIf="laborEntries.length > 0" class="mt-3 pt-2 border-t">
+          <p class="text-sm font-medium text-gray-700">Total mano de obra: {{ calculateTotalLaborCost() | currency:'USD':'symbol':'1.2-2' }}</p>
+        </div>
       </div>
 
       <!-- Opciones avanzadas -->
@@ -161,13 +329,83 @@
     <!-- Columna derecha (resultados y gráficas) -->
     <div class="space-y-6">
       <!-- Resultados -->
-      <div class="bg-white rounded-lg shadow-md p-6">
+      <div class="bg-white rounded-lg shadow-md p-6 relative">
+        <button
+          (click)="isResultsModalOpen = true"
+          class="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-indigo-100 hover:text-indigo-700 transition"
+          title="Expandir resultados"
+        >⛶</button>
         <h2 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Resultados</h2>
         <div class="space-y-4">
           <div><p class="text-sm text-gray-600">Costo (sin+con)</p><p class="text-lg font-semibold">{{ resultCost | number:'1.2-2' }}</p></div>
           <div><p class="text-sm text-gray-600">Costo mano de obra</p><p class="text-lg font-semibold">{{ resultLaborCost | number:'1.0-0' }}</p></div>
           <div><p class="text-sm text-gray-600">Costo total</p><p class="text-lg font-semibold">{{ resultTotalCost | number:'1.2-2' }}</p></div>
-          <div><p class="text-sm text-gray-600">Ganancia de costos sin ganancia</p><p class="text-lg font-semibold text-green-600">{{ resultMyProfit | number:'1.2-2' }}</p></div>
+          <div><p class="text-sm text-gray-600">Ganancia de costos</p><p class="text-lg font-semibold text-green-600">{{ resultMyProfit | number:'1.2-2' }}</p></div>
+
+          <!-- Tabla de desglose del precio al comerciante -->
+          <div *ngIf="resultMerchantBreakdown.length > 0" class="pt-4 border-t">
+            <p class="text-sm font-medium text-gray-700 mb-2">Desglose precio comerciante (factor: {{ resultMerchantFactor | number:'1.2-2' }})</p>
+            <div class="max-h-48 overflow-y-auto">
+              <table class="w-full text-xs">
+                <thead class="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th class="text-left py-1 px-1">Concepto</th>
+                    <th class="text-right py-1 px-1">Costo</th>
+                    <th class="text-right py-1 px-1 text-green-600">Ganancia</th>
+                    <th class="text-right py-1 px-1 text-indigo-600 font-bold">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let item of resultMerchantBreakdown" class="border-t"
+                      [ngClass]="{
+                        'bg-blue-50': item.type === 'ingredient',
+                        'bg-amber-50': item.type === 'labor',
+                        'bg-gray-100': item.type === 'cost_fixed',
+                        'bg-purple-50': item.type === 'rounding'
+                      }">
+                    <td class="py-1 px-1 truncate max-w-[100px]" [title]="item.description">
+                      <span *ngIf="item.type === 'ingredient'" class="text-blue-600">🥄</span>
+                      <span *ngIf="item.type === 'labor'" class="text-amber-600">⏱</span>
+                      <span *ngIf="item.type === 'cost_fixed'" class="text-gray-500">📦</span>
+                      <span *ngIf="item.type === 'rounding'" class="text-purple-600">🔄</span>
+                      {{ item.description }}
+                    </td>
+                    <td class="py-1 px-1 text-right">
+                      <span *ngIf="item.type !== 'rounding'">{{ item.cost | number:'1.2-2' }}</span>
+                      <span *ngIf="item.type === 'rounding'" class="text-gray-400">-</span>
+                    </td>
+                    <td class="py-1 px-1 text-right"
+                        [ngClass]="{
+                          'text-green-600': item.profit !== null && item.profit >= 0,
+                          'text-red-600': item.profit !== null && item.profit < 0
+                        }">
+                      <span *ngIf="item.profit !== null">
+                        <span *ngIf="item.profit > 0">+</span>{{ item.profit | number:'1.2-2' }}
+                      </span>
+                      <span *ngIf="item.profit === null" class="text-gray-400">-</span>
+                    </td>
+                    <td class="py-1 px-1 text-right font-semibold"
+                        [ngClass]="{
+                          'text-indigo-600': item.type !== 'rounding',
+                          'text-green-600': item.type === 'rounding' && item.total >= 0,
+                          'text-red-600': item.type === 'rounding' && item.total < 0
+                        }">
+                      <span *ngIf="item.type === 'rounding' && item.total > 0">+</span>{{ item.total | number:'1.2-2' }}
+                    </td>
+                  </tr>
+                </tbody>
+                <tfoot class="bg-gray-100 border-t-2 border-gray-300 sticky bottom-0">
+                  <tr class="font-bold">
+                    <td class="py-1 px-1">TOTAL</td>
+                    <td class="py-1 px-1 text-right">{{ getBreakdownSumCost() | number:'1.2-2' }}</td>
+                    <td class="py-1 px-1 text-right text-green-600">{{ getBreakdownSumProfit() | number:'1.2-2' }}</td>
+                    <td class="py-1 px-1 text-right text-indigo-700">{{ getBreakdownSumTotal() | number:'1.2-2' }}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
           <div class="pt-4 border-t"><p class="text-sm text-gray-600">Precio al comerciante</p><p class="text-2xl font-bold text-indigo-700">{{ resultMerchantPrice }}</p><p class="text-xs text-gray-500">(Sin redondear: {{ resultMerchantPriceRaw | number:'1.2-2' }})</p></div>
           <div class="pt-4 border-t"><p class="text-sm text-gray-600">Precio al público</p><p class="text-2xl font-bold text-purple-700">{{ resultPublicPrice }}</p><p class="text-xs text-gray-500">(Sin redondear: {{ resultPublicPriceRaw | number:'1.2-2' }})</p></div>
           <div><p class="text-sm text-gray-600">Ganancia al comerciante</p><p class="text-lg font-semibold text-blue-600">{{ resultMerchantProfit | number:'1.2-2' }}</p></div>
@@ -183,45 +421,122 @@
         </div>
       </div>
 
-      <!-- Extra info / Guardar -->
-      <div class="bg-white rounded-lg shadow-md p-6">
-        <h2 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Información Extra</h2>
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Título del cálculo</label>
-            <input [(ngModel)]="calculationTitle" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Links relacionados (uno por línea)</label>
-            <textarea [(ngModel)]="calculationLinksText" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-md"></textarea>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Imágenes (máx 3)</label>
-            <div class="grid grid-cols-3 gap-2">
-              <div *ngFor="let img of images; let i = index"
-                class="image-placeholder border-2 border-dashed border-gray-300 rounded-md h-24 flex items-center justify-center cursor-pointer overflow-hidden"
-                (click)="handleImageClick(i)">
-                <ng-container *ngIf="!img">
-                  <span class="text-gray-400 text-sm">Pegar imagen</span>
-                </ng-container>
-                <ng-container *ngIf="img">
-                  <img [src]="img" class="w-full h-full object-cover" />
-                </ng-container>
-              </div>
-            </div>
-          </div>
-          <!-- Guardar nuevo o actualizar existente -->
-          <ng-container *ngIf="!currentLoadedId">
-            <button (click)="saveCalculation()" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-md font-medium hover:bg-gray-200 transition">Guardar</button>
-          </ng-container>
-          <ng-container *ngIf="currentLoadedId">
-            <div class="flex space-x-2">
-              <button (click)="saveCalculation()" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-md font-medium hover:bg-gray-200 transition">Guardar como nuevo</button>
-              <button (click)="editCalculation()" class="bg-green-500 text-white px-4 py-2 rounded-md font-medium hover:bg-green-600 transition">Actualizar</button>
-            </div>
-          </ng-container>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Guardar receta como ingrediente -->
+<div *ngIf="isSaveAsIngredientModalVisible" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+  <div class="bg-white rounded-lg w-11/12 max-w-xl max-h-[90vh] overflow-auto p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="text-lg font-semibold">Guardar receta como ingrediente</h3>
+      <button (click)="closeSaveAsIngredientModal()" class="text-gray-500 hover:text-gray-700">✕</button>
+    </div>
+
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+        <input [(ngModel)]="saveAsIngredientName" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Unidad del ingrediente</label>
+          <select
+            [ngModel]="saveAsIngredientUnit"
+            (ngModelChange)="onSaveAsIngredientUnitChange($event)"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="KG">KG</option>
+            <option value="L">L</option>
+            <option value="PZ">PZ</option>
+          </select>
+          <p class="text-xs text-gray-500 mt-1">
+            Solo suma ingredientes en KG/g o L/ml (ignora PZ/UN). Si mezclas KG y L, es solo un aproximado numérico.
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Rendimiento (tamaño del lote)</label>
+          <input
+            type="number"
+            [ngModel]="saveAsIngredientYield"
+            (ngModelChange)="saveAsIngredientYield = $event; markSaveAsIngredientYieldTouched()"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            min="0"
+            step="0.001"
+          />
         </div>
       </div>
+
+      <!-- Desglose del rendimiento -->
+      <div *ngIf="saveAsIngredientYieldBreakdown.length > 0" class="border rounded-md p-3 bg-gray-50 max-h-48 overflow-auto">
+        <p class="text-sm font-medium text-gray-700 mb-2">Desglose del rendimiento:</p>
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="text-left text-gray-600">
+              <th class="py-1">Ingrediente</th>
+              <th class="py-1 text-center">Porc.</th>
+              <th class="py-1 text-right">Cantidad</th>
+              <th class="py-1 text-right">Total</th>
+              <th class="py-1 text-center">✓</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of saveAsIngredientYieldBreakdown" [class.text-gray-400]="item.ignored">
+              <td class="py-1">{{ item.name }}</td>
+              <td class="py-1 text-center">
+                <span *ngIf="item.portions > 1" class="text-indigo-600 font-semibold">{{ item.portions }}×</span>
+                <span *ngIf="item.portions <= 1">1</span>
+              </td>
+              <td class="py-1 text-right">{{ item.originalQty }} {{ item.originalUnit }}</td>
+              <td class="py-1 text-right">
+                <ng-container *ngIf="!item.ignored">{{ item.normalizedQty }} {{ item.normalizedUnit }}</ng-container>
+                <ng-container *ngIf="item.ignored">-</ng-container>
+              </td>
+              <td class="py-1 text-center">
+                <span *ngIf="!item.ignored" class="text-green-600">✓</span>
+                <span *ngIf="item.ignored" class="text-gray-400" title="Ignorado (PZ/UN)">✗</span>
+              </td>
+            </tr>
+          </tbody>
+          <tfoot class="border-t">
+            <tr class="font-semibold">
+              <td class="py-1">Total</td>
+              <td></td>
+              <td class="py-1 text-right">{{ saveAsIngredientYield }}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Costo del lote</label>
+          <input
+            type="number"
+            [(ngModel)]="saveAsIngredientCost"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            min="0"
+            step="0.01"
+          />
+          <p class="text-xs text-gray-500 mt-1">
+            Sugerido: ingredientes + costos sin ganancia + mano de obra (no incluye “costos con ganancia”).
+          </p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Costo por unidad</label>
+          <div class="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-gray-800">
+            {{ getSaveAsIngredientCostPerUnit() | currency:'USD':'symbol':'1.4-4' }} / {{ saveAsIngredientUnit === 'KG' ? 'kg' : (saveAsIngredientUnit === 'L' ? 'L' : 'pz') }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex justify-end gap-2 mt-6">
+      <button (click)="closeSaveAsIngredientModal()" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Cancelar</button>
+      <button (click)="saveRecipeAsIngredient()" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">Guardar ingrediente</button>
     </div>
   </div>
 </div>
@@ -257,6 +572,30 @@
     <div class="mb-4 text-right">
       <button (click)="exportIngredients()" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600">Exportar Excel</button>
     </div>
+
+    <!-- Buscador de ingredientes (filtra la tabla) -->
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-1">Buscar ingrediente</label>
+      <div class="flex items-center gap-2">
+        <input
+          [(ngModel)]="ingredientModalSearch"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          placeholder="Escribe para filtrar por nombre o unidad..."
+        />
+        <button
+          *ngIf="ingredientModalSearch"
+          (click)="ingredientModalSearch=''"
+          class="bg-gray-100 text-gray-700 px-3 py-2 rounded-md hover:bg-gray-200"
+          title="Limpiar búsqueda"
+        >
+          Limpiar
+        </button>
+      </div>
+      <p class="text-xs text-gray-500 mt-1">
+        Mostrando {{ filteredIngredientsForModal.length }} de {{ ingredients.length }}
+      </p>
+    </div>
+
     <!-- Formulario de Ingrediente -->
     <div class="grid grid-cols-2 gap-4 mb-4">
       <div>
@@ -299,7 +638,7 @@
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-200">
-        <tr *ngFor="let ing of sortedIngredients">
+        <tr *ngFor="let ing of filteredIngredientsForModal; trackBy: trackByIngredientId">
           <td class="px-2 py-1">
             <ng-container *ngIf="editingIngredientId === ing.id; else viewName">
               <input [(ngModel)]="newIngredient.name" class="w-full px-1 py-1 border rounded" />
@@ -420,4 +759,388 @@
       </table>
     </div>
   </div>
-</div> 
+</div>
+
+<!-- Modal: Resultados expandidos -->
+<div *ngIf="isResultsModalOpen" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" style="overscroll-behavior: contain;">
+  <div class="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-auto shadow-2xl" style="overscroll-behavior: contain;">
+    <div class="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center z-10">
+      <h2 class="text-2xl font-bold text-gray-800">Resultados - {{ calculationTitle || 'Cálculo Nuevo' }}</h2>
+      <button (click)="isResultsModalOpen = false" class="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 text-xl" title="Cerrar">✕</button>
+    </div>
+    <div class="p-4">
+      <!-- Resumen compacto: costos + precios en una fila -->
+      <div class="flex flex-wrap items-center gap-3 mb-4 text-sm">
+        <div class="flex items-center gap-1 bg-gray-50 px-3 py-1 rounded">
+          <span class="text-gray-500">Costo:</span>
+          <span class="font-semibold">{{ resultCost | number:'1.2-2' }}</span>
+        </div>
+        <div class="flex items-center gap-1 bg-gray-50 px-3 py-1 rounded">
+          <span class="text-gray-500">M.O.:</span>
+          <span class="font-semibold">{{ resultLaborCost | number:'1.0-0' }}</span>
+        </div>
+        <div class="flex items-center gap-1 bg-gray-50 px-3 py-1 rounded">
+          <span class="text-gray-500">Total:</span>
+          <span class="font-semibold">{{ resultTotalCost | number:'1.2-2' }}</span>
+        </div>
+        <div class="flex items-center gap-1 bg-green-50 px-3 py-1 rounded">
+          <span class="text-gray-500">Ganancia:</span>
+          <span class="font-semibold text-green-600">{{ resultMyProfit | number:'1.2-2' }}</span>
+        </div>
+      </div>
+
+      <!-- Precios principales -->
+      <div class="flex flex-wrap justify-center gap-4 mb-4">
+        <div class="bg-indigo-50 px-6 py-3 rounded-lg text-center">
+          <p class="text-xs text-gray-500">Comerciante</p>
+          <p class="text-3xl font-bold text-indigo-700">{{ resultMerchantPrice | currency:'USD':'symbol':'1.0-0' }}</p>
+        </div>
+        <div class="bg-purple-50 px-6 py-3 rounded-lg text-center">
+          <p class="text-xs text-gray-500">Público</p>
+          <p class="text-3xl font-bold text-purple-700">{{ resultPublicPrice | currency:'USD':'symbol':'1.0-0' }}</p>
+        </div>
+        <div class="bg-blue-50 px-6 py-3 rounded-lg text-center">
+          <p class="text-xs text-gray-500">Gan. comerciante</p>
+          <p class="text-3xl font-bold text-blue-600">{{ resultMerchantProfit | number:'1.2-2' }}</p>
+        </div>
+      </div>
+
+      <!-- Tabla de desglose expandida -->
+      <div *ngIf="resultMerchantBreakdown.length > 0">
+        <p class="text-lg font-semibold text-gray-700 mb-3">Desglose precio comerciante (factor: {{ resultMerchantFactor | number:'1.2-2' }})</p>
+        <div class="overflow-auto max-h-[55vh]">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-100 sticky top-0">
+              <tr>
+                <th class="text-left py-2 px-3">Concepto</th>
+                <th class="text-right py-2 px-3">Costo</th>
+                <th class="text-right py-2 px-3 text-green-600">Ganancia</th>
+                <th class="text-right py-2 px-3 text-indigo-600 font-bold">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of resultMerchantBreakdown" class="border-t"
+                  [ngClass]="{
+                    'bg-blue-50': item.type === 'ingredient',
+                    'bg-amber-50': item.type === 'labor',
+                    'bg-gray-50': item.type === 'cost_fixed',
+                    'bg-purple-50': item.type === 'rounding'
+                  }">
+                <td class="py-2 px-3" [title]="item.description">
+                  <span *ngIf="item.type === 'ingredient'" class="text-blue-600 mr-1">🥄</span>
+                  <span *ngIf="item.type === 'labor'" class="text-amber-600 mr-1">⏱</span>
+                  <span *ngIf="item.type === 'cost_fixed'" class="text-gray-500 mr-1">📦</span>
+                  <span *ngIf="item.type === 'rounding'" class="text-purple-600 mr-1">🔄</span>
+                  {{ item.description }}
+                </td>
+                <td class="py-2 px-3 text-right">
+                  <span *ngIf="item.type !== 'rounding'">{{ item.cost | number:'1.2-2' }}</span>
+                  <span *ngIf="item.type === 'rounding'" class="text-gray-400">-</span>
+                </td>
+                <td class="py-2 px-3 text-right"
+                    [ngClass]="{
+                      'text-green-600': item.profit !== null && item.profit >= 0,
+                      'text-red-600': item.profit !== null && item.profit < 0
+                    }">
+                  <span *ngIf="item.profit !== null">
+                    <span *ngIf="item.profit > 0">+</span>{{ item.profit | number:'1.2-2' }}
+                  </span>
+                  <span *ngIf="item.profit === null" class="text-gray-400">-</span>
+                </td>
+                <td class="py-2 px-3 text-right font-semibold"
+                    [ngClass]="{
+                      'text-indigo-600': item.type !== 'rounding',
+                      'text-green-600': item.type === 'rounding' && item.total >= 0,
+                      'text-red-600': item.type === 'rounding' && item.total < 0
+                    }">
+                  <span *ngIf="item.type === 'rounding' && item.total > 0">+</span>{{ item.total | number:'1.2-2' }}
+                </td>
+              </tr>
+            </tbody>
+            <tfoot class="bg-gray-200 border-t-2 border-gray-400">
+              <tr class="font-bold text-base">
+                <td class="py-2 px-3">TOTAL</td>
+                <td class="py-2 px-3 text-right">{{ getBreakdownSumCost() | number:'1.2-2' }}</td>
+                <td class="py-2 px-3 text-right text-green-600">{{ getBreakdownSumProfit() | number:'1.2-2' }}</td>
+                <td class="py-2 px-3 text-right text-indigo-700">{{ getBreakdownSumTotal() | number:'1.2-2' }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Recorte de imagen -->
+<div *ngIf="isImageCropModalOpen" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" style="overscroll-behavior: contain;">
+  <div class="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col" style="overscroll-behavior: contain;">
+    <!-- Header -->
+    <div class="flex justify-between items-center px-4 py-3 border-b bg-gray-50">
+      <h3 class="font-semibold text-gray-800">Recortar imagen</h3>
+      <button (click)="closeCropModal()" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+    </div>
+    <!-- Canvas de recorte -->
+    <div class="flex-1 overflow-auto p-4 flex items-center justify-center bg-gray-100" style="min-height: 300px;">
+      <div class="relative inline-block" style="max-width: 100%; max-height: 60vh;">
+        <canvas #cropCanvas class="max-w-full max-h-[60vh] cursor-crosshair" 
+          (mousedown)="onCropMouseDown($event)"
+          (mousemove)="onCropMouseMove($event)"
+          (mouseup)="onCropMouseUp($event)"
+          (touchstart)="onCropTouchStart($event)"
+          (touchmove)="onCropTouchMove($event)"
+          (touchend)="onCropTouchEnd($event)">
+        </canvas>
+      </div>
+    </div>
+    <!-- Instrucciones -->
+    <div class="px-4 py-2 bg-gray-50 text-sm text-gray-600 text-center">
+      Dibuja un rectángulo sobre la imagen para seleccionar el área a recortar
+    </div>
+    <!-- Acciones -->
+    <div class="px-4 py-3 border-t flex justify-between items-center gap-2">
+      <button (click)="resetCropSelection()" class="px-3 py-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
+        Reiniciar selección
+      </button>
+      <div class="flex gap-2">
+        <button (click)="closeCropModal()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">Cancelar</button>
+        <button (click)="applyCrop()" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700" [disabled]="!hasCropSelection">
+          Aplicar recorte
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Cálculos Guardados -->
+<div *ngIf="showSavedCalculations" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" style="overscroll-behavior: contain;" (click)="showSavedCalculations = false">
+  <div class="bg-white rounded-lg w-full max-w-2xl max-h-[85vh] overflow-hidden shadow-2xl flex flex-col" style="overscroll-behavior: contain;" (click)="$event.stopPropagation()">
+    <!-- Header -->
+    <div class="flex justify-between items-center px-4 py-3 border-b bg-indigo-50">
+      <h3 class="font-bold text-lg text-indigo-800">📋 Cálculos Guardados</h3>
+      <button (click)="showSavedCalculations = false" class="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded-full text-2xl" title="Cerrar">&times;</button>
+    </div>
+    <!-- Contenido -->
+    <div class="flex-1 overflow-auto p-4" style="overscroll-behavior: contain; -webkit-overflow-scrolling: touch;">
+      <div *ngIf="savedCalculations.length > 0; else noSavedModal">
+        <div *ngFor="let group of groupedSavedCalculations; trackBy: trackByFolderKey" class="mb-3">
+          <!-- Header de carpeta -->
+          <button
+            type="button"
+            (click)="toggleFolder(group.key)"
+            class="w-full flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg text-left hover:bg-gray-200 transition"
+          >
+            <span class="font-mono text-sm">{{ isFolderExpanded(group.key) ? '▾' : '▸' }}</span>
+            <span class="font-semibold text-gray-800 flex-1">{{ group.label }}</span>
+            <span class="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{{ group.items.length }}</span>
+          </button>
+          
+          <!-- Items de la carpeta -->
+          <div *ngIf="isFolderExpanded(group.key)" class="mt-2 space-y-2 pl-2">
+            <div *ngFor="let calc of group.items; trackBy: trackByCalcId" 
+              class="bg-white border rounded-lg p-3 shadow-sm hover:shadow-md transition">
+              <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                <!-- Avatar/imagen del cálculo tipo WhatsApp -->
+                <div class="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center overflow-hidden shadow-md border-2 border-white">
+                  <ng-container *ngIf="calc.images && calc.images.length > 0; else noImageAvatar">
+                    <img [src]="getCalcDisplayImage(calc)" 
+                         class="w-full h-full object-cover transition-opacity duration-300"
+                         alt="Preview" />
+                  </ng-container>
+                  <ng-template #noImageAvatar>
+                    <span class="text-white text-lg">📋</span>
+                  </ng-template>
+                </div>
+                <!-- Info del cálculo -->
+                <div class="flex-1 min-w-0">
+                  <div class="font-medium text-gray-800 truncate">{{ calc.title || '(Sin título)' }}</div>
+                  <div class="text-xs text-gray-500">{{ calc.createdAt | date:'dd/MM/yyyy HH:mm' }}</div>
+                  <!-- Indicador de múltiples imágenes -->
+                  <div *ngIf="calc.images && calc.images.length > 1" class="flex gap-0.5 mt-1">
+                    <span *ngFor="let img of calc.images; let i = index" 
+                      class="w-1.5 h-1.5 rounded-full transition-colors"
+                      [class.bg-indigo-500]="i === getCalcImageIndex(calc)"
+                      [class.bg-gray-300]="i !== getCalcImageIndex(calc)">
+                    </span>
+                  </div>
+                </div>
+                <!-- Campo de carpeta -->
+                <div class="flex-shrink-0 w-full sm:w-32">
+                  <input
+                    [ngModel]="getFolderDraft(calc)"
+                    (ngModelChange)="setFolderDraft(calc, $event)"
+                    (keydown.enter)="$event.preventDefault(); saveCalcFolderOnEnter(calc)"
+                    class="w-full px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    placeholder="Carpeta..."
+                  />
+                </div>
+                <!-- Botones de acción (grandes para móvil) -->
+                <div class="flex gap-2 flex-shrink-0">
+                  <button 
+                    (click)="loadCalculationAndClose(calc)" 
+                    class="flex-1 sm:flex-none px-4 py-3 sm:py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 active:bg-indigo-800 transition text-sm"
+                    style="min-width: 70px; touch-action: manipulation;"
+                  >
+                    📥 Cargar
+                  </button>
+                  <button 
+                    (click)="deleteSavedCalculation(calc)" 
+                    class="flex-1 sm:flex-none px-4 py-3 sm:py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 active:bg-red-700 transition text-sm"
+                    style="min-width: 70px; touch-action: manipulation;"
+                  >
+                    🗑️ Eliminar
+                  </button>
+                </div>
+              </div>
+              <!-- Fila inferior: Precio + botón Ver -->
+              <div class="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
+                <div class="flex items-center gap-2">
+                  <span class="text-xs text-gray-500">💼 Comerciante:</span>
+                  <span class="font-bold text-indigo-700">${{ getCalcMerchantPrice(calc) | number:'1.2-2' }}</span>
+                </div>
+                <button 
+                  (click)="openQuickPreview(calc)" 
+                  class="px-4 py-2 bg-emerald-500 text-white rounded-lg font-medium hover:bg-emerald-600 active:bg-emerald-700 transition text-sm flex items-center gap-1"
+                  style="touch-action: manipulation;"
+                  title="Ver resultados sin cargar"
+                >
+                  👁️ Ver detalles
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <ng-template #noSavedModal>
+        <div class="text-center py-12 text-gray-500">
+          <div class="text-4xl mb-3">📭</div>
+          <p>No hay cálculos guardados.</p>
+          <p class="text-sm mt-1">Guarda un cálculo para verlo aquí.</p>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Vista previa rápida de resultados -->
+<div *ngIf="isQuickPreviewOpen && quickPreviewCalc && quickPreviewResults" 
+  class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60] p-2"
+  (click)="closeQuickPreview()"
+  style="overscroll-behavior: contain;">
+  <div 
+    (click)="$event.stopPropagation()" 
+    class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[95vh] flex flex-col overflow-hidden"
+    style="overscroll-behavior: contain;">
+    <!-- Header -->
+    <div class="flex items-center justify-between px-4 py-3 border-b bg-gradient-to-r from-emerald-500 to-teal-500 text-white">
+      <div class="flex items-center gap-3">
+        <!-- Avatar del cálculo -->
+        <div class="w-10 h-10 rounded-full bg-white bg-opacity-20 flex items-center justify-center overflow-hidden shadow-md">
+          <ng-container *ngIf="quickPreviewCalc.images && quickPreviewCalc.images.length > 0; else noPreviewImg">
+            <img [src]="quickPreviewCalc.images[0]" class="w-full h-full object-cover" alt="Preview" />
+          </ng-container>
+          <ng-template #noPreviewImg>
+            <span class="text-white text-lg">📋</span>
+          </ng-template>
+        </div>
+        <div>
+          <h3 class="font-bold text-lg leading-tight">{{ quickPreviewCalc.title || '(Sin título)' }}</h3>
+          <p class="text-xs text-emerald-100">Vista rápida de resultados</p>
+        </div>
+      </div>
+      <button (click)="closeQuickPreview()" class="w-10 h-10 flex items-center justify-center text-white hover:bg-white hover:bg-opacity-20 rounded-full text-2xl transition" title="Cerrar">&times;</button>
+    </div>
+    <!-- Contenido scrolleable -->
+    <div class="flex-1 overflow-auto p-4" style="overscroll-behavior: contain; -webkit-overflow-scrolling: touch;">
+      <!-- Resumen de precios -->
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        <div class="bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-xl p-3 text-center shadow-lg">
+          <div class="text-xs opacity-80 mb-1">💼 Comerciante</div>
+          <div class="text-2xl font-bold">${{ quickPreviewResults.merchantPrice | number:'1.2-2' }}</div>
+        </div>
+        <div class="bg-gradient-to-br from-pink-500 to-rose-600 text-white rounded-xl p-3 text-center shadow-lg">
+          <div class="text-xs opacity-80 mb-1">🏪 Público</div>
+          <div class="text-2xl font-bold">${{ quickPreviewResults.publicPrice | number:'1.2-2' }}</div>
+        </div>
+      </div>
+      
+      <!-- Costos resumidos -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 text-sm">
+        <div class="bg-gray-100 rounded-lg p-2 text-center">
+          <div class="text-xs text-gray-500">🥕 Ingredientes</div>
+          <div class="font-semibold text-gray-800">${{ quickPreviewResults.ingredientsCost | number:'1.2-2' }}</div>
+        </div>
+        <div class="bg-gray-100 rounded-lg p-2 text-center">
+          <div class="text-xs text-gray-500">👷 Mano de obra</div>
+          <div class="font-semibold text-gray-800">${{ quickPreviewResults.laborCost | number:'1.2-2' }}</div>
+        </div>
+        <div class="bg-gray-100 rounded-lg p-2 text-center">
+          <div class="text-xs text-gray-500">📊 Costo base</div>
+          <div class="font-semibold text-gray-800">${{ quickPreviewResults.baseCost | number:'1.2-2' }}</div>
+        </div>
+        <div class="bg-gray-100 rounded-lg p-2 text-center">
+          <div class="text-xs text-gray-500">📈 Factor</div>
+          <div class="font-semibold text-gray-800">×{{ quickPreviewResults.merchantFactor | number:'1.2-2' }}</div>
+        </div>
+      </div>
+
+      <!-- Tabla de desglose -->
+      <div *ngIf="quickPreviewResults.breakdown.length > 0" class="bg-gray-50 rounded-lg p-3">
+        <h4 class="font-semibold text-gray-700 mb-2 text-sm">📋 Desglose del precio</h4>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="border-b text-gray-500">
+                <th class="text-left py-1.5 px-2">Concepto</th>
+                <th class="text-right py-1.5 px-2">Costo</th>
+                <th class="text-right py-1.5 px-2">Ganancia</th>
+                <th class="text-right py-1.5 px-2">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of quickPreviewResults.breakdown" 
+                class="border-b border-gray-200"
+                [ngClass]="{
+                  'bg-amber-50': item.type === 'cost_profit',
+                  'bg-green-50': item.type === 'ingredient',
+                  'bg-blue-50': item.type === 'labor',
+                  'bg-gray-100': item.type === 'cost_fixed',
+                  'bg-purple-50 font-medium': item.type === 'rounding_adjust'
+                }">
+                <td class="py-1.5 px-2 truncate max-w-[120px]" [title]="item.description">{{ item.description }}</td>
+                <td class="text-right py-1.5 px-2">${{ item.cost | number:'1.2-2' }}</td>
+                <td class="text-right py-1.5 px-2">
+                  <span *ngIf="item.profit !== null" [ngClass]="{'text-green-600': (item.profit || 0) > 0, 'text-red-500': (item.profit || 0) < 0}">
+                    {{ (item.profit || 0) >= 0 ? '+' : '' }}${{ item.profit | number:'1.2-2' }}
+                  </span>
+                  <span *ngIf="item.profit === null" class="text-gray-400">—</span>
+                </td>
+                <td class="text-right py-1.5 px-2 font-medium">${{ item.total | number:'1.2-2' }}</td>
+              </tr>
+            </tbody>
+            <tfoot class="bg-gray-200 font-semibold">
+              <tr>
+                <td class="py-2 px-2">Total</td>
+                <td class="text-right py-2 px-2">${{ quickPreviewResults.baseCost + quickPreviewResults.costsWithProfitSum | number:'1.2-2' }}</td>
+                <td class="text-right py-2 px-2 text-green-600">
+                  +${{ quickPreviewResults.merchantPrice - quickPreviewResults.baseCost - quickPreviewResults.costsWithProfitSum | number:'1.2-2' }}
+                </td>
+                <td class="text-right py-2 px-2">${{ quickPreviewResults.merchantPrice | number:'1.2-2' }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <!-- Botón para cargar este cálculo -->
+      <div class="mt-4 flex gap-2">
+        <button 
+          (click)="closeQuickPreview(); loadCalculationAndClose(quickPreviewCalc!)" 
+          class="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 active:bg-indigo-800 transition"
+          style="touch-action: manipulation;">
+          📥 Cargar este cálculo
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

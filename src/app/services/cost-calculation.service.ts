@@ -24,20 +24,34 @@ export interface LaborInfo {
   minutes: string;
 }
 
+/** Entrada de mano de obra con selección de tarifa */
+export interface LaborEntry {
+  description?: string; // Concepto/descripción de la mano de obra
+  hours: string;
+  minutes: string;
+  rateType: 'default' | 'fixed50'; // 'default' = $34.85/hr, 'fixed50' = $50/hr
+}
+
 export interface CostCalculation {
   id?: string;
   title: string;
+  /** Carpeta para agrupar en la lista (opcional, compatible con recetas antiguas) */
+  folder?: string;
   links: string[];
   costsWithoutProfit: CostItem[];
   costsWithProfit: CostItem[];
-  labor: LaborInfo;
+  labor: LaborInfo; // Formato antiguo (compatibilidad)
+  laborEntries?: LaborEntry[]; // Nuevo formato: múltiples entradas con tarifa
   forceBaseCost: string;
   forceMerchantFactor: string;
   forcePublicFactor: string;
   merchantRounding: string;
   publicRounding: string;
   images: string[]; // dataURL base64 de máximo 3 imágenes
-  selectedIngredients: { ingredientId: string; quantity: number }[];
+  // `quantityUnit` es opcional para compatibilidad con recetas antiguas:
+  // si no existe, se asume la unidad base del ingrediente (p.ej. KG o L).
+  // `portions` es el número de porciones (ej: 3 porciones de 300g cada una)
+  selectedIngredients: { ingredientId: string; quantity: number; quantityUnit?: 'KG' | 'G' | 'L' | 'ML' | 'PZ'; portions?: number }[];
   userId: string; // uid del usuario
   createdAt: number; // timestamp en milisegundos
 }
