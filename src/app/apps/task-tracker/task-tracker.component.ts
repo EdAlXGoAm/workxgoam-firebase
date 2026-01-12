@@ -51,6 +51,7 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
   tasks: Task[] = [];
   projects: Project[] = [];
   environments: Environment[] = [];
+  private _orderedEnvironmentsCache: Environment[] = [];
   taskTypes: TaskType[] = [];
   filteredTasks: Task[] = [];
   showNewEnvironmentModal = false;
@@ -493,6 +494,7 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
       id: doc.id,
       ...doc.data()
     } as Environment));
+    this.updateOrderedEnvironmentsCache();
   }
 
   private async loadTaskTypes() {
@@ -2696,57 +2698,42 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
 
   // Nuevo: Métodos para manejar environments
   get orderedEnvironments(): Environment[] {
-    // Detectar si estamos en dispositivo móvil (ancho < 768px)
+    return this._orderedEnvironmentsCache;
+  }
+
+  updateOrderedEnvironmentsCache(): void {
     const isMobile = window.innerWidth < 768;
     
-    console.log('🔍 orderedEnvironments - isMobile:', isMobile, 'window.innerWidth:', window.innerWidth);
-    
-    const result = [...this.environments].sort((a, b) => {
-      // En móviles, solo usar el orden personalizado sin priorizar por tareas
+    this._orderedEnvironmentsCache = [...this.environments].sort((a, b) => {
       if (isMobile) {
         const aOrder = this.environmentCustomOrder[a.id] ?? Infinity;
         const bOrder = this.environmentCustomOrder[b.id] ?? Infinity;
-        
-        console.log(`  📱 Móvil - Comparando ${a.name} (orden: ${aOrder}) vs ${b.name} (orden: ${bOrder})`);
         
         if (aOrder !== Infinity || bOrder !== Infinity) {
           if (aOrder !== bOrder) {
             return aOrder - bOrder;
           }
         }
-        
-        // Fallback alfabético si no hay orden personalizado
         return a.name.localeCompare(b.name);
       }
       
-      // En desktop, mantener la lógica original: priorizar environments con tareas
       const aHasTasks = this.environmentHasTasks(a.id);
       const bHasTasks = this.environmentHasTasks(b.id);
       
-      console.log(`  🖥️ Desktop - ${a.name} (tareas: ${aHasTasks}) vs ${b.name} (tareas: ${bHasTasks})`);
-      
-      // Environments con tareas van primero
       if (aHasTasks && !bHasTasks) return -1;
       if (!aHasTasks && bHasTasks) return 1;
       
-      // Dentro del mismo grupo, usar orden personalizado si existe
       const aOrder = this.environmentCustomOrder[a.id] ?? Infinity;
       const bOrder = this.environmentCustomOrder[b.id] ?? Infinity;
       
       if (aOrder !== Infinity || bOrder !== Infinity) {
-        // Si alguno tiene orden personalizado, usarlo
         if (aOrder !== bOrder) {
           return aOrder - bOrder;
         }
       }
       
-      // Si no hay orden personalizado, ordenar alfabéticamente (fallback)
       return a.name.localeCompare(b.name);
     });
-    
-    console.log('✅ Resultado final:', result.map(e => `${e.name} (orden: ${this.environmentCustomOrder[e.id]})`));
-    
-    return result;
   }
 
   environmentHasTasks(environmentId: string): boolean {
@@ -2919,20 +2906,11 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === 'object') {
           this.environmentCustomOrder = parsed;
-          console.log('📦 Orden personalizado cargado desde cache:', this.environmentCustomOrder);
-          
-          // Depuración: mostrar el orden con nombres de environments
-          const orderDebug = Object.entries(this.environmentCustomOrder).map(([id, order]) => {
-            const env = this.environments.find(e => e.id === id);
-            return `${env?.name || id}: ${order}`;
-          });
-          console.log('📋 Orden con nombres:', orderDebug);
+          this.updateOrderedEnvironmentsCache();
         }
-      } else {
-        console.log('⚠️ No se encontró orden personalizado en cache, se inicializará uno nuevo');
       }
     } catch (error) {
-      console.error('❌ Error al cargar el orden personalizado:', error);
+      console.error('Error al cargar el orden personalizado:', error);
     }
   }
   
@@ -2970,7 +2948,7 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
   private saveEnvironmentCustomOrder(): void {
     try {
       localStorage.setItem('taskTracker_envCustomOrder', JSON.stringify(this.environmentCustomOrder));
-      console.log('Orden personalizado guardado:', this.environmentCustomOrder);
+      this.updateOrderedEnvironmentsCache();
     } catch (error) {
       console.error('Error al guardar el orden personalizado:', error);
     }

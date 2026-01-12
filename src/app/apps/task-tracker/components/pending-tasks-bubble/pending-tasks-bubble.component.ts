@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, OnChanges, SimpleChanges, HostListener } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, OnChanges, SimpleChanges, HostListener, ChangeDetectionStrategy, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Task } from '../../models/task.model';
 import { Project } from '../../models/project.model';
@@ -9,72 +9,37 @@ import { TaskType } from '../../models/task-type.model';
   selector: 'app-pending-tasks-bubble',
   standalone: true,
   imports: [CommonModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <!-- Burbuja Flotante -->
-    <div class="floating-bubble" 
-         [class.has-tasks]="pendingTasks.length > 0"
-         [class.no-tasks]="pendingTasks.length === 0"
-         [class.dragging]="isDragging"
-         [style.top.%]="bubbleTopPosition"
-         (click)="onBubbleClick($event)"
-         (mousedown)="onBubbleMouseDown($event)"
-         (touchstart)="onBubbleTouchStart($event)"
-         [title]="getBubbleTooltip()">
-      <svg class="bubble-svg-content" viewBox="0 0 80 80" preserveAspectRatio="xMidYMid meet">
-        <!-- Drag indicator (puntos arriba) -->
-        <g class="drag-indicator-group">
-          <circle cx="30" cy="8" r="1.5" fill="rgba(255, 255, 255, 0.6)"/>
-          <circle cx="30" cy="12" r="1.5" fill="rgba(255, 255, 255, 0.6)"/>
-          <circle cx="35" cy="8" r="1.5" fill="rgba(255, 255, 255, 0.6)"/>
-          <circle cx="35" cy="12" r="1.5" fill="rgba(255, 255, 255, 0.6)"/>
-          <circle cx="40" cy="8" r="1.5" fill="rgba(255, 255, 255, 0.6)"/>
-          <circle cx="40" cy="12" r="1.5" fill="rgba(255, 255, 255, 0.6)"/>
-          <circle cx="45" cy="8" r="1.5" fill="rgba(255, 255, 255, 0.6)"/>
-          <circle cx="45" cy="12" r="1.5" fill="rgba(255, 255, 255, 0.6)"/>
-          <circle cx="50" cy="8" r="1.5" fill="rgba(255, 255, 255, 0.6)"/>
-          <circle cx="50" cy="12" r="1.5" fill="rgba(255, 255, 255, 0.6)"/>
-        </g>
-        
-        <!-- Ícono de tareas -->
-        <g class="bubble-icon-group" transform="translate(40, 25)">
-          <path d="M-8,-8 L8,-8 L8,8 L-8,8 Z M-6,-2 L-2,-2 L-2,2 L-6,2 Z M0,-2 L6,-2 M0,2 L6,2" 
-                stroke="white" 
-                stroke-width="1.5" 
-                fill="none" 
-                stroke-linecap="round"/>
-          <polyline points="-5,-5 -3,-3 -1,-5" 
-                    stroke="white" 
-                    stroke-width="1.5" 
-                    fill="none" 
-                    stroke-linecap="round" 
-                    stroke-linejoin="round"/>
-        </g>
-        
-        <!-- Contador de tareas -->
-        <text x="40" y="48" 
-              text-anchor="middle" 
-              dominant-baseline="middle" 
-              fill="white" 
-              font-size="14" 
-              font-weight="bold" 
-              font-family="monospace"
-              class="bubble-count-text">
-          {{ pendingTasks.length }}
-        </text>
-        
-        <!-- Label "Pendientes" -->
-        <text x="40" y="60" 
-              text-anchor="middle" 
-              dominant-baseline="middle" 
-              fill="white" 
-              font-size="6" 
-              font-weight="normal" 
-              letter-spacing="0.5"
-              opacity="0.9"
-              class="bubble-label-text">
-          PENDIENTES
-        </text>
-      </svg>
+    <div
+      (click)="onBubbleClick($event)"
+      (mousedown)="onBubbleMouseDown($event)"
+      (touchstart)="onBubbleTouchStart($event)"
+      class="fixed right-3 z-40 w-14 h-14 rounded-full text-white shadow-lg flex items-center justify-center select-none overflow-visible"
+      [class.bg-orange-500]="pendingTasks.length > 0"
+      [class.bg-slate-500]="pendingTasks.length === 0"
+      [class.scale-110]="isDragging"
+      [class.cursor-grabbing]="isDragging"
+      [class.cursor-grab]="!isDragging"
+      [style.top.%]="bubbleTopPosition"
+      [style.transform]="'translateY(-50%)'"
+      [title]="getBubbleTooltip()"
+      style="touch-action: none; transition: box-shadow 0.2s;"
+    >
+      <!-- Indicador de drag (puntos) -->
+      <div class="absolute top-1 left-1/2 -translate-x-1/2 flex gap-0.5 opacity-50 pointer-events-none">
+        <span class="w-1 h-1 bg-white rounded-full"></span>
+        <span class="w-1 h-1 bg-white rounded-full"></span>
+        <span class="w-1 h-1 bg-white rounded-full"></span>
+      </div>
+      <span class="text-xl pointer-events-none">📋</span>
+      <!-- Badge contador -->
+      <span *ngIf="pendingTasks.length > 0" 
+        class="absolute w-6 h-6 bg-red-500 rounded-full text-xs font-bold flex items-center justify-center shadow-md border-2 border-white pointer-events-none"
+        style="top: -4px; left: -4px;">
+        {{ pendingTasks.length }}
+      </span>
     </div>
 
     <!-- Modal (cuando se hace click en la burbuja) -->
@@ -269,77 +234,6 @@ import { TaskType } from '../../models/task-type.model';
     .priority-high { background-color: #ef4444; }
     .priority-critical { background-color: #dc2626; color: white; }
     
-    /* Burbuja flotante */
-    .floating-bubble {
-      position: fixed;
-      right: 20px;
-      top: 40%;
-      transform: translateY(-50%);
-      width: 80px;
-      height: 80px;
-      border-radius: 50%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      cursor: move;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      z-index: 999;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 0 rgba(251, 146, 60, 0.5);
-      animation: pulse 2s infinite;
-      user-select: none;
-      -webkit-user-select: none;
-      touch-action: none;
-    }
-    
-    .floating-bubble.dragging {
-      cursor: grabbing;
-      transform: translateY(-50%) scale(1.1);
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25), 0 0 0 0 rgba(251, 146, 60, 0.5);
-      animation: none;
-      transition: none;
-    }
-    
-    .floating-bubble.has-tasks {
-      background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
-    }
-    
-    .floating-bubble.no-tasks {
-      background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
-    }
-    
-    .floating-bubble:hover {
-      transform: translateY(-50%) scale(1.1);
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25), 0 0 0 0 rgba(251, 146, 60, 0.5);
-    }
-    
-    @keyframes pulse {
-      0%, 100% {
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 0 rgba(251, 146, 60, 0.5);
-      }
-      50% {
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 15px rgba(251, 146, 60, 0);
-      }
-    }
-    
-    .bubble-svg-content {
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      overflow: visible;
-    }
-    
-    .floating-bubble:hover .drag-indicator-group circle {
-      fill: rgba(255, 255, 255, 0.9);
-    }
-    
-    .bubble-count-text {
-      user-select: none;
-    }
-    
-    .bubble-label-text {
-      user-select: none;
-    }
     
     /* Modal */
     .modal-backdrop {
@@ -569,29 +463,6 @@ import { TaskType } from '../../models/task-type.model';
     
      /* Responsivo para móviles */
      @media (max-width: 768px) {
-       .floating-bubble {
-         width: 70px;
-         height: 70px;
-         right: 15px;
-       }
-       
-       .bubble-svg-content {
-         width: 100%;
-         height: 100%;
-       }
-       
-       .bubble-count-text {
-         font-size: 12px;
-       }
-       
-       .bubble-label-text {
-         font-size: 5px;
-       }
-       
-       .drag-indicator-group circle {
-         r: 1.2;
-       }
-       
        .project-dropdown {
          min-width: calc(100vw - 40px);
          max-width: calc(100vw - 40px);
@@ -634,6 +505,13 @@ export class PendingTasksBubbleComponent implements OnInit, OnDestroy, OnChanges
   private dragStartY: number = 0;
   private dragStartTop: number = 0;
   private lastDragEndTime: number = 0;
+  
+  // Sistema "hold to drag" - requiere mantener presionado antes de arrastrar
+  private bubbleDragEnabled = false;
+  private bubbleHoldTimer: any = null;
+  private readonly HOLD_TO_DRAG_DELAY = 400; // ms que hay que mantener presionado para activar drag
+
+  constructor(private cdr: ChangeDetectorRef, private ngZone: NgZone) {}
 
   ngOnInit() {
     this.loadBubblePosition();
@@ -641,6 +519,11 @@ export class PendingTasksBubbleComponent implements OnInit, OnDestroy, OnChanges
   }
 
   ngOnDestroy() {
+    // Cancelar timer de hold-to-drag si existe
+    if (this.bubbleHoldTimer) {
+      clearTimeout(this.bubbleHoldTimer);
+      this.bubbleHoldTimer = null;
+    }
     // Restaurar overflow del body por si acaso
     document.body.style.overflow = '';
     // Cerrar dropdown si está abierto
@@ -970,6 +853,7 @@ export class PendingTasksBubbleComponent implements OnInit, OnDestroy, OnChanges
 
   toggleModal(): void {
     this.isModalOpen = !this.isModalOpen;
+    this.cdr.markForCheck();
     if (this.isModalOpen) {
       document.body.style.overflow = 'hidden';
     } else {
@@ -982,6 +866,7 @@ export class PendingTasksBubbleComponent implements OnInit, OnDestroy, OnChanges
     this.openDropdownTaskId = null;
     this.showSortDropdown = false;
     this.sortDropdownPosition = null;
+    this.cdr.markForCheck();
     this.dropdownPositions = {};
     document.body.style.overflow = '';
   }
@@ -1132,90 +1017,115 @@ export class PendingTasksBubbleComponent implements OnInit, OnDestroy, OnChanges
   onBubbleMouseDown(event: MouseEvent): void {
     this.dragStartY = event.clientY;
     this.dragStartTop = this.bubbleTopPosition;
+    this.bubbleDragEnabled = false;
     let hasMoved = false;
     const startTime = Date.now();
+
+    // Timer para activar modo drag después de mantener presionado
+    this.bubbleHoldTimer = setTimeout(() => {
+      this.bubbleDragEnabled = true;
+    }, this.HOLD_TO_DRAG_DELAY);
     
     const mouseMoveHandler = (e: MouseEvent) => {
-      const deltaY = Math.abs(e.clientY - this.dragStartY);
+      // Solo permitir drag si se mantuvo presionado el tiempo suficiente
+      if (!this.bubbleDragEnabled) return;
       
-      if (!hasMoved && deltaY > 15) {
+      const deltaY = Math.abs(e.clientY - this.dragStartY);
+      if (!hasMoved && deltaY > 5) {
         hasMoved = true;
         this.isDragging = true;
         event.preventDefault();
       }
-      
       if (hasMoved) {
         this.onDragMove(e.clientY);
       }
     };
     
     const mouseUpHandler = (e: MouseEvent) => {
-      const clickTime = Date.now() - startTime;
+      // Cancelar timer si existe
+      if (this.bubbleHoldTimer) {
+        clearTimeout(this.bubbleHoldTimer);
+        this.bubbleHoldTimer = null;
+      }
       
       if (hasMoved) {
         this.endDrag();
-        // Prevenir que el evento click se dispare después del drag
-        e.preventDefault();
-        e.stopPropagation();
-        // Marcar que acabamos de hacer drag
-        this.lastDragEndTime = Date.now();
-      } else if (clickTime < 300) {
-        // Si fue un click rápido sin movimiento, abrir modal
-        // Prevenir el evento click para evitar doble apertura
         e.preventDefault();
         e.stopPropagation();
         this.lastDragEndTime = Date.now();
-        this.toggleModal();
+      } else {
+        // Click normal - no hacemos nada aquí, dejamos que el evento click lo procese
       }
+      this.bubbleDragEnabled = false;
       document.removeEventListener('mousemove', mouseMoveHandler);
       document.removeEventListener('mouseup', mouseUpHandler);
     };
     
-    document.addEventListener('mousemove', mouseMoveHandler);
-    document.addEventListener('mouseup', mouseUpHandler, { once: true });
+    this.ngZone.runOutsideAngular(() => {
+      document.addEventListener('mousemove', mouseMoveHandler);
+      document.addEventListener('mouseup', mouseUpHandler, { once: true });
+    });
   }
 
   onBubbleTouchStart(event: TouchEvent): void {
     if (event.touches.length !== 1) return;
-    
     const touch = event.touches[0];
     this.dragStartY = touch.clientY;
     this.dragStartTop = this.bubbleTopPosition;
+    this.bubbleDragEnabled = false;
     let hasMoved = false;
     const startTime = Date.now();
-    
+
+    // Timer para activar modo drag después de mantener presionado
+    this.bubbleHoldTimer = setTimeout(() => {
+      this.bubbleDragEnabled = true;
+    }, this.HOLD_TO_DRAG_DELAY);
+
     const touchMoveHandler = (e: TouchEvent) => {
+      // Solo permitir drag si se mantuvo presionado el tiempo suficiente
+      if (!this.bubbleDragEnabled) return;
+      
       if (e.touches.length === 1) {
         const deltaY = Math.abs(e.touches[0].clientY - this.dragStartY);
-        
-        if (!hasMoved && deltaY > 20) {
+        if (!hasMoved && deltaY > 5) {
           hasMoved = true;
           this.isDragging = true;
           e.preventDefault();
         }
-        
         if (hasMoved) {
           this.onDragMove(e.touches[0].clientY);
         }
       }
     };
-    
+
     const touchEndHandler = () => {
-      const tapTime = Date.now() - startTime;
+      // Cancelar timer si existe
+      if (this.bubbleHoldTimer) {
+        clearTimeout(this.bubbleHoldTimer);
+        this.bubbleHoldTimer = null;
+      }
       
       if (hasMoved) {
         this.endDrag();
         this.lastDragEndTime = Date.now();
-      } else if (tapTime < 300) {
-        this.lastDragEndTime = Date.now();
-        this.toggleModal();
+      } else {
+        // Tap normal - abrir modal DIRECTAMENTE (en móvil el evento click puede no dispararse)
+        const tapTime = Date.now() - startTime;
+        if (tapTime < this.HOLD_TO_DRAG_DELAY + 100) { // +100ms de tolerancia
+          this.toggleModal();
+          // Marcar tiempo para prevenir doble toggle si click se dispara después
+          this.lastDragEndTime = Date.now();
+        }
       }
+      this.bubbleDragEnabled = false;
       document.removeEventListener('touchmove', touchMoveHandler);
       document.removeEventListener('touchend', touchEndHandler);
     };
-    
-    document.addEventListener('touchmove', touchMoveHandler, { passive: false });
-    document.addEventListener('touchend', touchEndHandler, { once: true });
+
+    this.ngZone.runOutsideAngular(() => {
+      document.addEventListener('touchmove', touchMoveHandler, { passive: false });
+      document.addEventListener('touchend', touchEndHandler, { once: true });
+    });
   }
 
   private onDragMove(clientY: number): void {
@@ -1231,6 +1141,7 @@ export class PendingTasksBubbleComponent implements OnInit, OnDestroy, OnChanges
     newTop = Math.max(5, Math.min(95, newTop));
     
     this.bubbleTopPosition = newTop;
+    this.cdr.detectChanges();
   }
 
   private endDrag(): void {
@@ -1238,6 +1149,7 @@ export class PendingTasksBubbleComponent implements OnInit, OnDestroy, OnChanges
       this.isDragging = false;
       this.lastDragEndTime = Date.now();
       this.saveBubblePosition();
+      this.cdr.markForCheck();
     }
   }
 

@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TimelineSvgComponent } from '../timeline-svg/timeline-svg.component';
@@ -358,10 +358,11 @@ import { TaskType } from '../../models/task-type.model';
     button[disabled]:hover { opacity: 0.4; }
   `]
 })
-export class BoardViewComponent {
+export class BoardViewComponent implements OnChanges {
   @Input() tasks: Task[] = [];
   @Input() projects: Project[] = [];
   @Input() environments: Environment[] = [];
+  private _orderedEnvironmentsCache: Environment[] = [];
   @Input() taskTypes: TaskType[] = [];
   @Input() showHidden: boolean = false;
   @Input() environmentHiddenVisibility: { [envId: string]: 'hidden' | 'show-all' | 'show-24h' | 'date-range' } = {};
@@ -394,49 +395,47 @@ export class BoardViewComponent {
   collapsedEnvironments: { [envId: string]: boolean } = {};
   collapsedProjects: { [projectId: string]: boolean } = {};
 
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['environments'] || changes['environmentCustomOrder'] || changes['tasks']) {
+      this.updateOrderedEnvironmentsCache();
+    }
+  }
+
   get orderedEnvironments(): Environment[] {
-    // Detectar si estamos en dispositivo móvil (ancho < 768px)
+    return this._orderedEnvironmentsCache;
+  }
+
+  private updateOrderedEnvironmentsCache(): void {
     const isMobile = window.innerWidth < 768;
     
-    console.log('🔍 [BOARD-VIEW] orderedEnvironments - isMobile:', isMobile, 'window.innerWidth:', window.innerWidth);
-    
-    return [...this.environments].sort((a, b) => {
-      // En móviles, solo usar el orden personalizado sin priorizar por tareas
+    this._orderedEnvironmentsCache = [...this.environments].sort((a, b) => {
       if (isMobile) {
         const aOrder = this.environmentCustomOrder[a.id] ?? Infinity;
         const bOrder = this.environmentCustomOrder[b.id] ?? Infinity;
-        
-        console.log(`  📱 [BOARD-VIEW] Móvil - Comparando ${a.name} (orden: ${aOrder}) vs ${b.name} (orden: ${bOrder})`);
         
         if (aOrder !== Infinity || bOrder !== Infinity) {
           if (aOrder !== bOrder) {
             return aOrder - bOrder;
           }
         }
-        
-        // Fallback alfabético si no hay orden personalizado
         return a.name.localeCompare(b.name);
       }
       
-      // En desktop, mantener la lógica original: priorizar environments con tareas
       const aHas = this.environmentHasTasks(a.id);
       const bHas = this.environmentHasTasks(b.id);
       
       if (aHas && !bHas) return -1;
       if (!aHas && bHas) return 1;
       
-      // Dentro del mismo grupo, usar orden personalizado si existe
       const aOrder = this.environmentCustomOrder[a.id] ?? Infinity;
       const bOrder = this.environmentCustomOrder[b.id] ?? Infinity;
       
       if (aOrder !== Infinity || bOrder !== Infinity) {
-        // Si alguno tiene orden personalizado, usarlo
         if (aOrder !== bOrder) {
           return aOrder - bOrder;
         }
       }
       
-      // Si no hay orden personalizado, ordenar alfabéticamente (fallback)
       return a.name.localeCompare(b.name);
     });
   }
