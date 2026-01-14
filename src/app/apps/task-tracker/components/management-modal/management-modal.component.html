@@ -1,7 +1,7 @@
 <!-- Modal Backdrop -->
 <div *ngIf="showModal" class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 p-4">
   <!-- Modal Content -->
-  <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl transform transition-all">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl transform transition-all" (click)="$event.stopPropagation()">
     <!-- Modal Header -->
     <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200">
       <h3 class="text-xl font-semibold text-gray-800">Gestionar Entornos y Proyectos</h3>
@@ -56,6 +56,7 @@
           <li *ngFor="let env of environments" class="bg-white p-4 rounded-lg shadow border border-gray-200 flex justify-between items-center hover:shadow-md transition-shadow">
             <div class="flex items-center">
               <div class="w-4 h-4 rounded-full mr-3" [style.background-color]="env.color"></div>
+              <span *ngIf="env.emoji" class="text-xl mr-2">{{ env.emoji }}</span>
             <div>
               <p class="font-semibold text-gray-800">{{ env.name }}</p>
                 <p class="text-xs text-gray-500">{{ getProjectCountByEnvironment(env.id) }} proyecto(s)</p>
@@ -114,218 +115,16 @@
   </div>
 </div>
 
-<!-- Modal para Agregar Entorno -->
-<div *ngIf="showAddEnvironmentModal" class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 p-4">
-  <div class="bg-white rounded-xl shadow-2xl w-full max-w-md transition-all">
-    <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200">
-      <h3 class="text-xl font-semibold text-gray-800">Agregar Nuevo Entorno</h3>
-      <button (click)="closeEnvironmentModal()" class="text-gray-400 hover:text-gray-600 transition">
-        <i class="fas fa-times fa-lg"></i>
-      </button>
-    </div>
-    <div class="p-6">
-      <form (ngSubmit)="saveEnvironment()" class="space-y-4">
-        <div>
-          <label for="envName" class="block text-sm font-medium text-gray-700 mb-1">Nombre del Entorno</label>
-          <input type="text" id="envName" name="envName" [(ngModel)]="currentEnvironment.name" required 
-                 class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                 placeholder="Ingresa el nombre del entorno">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-3">Color</label>
-          
-          <!-- Colores sugeridos -->
-          <div class="mb-6">
-            <p class="text-xs text-gray-500 mb-3">Colores sugeridos:</p>
-            <div class="flex flex-wrap gap-2">
-              <button
-                *ngFor="let color of suggestedColors"
-                type="button"
-                (click)="selectSuggestedColor(color)"
-                class="w-8 h-8 rounded-full border-2 hover:scale-110 transition-transform focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                [style.background-color]="color"
-                [class.border-gray-800]="currentEnvironment.color === color"
-                [class.border-gray-300]="currentEnvironment.color !== color"
-                [title]="color">
-              </button>
-            </div>
-          </div>
-
-          <!-- Color Picker Personalizado -->
-          <div class="mb-4">
-            <p class="text-xs text-gray-500 mb-3">O elige un color personalizado:</p>
-            <div class="flex gap-4">
-              <!-- Área principal del color picker -->
-              <div class="relative">
-                <div 
-                  class="w-48 h-32 border border-gray-300 rounded-lg cursor-crosshair relative overflow-hidden"
-                  [style.background]="'linear-gradient(to right, white, hsl(' + colorPickerHue + ', 100%, 50%)), linear-gradient(to top, black, transparent)'"
-                  (click)="onColorAreaClick($event)">
-                  
-                  <!-- Indicador de posición -->
-                  <div 
-                    class="absolute w-3 h-3 border-2 border-white rounded-full transform -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-                    [style.left]="colorPickerSaturation + '%'"
-                    [style.top]="(100 - colorPickerLightness) + '%'"
-                    style="box-shadow: 0 0 0 1px rgba(0,0,0,0.3);">
-                  </div>
-                </div>
-              </div>
-
-              <!-- Barra de matiz -->
-              <div class="relative">
-                <div 
-                  class="w-6 h-32 border border-gray-300 rounded cursor-pointer"
-                  style="background: linear-gradient(to bottom, 
-                    hsl(0, 100%, 50%) 0%, 
-                    hsl(60, 100%, 50%) 16.66%, 
-                    hsl(120, 100%, 50%) 33.33%, 
-                    hsl(180, 100%, 50%) 50%, 
-                    hsl(240, 100%, 50%) 66.66%, 
-                    hsl(300, 100%, 50%) 83.33%, 
-                    hsl(360, 100%, 50%) 100%)"
-                  (click)="onHueBarClick($event)">
-                  
-                  <!-- Indicador de matiz -->
-                  <div 
-                    class="absolute w-full h-0.5 bg-white border border-gray-400 transform -translate-y-1/2 pointer-events-none"
-                    [style.top]="(colorPickerHue / 360) * 100 + '%'">
-                  </div>
-                </div>
-              </div>
-
-              <!-- Vista previa -->
-              <div class="flex flex-col items-center gap-2">
-                <p class="text-xs text-gray-500">Vista previa:</p>
-                <div 
-                  class="w-16 h-16 border border-gray-300 rounded-lg"
-                  [style.background-color]="currentEnvironment.color || '#3B82F6'">
-                </div>
-                <p class="text-xs font-mono text-gray-600">{{ currentEnvironment.color || '#3B82F6' }}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="flex justify-end space-x-3 pt-4">
-          <button type="button" (click)="closeEnvironmentModal()"
-                  class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none">
-            Cancelar
-          </button>
-          <button type="submit"
-                  class="px-4 py-2 bg-indigo-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-            Crear Entorno
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
-<!-- Modal para Editar Entorno -->
-<div *ngIf="showEditEnvironmentModal" class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 p-4">
-  <div class="bg-white rounded-xl shadow-2xl w-full max-w-md transition-all">
-    <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200">
-      <h3 class="text-xl font-semibold text-gray-800">Editar Entorno</h3>
-      <button (click)="closeEnvironmentModal()" class="text-gray-400 hover:text-gray-600 transition">
-        <i class="fas fa-times fa-lg"></i>
-      </button>
-    </div>
-    <div class="p-6">
-      <form (ngSubmit)="saveEnvironment()" class="space-y-4">
-        <div>
-          <label for="editEnvName" class="block text-sm font-medium text-gray-700 mb-1">Nombre del Entorno</label>
-          <input type="text" id="editEnvName" name="editEnvName" [(ngModel)]="currentEnvironment.name" required 
-                 class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-3">Color</label>
-          
-          <!-- Colores sugeridos -->
-          <div class="mb-6">
-            <p class="text-xs text-gray-500 mb-3">Colores sugeridos:</p>
-            <div class="flex flex-wrap gap-2">
-              <button
-                *ngFor="let color of suggestedColors"
-                type="button"
-                (click)="selectSuggestedColor(color)"
-                class="w-8 h-8 rounded-full border-2 hover:scale-110 transition-transform focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                [style.background-color]="color"
-                [class.border-gray-800]="currentEnvironment.color === color"
-                [class.border-gray-300]="currentEnvironment.color !== color"
-                [title]="color">
-              </button>
-            </div>
-          </div>
-
-          <!-- Color Picker Personalizado -->
-          <div class="mb-4">
-            <p class="text-xs text-gray-500 mb-3">O elige un color personalizado:</p>
-            <div class="flex gap-4">
-              <!-- Área principal del color picker -->
-              <div class="relative">
-                <div 
-                  class="w-48 h-32 border border-gray-300 rounded-lg cursor-crosshair relative overflow-hidden"
-                  [style.background]="'linear-gradient(to right, white, hsl(' + colorPickerHue + ', 100%, 50%)), linear-gradient(to top, black, transparent)'"
-                  (click)="onColorAreaClick($event)">
-                  
-                  <!-- Indicador de posición -->
-                  <div 
-                    class="absolute w-3 h-3 border-2 border-white rounded-full transform -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-                    [style.left]="colorPickerSaturation + '%'"
-                    [style.top]="(100 - colorPickerLightness) + '%'"
-                    style="box-shadow: 0 0 0 1px rgba(0,0,0,0.3);">
-                  </div>
-                </div>
-              </div>
-
-              <!-- Barra de matiz -->
-              <div class="relative">
-                <div 
-                  class="w-6 h-32 border border-gray-300 rounded cursor-pointer"
-                  style="background: linear-gradient(to bottom, 
-                    hsl(0, 100%, 50%) 0%, 
-                    hsl(60, 100%, 50%) 16.66%, 
-                    hsl(120, 100%, 50%) 33.33%, 
-                    hsl(180, 100%, 50%) 50%, 
-                    hsl(240, 100%, 50%) 66.66%, 
-                    hsl(300, 100%, 50%) 83.33%, 
-                    hsl(360, 100%, 50%) 100%)"
-                  (click)="onHueBarClick($event)">
-                  
-                  <!-- Indicador de matiz -->
-                  <div 
-                    class="absolute w-full h-0.5 bg-white border border-gray-400 transform -translate-y-1/2 pointer-events-none"
-                    [style.top]="(colorPickerHue / 360) * 100 + '%'">
-                  </div>
-                </div>
-              </div>
-
-              <!-- Vista previa -->
-              <div class="flex flex-col items-center gap-2">
-                <p class="text-xs text-gray-500">Vista previa:</p>
-                <div 
-                  class="w-16 h-16 border border-gray-300 rounded-lg"
-                  [style.background-color]="currentEnvironment.color || '#3B82F6'">
-                </div>
-                <p class="text-xs font-mono text-gray-600">{{ currentEnvironment.color || '#3B82F6' }}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="flex justify-end space-x-3 pt-4">
-          <button type="button" (click)="closeEnvironmentModal()"
-                  class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none">
-            Cancelar
-          </button>
-          <button type="submit"
-                  class="px-4 py-2 bg-indigo-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-            Guardar Cambios
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
+<!-- Modal de Entorno (componente reutilizable) -->
+<app-environment-modal
+  *ngIf="showEnvironmentModal"
+  [showModal]="showEnvironmentModal"
+  [suggestedColors]="suggestedColors"
+  [isEditing]="environmentToEdit !== null"
+  [initialEnvironment]="environmentToEdit"
+  (closeModal)="closeEnvironmentModal()"
+  (saveEnvironment)="onSaveEnvironment($event)">
+</app-environment-modal>
 
 <!-- Modal para Agregar Proyecto -->
 <div *ngIf="showAddProjectModal" class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-[60] p-4">
@@ -357,7 +156,7 @@
           <select id="projectEnvironment" name="projectEnvironment" [(ngModel)]="currentProject.environment" required
                   class="hidden md:block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white">
             <option [ngValue]="null" disabled>Selecciona un entorno</option>
-            <option *ngFor="let env of environments" [value]="env.id">{{ env.name }}</option>
+            <option *ngFor="let env of environments" [value]="env.id">{{ env.emoji ? env.emoji + ' ' + env.name : env.name }}</option>
           </select>
           
           <!-- Selector personalizado para móvil (<768px) -->
@@ -415,7 +214,7 @@
           <select id="editProjectEnvironment" name="editProjectEnvironment" [(ngModel)]="currentProject.environment" required
                   class="hidden md:block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white">
             <option [ngValue]="null" disabled>Selecciona un entorno</option>
-            <option *ngFor="let env of environments" [value]="env.id">{{ env.name }}</option>
+            <option *ngFor="let env of environments" [value]="env.id">{{ env.emoji ? env.emoji + ' ' + env.name : env.name }}</option>
           </select>
           
           <!-- Selector personalizado para móvil (<768px) -->
@@ -443,4 +242,4 @@
       </form>
     </div>
   </div>
-</div> 
+</div>

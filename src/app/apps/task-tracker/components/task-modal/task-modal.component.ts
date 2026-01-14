@@ -716,7 +716,7 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   buildEnvironmentOptions(): void {
     this.environmentOptions = this.environments.map(env => ({
       value: env.id || '',
-      label: env.name
+      label: env.emoji ? `${env.emoji} ${env.name}` : env.name
     }));
   }
   

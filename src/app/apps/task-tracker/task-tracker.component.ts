@@ -118,7 +118,8 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
   filteredProjects: Project[] = [];
   newEnvironment: Partial<Environment> = {
     name: '',
-    color: '#3B82F6'
+    color: '#3B82F6',
+    emoji: ''
   };
   
   newProject: Partial<Project> = {
@@ -338,12 +339,10 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     console.log('🎬 CONFIGURANDO listener de scroll...');
     // Guardar posición del scroll cuando el usuario hace scroll (con throttling)
     this.scrollHandler = () => {
-      console.log('📜 Evento scroll detectado, posición actual:', window.pageYOffset);
       if (this.scrollSaveTimeout) {
         clearTimeout(this.scrollSaveTimeout);
       }
       this.scrollSaveTimeout = setTimeout(() => {
-        console.log('⏰ Timeout completado, guardando scroll...');
         this.saveScrollPosition();
       }, 250); // Guardar después de 250ms sin scroll
     };
@@ -362,11 +361,9 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
   private saveScrollPosition(): void {
     try {
       const scrollPosition = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
-      console.log('🔵 GUARDANDO posición de scroll:', scrollPosition);
       localStorage.setItem('taskTracker_scrollPosition', JSON.stringify(scrollPosition));
-      console.log('✅ Scroll guardado en localStorage');
     } catch (error) {
-      console.error('❌ Error al guardar la posición del scroll:', error);
+      console.error('Error al guardar la posición del scroll:', error);
     }
   }
 
@@ -741,17 +738,19 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     
     this.buildEnvironmentOptionsForNewProject();
     this.showNewProjectModal = true;
+    document.body.style.overflow = 'hidden';
   }
 
   closeNewProjectModal() {
     this.showNewProjectModal = false;
+    document.body.style.overflow = '';
   }
   
   // Métodos para selector personalizado de nuevo proyecto
   buildEnvironmentOptionsForNewProject(): void {
     this.environmentOptionsForNewProject = this.orderedEnvironments.map(env => ({
       value: env.id || '',
-      label: env.name
+      label: env.emoji ? `${env.emoji} ${env.name}` : env.name
     }));
   }
   
@@ -888,10 +887,11 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     }
   }
 
-  async onSaveNewEnvironment(env: { name: string; color: string }) {
+  async onSaveNewEnvironment(env: { name: string; color: string; emoji?: string }) {
     try {
       this.newEnvironment.name = env.name;
       this.newEnvironment.color = env.color;
+      this.newEnvironment.emoji = env.emoji || '';
       await this.saveNewEnvironment();
     } catch (error) {
       console.error('Error en onSaveNewEnvironment:', error);
@@ -938,7 +938,8 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
   private resetNewEnvironment() {
     this.newEnvironment = {
       name: '',
-      color: '#3B82F6'
+      color: '#3B82F6',
+      emoji: ''
     };
   }
 
@@ -1393,11 +1394,13 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     this.isCalendarExpanded = true;
     
     this.showProjectTasksModal = true;
+    document.body.style.overflow = 'hidden';
     this.closeProjectContextMenu();
   }
 
   closeProjectTasksModal() {
     this.showProjectTasksModal = false;
+    document.body.style.overflow = '';
     this.selectedProjectForTasksModal = null;
     this.projectTasksForModal = [];
     this.projectTaskIncluded = {};
@@ -1424,11 +1427,13 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
       this.newSumTemplateName = '';
     }
     this.showSaveSumTemplateModal = true;
+    document.body.style.overflow = 'hidden';
   }
 
   closeSaveSumTemplateModal() {
     this.showSaveSumTemplateModal = false;
     this.newSumTemplateName = '';
+    document.body.style.overflow = '';
     // No limpiar editingTemplateId aquí, se limpia después de guardar exitosamente
   }
 
@@ -2051,11 +2056,12 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     }
     this.projectForAssigningOrphans = '';
     this.showAssignOrphanedTasksModal = true;
-    console.log('showAssignOrphanedTasksModal set to true');
+    document.body.style.overflow = 'hidden';
   }
 
   closeAssignOrphanedTasksModal(): void {
     this.showAssignOrphanedTasksModal = false;
+    document.body.style.overflow = '';
   }
 
   getSelectedOrphanedTasksIds(): string[] {
@@ -2860,7 +2866,7 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
 
   getEnvironmentName(envId: string): string {
     const env = this.environments.find(e => e.id === envId);
-    return env?.name || 'Desconocido';
+    return env ? (env.emoji ? `${env.emoji} ${env.name}` : env.name) : 'Desconocido';
   }
 
   private loadEnvironmentViewModes(): void {

@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output, OnChanges, SimpleChanges, OnInit } from '@angular/core';
+import { Component, EventEmitter, Input, Output, OnChanges, SimpleChanges, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TaskTypeService } from '../../services/task-type.service';
@@ -10,7 +10,7 @@ import { TaskType } from '../../models/task-type.model';
   imports: [CommonModule, FormsModule],
   template: `
     <div *ngIf="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
-      <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" (click)="$event.stopPropagation()">
         <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200 flex-shrink-0">
           <h3 class="text-xl font-semibold text-gray-800">Gestionar Tipos de Tarea</h3>
           <button (click)="onClose()" class="text-gray-400 hover:text-gray-600 transition">
@@ -151,7 +151,7 @@ import { TaskType } from '../../models/task-type.model';
     </div>
   `
 })
-export class TaskTypeModalComponent implements OnInit, OnChanges {
+export class TaskTypeModalComponent implements OnInit, OnChanges, OnDestroy {
   @Input() showModal: boolean = false;
   @Input() projectId: string = '';
   @Output() closeModal = new EventEmitter<void>();
@@ -183,6 +183,11 @@ export class TaskTypeModalComponent implements OnInit, OnChanges {
 
   ngOnInit() {
     this.loadTaskTypes();
+    document.body.style.overflow = 'hidden';
+  }
+
+  ngOnDestroy() {
+    document.body.style.overflow = '';
   }
 
   ngOnChanges(changes: SimpleChanges): void {

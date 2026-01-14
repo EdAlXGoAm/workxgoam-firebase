@@ -59,6 +59,16 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     section: 0
   };
 
+  // Preview secundaria para cuando el drag se extiende a otra sección
+  previewStateSecondary = {
+    visible: false,
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+    section: 0
+  };
+
   constructor(
     private cdr: ChangeDetectorRef,
     private timelineFocusService: TimelineFocusService,
@@ -298,6 +308,7 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     // Fase END: Ejecutar acción y limpiar
     if (event.phase === 'end') {
       this.previewState.visible = false;
+      this.previewStateSecondary.visible = false;
       this.cdr.detectChanges();
 
       switch (event.type) {
@@ -369,11 +380,63 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
         newWidth += event.deltaX;
     }
 
+    // Límites de la sección
+    const leftLimit = this.hourOffsetStart;
+    const rightLimit = this.svgWidth - this.hourOffsetEnd;
+    const sectionWidth = rightLimit - leftLimit;
+
+    // Resetear preview secundaria
+    this.previewStateSecondary.visible = false;
+
+    // Calcular si se extiende fuera de los límites
+    const extendsLeft = newX < leftLimit;
+    const extendsRight = (newX + newWidth) > rightLimit;
+
+    // Mapeo de secciones: 0 -> sección 0-8h, 8 -> sección 8-16h, 16 -> sección 16-24h
+    const sectionIndex = section / 8; // 0, 1, o 2
+
+    if (extendsLeft && sectionIndex > 0) {
+      // Se extiende hacia la sección anterior
+      const overflow = leftLimit - newX;
+      const prevSection = (sectionIndex - 1) * 8;
+      
+      this.previewStateSecondary = {
+        visible: true,
+        x: rightLimit - overflow,
+        y: 20,
+        width: Math.min(overflow, sectionWidth),
+        height: 40,
+        section: prevSection
+      };
+
+      // Ajustar preview principal para que empiece en el límite izquierdo
+      newX = leftLimit;
+      newWidth = newWidth - overflow;
+    }
+
+    if (extendsRight && sectionIndex < 2) {
+      // Se extiende hacia la sección siguiente
+      const overflow = (newX + newWidth) - rightLimit;
+      const nextSection = (sectionIndex + 1) * 8;
+      
+      this.previewStateSecondary = {
+        visible: true,
+        x: leftLimit,
+        y: 20,
+        width: Math.min(overflow, sectionWidth),
+        height: 40,
+        section: nextSection
+      };
+
+      // Ajustar preview principal para que termine en el límite derecho
+      newWidth = rightLimit - newX;
+    }
+
     this.previewState = {
         visible: true,
-        x: newX,
+        x: Math.max(leftLimit, newX),
         y: 20,
-        width: Math.max(5, newWidth),
+        width: Math.max(5, Math.min(newWidth, sectionWidth)),
         height: 40,
         section: section
     };

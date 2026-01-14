@@ -37,7 +37,7 @@ import { Environment } from '../../models/environment.model';
     </div>
 
     <!-- Modal (cuando se hace click en la burbuja) -->
-    <div *ngIf="isModalOpen" class="modal-backdrop" (click)="closeModal()">
+    <div *ngIf="isModalOpen" class="modal-backdrop">
       <div class="modal-content" (click)="$event.stopPropagation()">
         <div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl p-4 md:p-6 text-white shadow-lg">
           <!-- Header más compacto en móvil -->

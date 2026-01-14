@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output, OnInit } from '@angular/core';
+import { Component, EventEmitter, Input, Output, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Task } from '../../models/task.model';
@@ -16,7 +16,7 @@ export interface TimeShiftResult {
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="modal-overlay" (click)="onCancel()">
+    <div class="modal-overlay">
       <div class="modal-content" (click)="$event.stopPropagation()">
         <!-- Header -->
         <div class="modal-header">
@@ -495,7 +495,7 @@ export interface TimeShiftResult {
     }
   `]
 })
-export class TimeShiftModalComponent implements OnInit {
+export class TimeShiftModalComponent implements OnInit, OnDestroy {
   @Input() task: Task | null = null;
   @Input() fragmentIndex: number | null = null;
   @Input() isVertical: boolean = false; // true para week-timeline (up/down), false para daily (left/right)
@@ -523,11 +523,16 @@ export class TimeShiftModalComponent implements OnInit {
   constructor(private taskTimeService: TaskTimeService) {}
 
   ngOnInit(): void {
+    document.body.style.overflow = 'hidden';
     this.direction = this.suggestedDirection;
     if (this.suggestedMinutes > 0) {
       this.selectedMinutes = this.suggestedMinutes;
       this.customMinutes = this.suggestedMinutes;
     }
+  }
+
+  ngOnDestroy(): void {
+    document.body.style.overflow = '';
   }
 
   onCustomInputChange(): void {

@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AndroidDatePickerComponent } from '../android-date-picker/android-date-picker.component';
@@ -10,7 +10,7 @@ import { AndroidDatePickerComponent } from '../android-date-picker/android-date-
   templateUrl: './date-range-modal.component.html',
   styleUrls: ['./date-range-modal.component.css']
 })
-export class DateRangeModalComponent implements OnInit, OnChanges {
+export class DateRangeModalComponent implements OnInit, OnChanges, OnDestroy {
   @Input() showModal = false;
   @Input() initialStartDate: string = '';
   @Input() initialEndDate: string = '';
@@ -27,6 +27,11 @@ export class DateRangeModalComponent implements OnInit, OnChanges {
   
   ngOnInit() {
     this.initializeValues();
+    document.body.style.overflow = 'hidden';
+  }
+
+  ngOnDestroy() {
+    document.body.style.overflow = '';
   }
   
   ngOnChanges(changes: SimpleChanges) {

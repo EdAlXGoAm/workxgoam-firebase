@@ -11,7 +11,7 @@ import { MuiTimePickerComponent } from '../mui-time-picker/mui-time-picker.compo
   imports: [CommonModule, FormsModule, AndroidDatePickerComponent, MuiTimePickerComponent],
   template: `
     <div *ngIf="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[95vh] overflow-hidden flex flex-col">
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[95vh] overflow-hidden flex flex-col" (click)="$event.stopPropagation()">
         <!-- Modal Header -->
         <div class="bg-indigo-600 text-white p-6 flex-shrink-0">
           <div class="flex justify-between items-center">

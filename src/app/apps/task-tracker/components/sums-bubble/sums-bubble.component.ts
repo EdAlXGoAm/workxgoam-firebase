@@ -43,7 +43,7 @@ import { TaskSumTemplateService } from '../../services/task-sum-template.service
     </div>
 
     <!-- Modal (cuando se hace click en la burbuja) -->
-    <div *ngIf="isModalOpen" class="modal-backdrop" (click)="onModalBackdropClick($event)">
+    <div *ngIf="isModalOpen" class="modal-backdrop">
       <div class="modal-content" (click)="onModalContentClick($event)">
         <div class="bg-white rounded-xl p-4 md:p-6 shadow-lg">
           <!-- Header -->
@@ -488,7 +488,7 @@ export class SumsBubbleComponent implements OnInit, OnDestroy, OnChanges {
 
   getEnvironmentName(environmentId: string): string {
     const env = this.environments.find(e => e.id === environmentId);
-    return env?.name || 'Desconocido';
+    return env ? (env.emoji ? `${env.emoji} ${env.name}` : env.name) : 'Desconocido';
   }
 
   getEnvironmentColor(environmentId: string): string {

@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Task } from '../../models/task.model';
 
@@ -8,7 +8,7 @@ import { Task } from '../../models/task.model';
   imports: [CommonModule],
   template: `
    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-md" (click)="$event.stopPropagation()">
       <div class="p-6">
         <div class="flex justify-between items-center mb-4">
           <h3 class="text-xl font-bold">{{ getStatusChangeModalTitle() }}</h3>
@@ -53,12 +53,20 @@ import { Task } from '../../models/task.model';
    </div>
   `
 })
-export class ChangeStatusModalComponent {
+export class ChangeStatusModalComponent implements OnInit, OnDestroy {
   @Input() statusChangeWillHide: boolean = false;
   @Input() pendingStatusChange: { task: Task; status: 'pending' | 'in-progress' | 'completed' } | null = null;
 
   @Output() closeModal = new EventEmitter<void>();
   @Output() confirmChangeVisibility = new EventEmitter<boolean>();
+
+  ngOnInit() {
+    document.body.style.overflow = 'hidden';
+  }
+
+  ngOnDestroy() {
+    document.body.style.overflow = '';
+  }
 
   close() {
     this.closeModal.emit();

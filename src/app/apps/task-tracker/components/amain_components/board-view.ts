@@ -100,9 +100,9 @@ import { TaskType } from '../../models/task-type.model';
         <div *ngFor="let env of orderedEnvironments" class="board-column" [class.board-column-empty]="!environmentHasTasks(env.id)">
           <div class="environment-header p-4 pb-2">
             <div class="flex items-center justify-between">
-              <h3 class="font-semibold p-2 rounded-md text-black flex-1"
-                  [style.background-color]="env.color + 'aa'" 
-                  [style.color]="'black'">{{env.name}}</h3>
+              <h3 class="font-medium px-3 py-1.5 rounded-full text-sm flex-1 inline-flex items-center gap-1 text-gray-700"
+                  [style.background-color]="env.color + '20'" 
+                  [style.border]="'1px solid ' + env.color + '40'">{{env.emoji ? env.emoji + ' ' : ''}}{{env.name}}</h3>
               <div class="flex items-center ml-2">
                 <div class="flex items-center mr-1 border-r border-gray-300 pr-1">
                   <button (click)="moveEnvironmentUp.emit(env.id); $event.stopPropagation()"
@@ -139,7 +139,8 @@ import { TaskType } from '../../models/task-type.model';
           <div class="environment-content-wrapper">
           <div class="environment-content px-4">
             <div *ngIf="!isEnvironmentCollapsed(env.id)" class="space-y-4">
-              <div *ngFor="let project of getProjectsByEnvironment(env.id)" class="project-section">
+              <!-- Proyectos CON tareas visibles (layout normal) -->
+              <div *ngFor="let project of getProjectsWithTasksInEnv(env.id)" class="project-section">
                 <div class="flex items-center justify-between mb-2 p-2 bg-gray-50 rounded-lg">
                   <div class="flex items-center gap-2">
                     <button (click)="projectContextMenu.emit({ mouseEvent: $event, project })" class="p-1 text-gray-500 hover:text-gray-700">
@@ -227,6 +228,28 @@ import { TaskType } from '../../models/task-type.model';
                       </div>
                     </ng-template>
                   </ng-container>
+                </div>
+              </div>
+
+              <!-- Proyectos SIN tareas visibles (doble columna, compacto) -->
+              <div *ngIf="getProjectsWithoutTasksInEnv(env.id).length > 0" class="mt-3 pt-3 border-t border-gray-200">
+                <p class="text-xs text-gray-500 mb-2"><i class="fas fa-folder-open mr-1"></i>Otros proyectos</p>
+                <div class="grid grid-cols-2 gap-2">
+                  <div *ngFor="let project of getProjectsWithoutTasksInEnv(env.id)" 
+                       class="flex items-center justify-between p-2 bg-gray-50 rounded-lg text-xs">
+                    <div class="flex items-center gap-1 min-w-0 flex-1">
+                      <button (click)="projectContextMenu.emit({ mouseEvent: $event, project })" class="p-0.5 text-gray-400 hover:text-gray-600 flex-shrink-0">
+                        <i class="fas fa-ellipsis-v text-xs"></i>
+                      </button>
+                      <span class="text-gray-600 truncate"><i class="fas fa-folder mr-1 text-gray-400"></i>{{project.name}}</span>
+                    </div>
+                    <button 
+                      (click)="addTaskToProject.emit({ environmentId: env.id, projectId: project.id })"
+                      class="bg-indigo-500 text-white p-1 rounded hover:bg-indigo-600 transition-colors flex-shrink-0 ml-1"
+                      title="Agregar tarea">
+                      <i class="fas fa-plus text-xs"></i>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -454,6 +477,18 @@ export class BoardViewComponent implements OnChanges {
 
   getProjectsByEnvironment(environmentId: string): Project[] {
     return this.projects.filter(project => project.environment === environmentId);
+  }
+
+  getProjectsWithTasksInEnv(environmentId: string): Project[] {
+    return this.projects.filter(project => 
+      project.environment === environmentId && this.getTasksByProject(project.id).length > 0
+    );
+  }
+
+  getProjectsWithoutTasksInEnv(environmentId: string): Project[] {
+    return this.projects.filter(project => 
+      project.environment === environmentId && this.getTasksByProject(project.id).length === 0
+    );
   }
 
   getEnvironmentViewMode(envId: string): 'cards' | 'list' {

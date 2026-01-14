@@ -43,7 +43,7 @@ import { TaskType } from '../../models/task-type.model';
     </div>
 
     <!-- Modal (cuando se hace click en la burbuja) -->
-      <div *ngIf="isModalOpen" class="modal-backdrop" (click)="closeModal()">
+      <div *ngIf="isModalOpen" class="modal-backdrop">
         <div class="modal-content" (click)="$event.stopPropagation()">
           <div class="bg-white rounded-xl p-4 md:p-6 shadow-lg">
             <!-- Header -->
@@ -645,7 +645,7 @@ export class PendingTasksBubbleComponent implements OnInit, OnDestroy, OnChanges
 
   getEnvironmentName(environmentId: string): string {
     const env = this.environments.find(e => e.id === environmentId);
-    return env?.name || 'Sin ambiente';
+    return env ? (env.emoji ? `${env.emoji} ${env.name}` : env.name) : 'Sin ambiente';
   }
 
   getEnvironmentColor(environmentId: string): string {

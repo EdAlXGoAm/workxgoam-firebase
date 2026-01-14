@@ -160,6 +160,19 @@
               rx="6" ry="6"
               class="preview-shadow"
               pointer-events="none" />
+        <!-- Sombra de previsualización secundaria -->
+        <rect *ngIf="previewStateSecondary.visible && previewStateSecondary.section === 0"
+              [attr.x]="previewStateSecondary.x"
+              [attr.y]="previewStateSecondary.y"
+              [attr.width]="previewStateSecondary.width"
+              [attr.height]="previewStateSecondary.height"
+              fill="rgba(99, 102, 241, 0.2)"
+              stroke="#6366f1"
+              stroke-width="2"
+              stroke-dasharray="4 4"
+              rx="6" ry="6"
+              class="preview-shadow"
+              pointer-events="none" />
       </g>
 
       <!-- Tercio 2: 08:00 - 16:00 -->
@@ -244,6 +257,19 @@
               rx="6" ry="6"
               class="preview-shadow"
               pointer-events="none" />
+        <!-- Sombra de previsualización secundaria -->
+        <rect *ngIf="previewStateSecondary.visible && previewStateSecondary.section === 8"
+              [attr.x]="previewStateSecondary.x"
+              [attr.y]="previewStateSecondary.y"
+              [attr.width]="previewStateSecondary.width"
+              [attr.height]="previewStateSecondary.height"
+              fill="rgba(99, 102, 241, 0.2)"
+              stroke="#6366f1"
+              stroke-width="2"
+              stroke-dasharray="4 4"
+              rx="6" ry="6"
+              class="preview-shadow"
+              pointer-events="none" />
       </g>
 
       <!-- Tercio 3: 16:00 - 24:00 -->
@@ -321,6 +347,19 @@
               [attr.y]="previewState.y"
               [attr.width]="previewState.width"
               [attr.height]="previewState.height"
+              fill="rgba(99, 102, 241, 0.2)"
+              stroke="#6366f1"
+              stroke-width="2"
+              stroke-dasharray="4 4"
+              rx="6" ry="6"
+              class="preview-shadow"
+              pointer-events="none" />
+        <!-- Sombra de previsualización secundaria -->
+        <rect *ngIf="previewStateSecondary.visible && previewStateSecondary.section === 16"
+              [attr.x]="previewStateSecondary.x"
+              [attr.y]="previewStateSecondary.y"
+              [attr.width]="previewStateSecondary.width"
+              [attr.height]="previewStateSecondary.height"
               fill="rgba(99, 102, 241, 0.2)"
               stroke="#6366f1"
               stroke-width="2"

@@ -108,9 +108,9 @@ import { TaskType } from '../../models/task-type.model';
         <div *ngFor="let env of orderedEnvironments" class="board-column" [class.board-column-empty]="!environmentHasTasks(env.id)">
           <div class="environment-header p-4 pb-2">
             <div class="flex items-center justify-between">
-              <h3 class="font-semibold p-2 rounded-md text-black flex-1"
-                  [style.background-color]="env.color + 'aa'" 
-                  [style.color]="'black'">{{env.name}}</h3>
+              <h3 class="font-medium px-3 py-1.5 rounded-full text-sm flex-1 inline-flex items-center gap-1 text-gray-700"
+                  [style.background-color]="env.color + '20'" 
+                  [style.border]="'1px solid ' + env.color + '40'">{{env.emoji ? env.emoji + ' ' : ''}}{{env.name}}</h3>
               <div class="flex items-center ml-2">
                 <div class="flex items-center mr-1 border-r border-gray-300 pr-1">
                   <button (click)="moveEnvironmentUp.emit(env.id); $event.stopPropagation()"
