@@ -9,11 +9,12 @@ import { Project } from '../../models/project.model';
 import { Environment } from '../../models/environment.model';
 import { CustomSelectComponent, SelectOption } from '../custom-select/custom-select.component';
 import { EnvironmentModalComponent } from '../environment-modal/environment-modal.component';
+import { ProjectImageQuickEditComponent } from '../project-image-quick-edit/project-image-quick-edit.component';
 
 @Component({
   selector: 'app-management-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule, CustomSelectComponent, EnvironmentModalComponent],
+  imports: [CommonModule, FormsModule, CustomSelectComponent, EnvironmentModalComponent, ProjectImageQuickEditComponent],
   templateUrl: './management-modal.component.html',
   styleUrls: ['./management-modal.component.css']
 })
@@ -35,6 +36,10 @@ export class ManagementModalComponent implements OnInit, OnDestroy {
   isEditingProject: boolean = false;
   showAddProjectModal: boolean = false;
   showEditProjectModal: boolean = false;
+  
+  // Estado para el modal de imagen del proyecto
+  showProjectImageModal: boolean = false;
+  projectForImageEdit: Project | null = null;
   
   // Opciones para selectores personalizados
   environmentOptions: SelectOption[] = [];
@@ -263,5 +268,51 @@ export class ManagementModalComponent implements OnInit, OnDestroy {
 
   close(): void {
     this.closeModal.emit();
+  }
+
+  // Métodos para el modal de imagen del proyecto
+  openProjectImageModal(project: Project): void {
+    this.projectForImageEdit = project;
+    this.showProjectImageModal = true;
+  }
+
+  closeProjectImageModal(): void {
+    this.showProjectImageModal = false;
+    this.projectForImageEdit = null;
+  }
+
+  async onProjectImageUpdated(imageDataUrl: string): Promise<void> {
+    if (!this.projectForImageEdit) return;
+    
+    try {
+      await this.projectService.updateProject(this.projectForImageEdit.id, { image: imageDataUrl });
+      this.closeProjectImageModal();
+      this.dataChanged.emit();
+    } catch (error) {
+      console.error('Error updating project image:', error);
+      alert(`Error al actualizar la imagen: ${error}`);
+    }
+  }
+
+  // Manejar imagen seleccionada en el formulario de proyecto (sin guardar aún)
+  openProjectImageModalForForm(): void {
+    // Crear un proyecto temporal para el modal
+    this.projectForImageEdit = {
+      id: 'temp',
+      userId: '',
+      name: this.currentProject.name || 'Nuevo proyecto',
+      environment: this.currentProject.environment || '',
+      description: this.currentProject.description || '',
+      color: this.currentProject.color || '',
+      image: this.currentProject.image,
+      createdAt: '',
+      updatedAt: ''
+    };
+    this.showProjectImageModal = true;
+  }
+
+  onProjectFormImageUpdated(imageDataUrl: string): void {
+    this.currentProject.image = imageDataUrl;
+    this.closeProjectImageModal();
   }
 }
