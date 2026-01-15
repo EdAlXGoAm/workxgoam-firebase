@@ -32,6 +32,13 @@ import { GoogleImageService, ImageSearchResult } from '../../services/google-ima
               [disabled]="isLoading"
               placeholder="Buscar imágenes..."
               class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm disabled:bg-gray-100">
+            <select
+              [(ngModel)]="resultCount"
+              [disabled]="isLoading"
+              title="Cantidad de resultados"
+              class="px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm disabled:bg-gray-100 bg-white">
+              <option *ngFor="let count of resultCountOptions" [value]="count">{{ count }}</option>
+            </select>
             <button
               (click)="handleSearch()"
               [disabled]="isLoading || !searchQuery.trim()"
@@ -90,6 +97,7 @@ import { GoogleImageService, ImageSearchResult } from '../../services/google-ima
 export class ImageSearchComponent implements OnInit, OnDestroy, OnChanges {
   @Input() isOpen: boolean = false;
   @Input() initialQuery: string = '';
+  @Input() defaultResultCount: number = 10;
   @Output() closeModal = new EventEmitter<void>();
   @Output() selectImage = new EventEmitter<string>();
 
@@ -102,6 +110,8 @@ export class ImageSearchComponent implements OnInit, OnDestroy, OnChanges {
   error: string | null = null;
   hasSearched: boolean = false;
   uploadingImageUrl: string | null = null;
+  resultCount: number = 10;
+  resultCountOptions: number[] = [6, 10, 20, 30, 40, 50];
 
   constructor(private googleImageService: GoogleImageService) {}
 
@@ -109,6 +119,7 @@ export class ImageSearchComponent implements OnInit, OnDestroy, OnChanges {
     if (this.isOpen) {
       document.body.style.overflow = 'hidden';
       this.searchQuery = this.initialQuery;
+      this.resultCount = this.defaultResultCount;
     }
   }
 
@@ -150,7 +161,7 @@ export class ImageSearchComponent implements OnInit, OnDestroy, OnChanges {
     this.hasSearched = true;
 
     try {
-      const data = await this.googleImageService.searchImages(this.searchQuery.trim(), 10);
+      const data = await this.googleImageService.searchImages(this.searchQuery.trim(), this.resultCount);
       this.results = data.items || [];
       if (this.results.length === 0) {
         this.error = 'No se encontraron imágenes. Intenta con otro término.';

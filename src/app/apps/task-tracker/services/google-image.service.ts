@@ -36,15 +36,15 @@ export class GoogleImageService {
   /**
    * Busca imágenes usando Google Custom Search API
    * @param query Término de búsqueda
-   * @param num Número de resultados (1-10, default: 10)
+   * @param num Número de resultados (1-50, default: 10)
    */
   async searchImages(query: string, num: number = 10): Promise<ImageSearchResponse> {
     if (!query || !query.trim()) {
       throw new Error('El término de búsqueda es requerido');
     }
 
-    if (num < 1 || num > 10) {
-      throw new Error('El número de resultados debe estar entre 1 y 10');
+    if (num < 1 || num > 50) {
+      throw new Error('El número de resultados debe estar entre 1 y 50');
     }
 
     const response = await fetch(
