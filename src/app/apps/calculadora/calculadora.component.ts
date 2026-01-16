@@ -192,33 +192,51 @@ export class CalculadoraComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   /** Grupos para listar cálculos guardados por carpeta, con toggle expand/collapse */
-  get groupedSavedCalculations(): { key: string; label: string; items: CostCalculation[] }[] {
+  get groupedSavedCalculations(): { key: string; label: string; items: CostCalculation[]; isIndividual?: boolean }[] {
+    const noFolderItems: CostCalculation[] = [];
     const groups = new Map<string, CostCalculation[]>();
+    
     for (const c of (this.savedCalculations || [])) {
       const key = this.normalizeFolderKey((c as any).folder);
-      const arr = groups.get(key) || [];
-      arr.push(c);
-      groups.set(key, arr);
+      if (key === '') {
+        // Sin carpeta: agregar a lista individual
+        noFolderItems.push(c);
+      } else {
+        // Con carpeta: agrupar
+        const arr = groups.get(key) || [];
+        arr.push(c);
+        groups.set(key, arr);
+      }
     }
 
-    const out: { key: string; label: string; items: CostCalculation[] }[] = [];
+    const out: { key: string; label: string; items: CostCalculation[]; isIndividual?: boolean }[] = [];
+    
+    // 1. Primero: items sin carpeta como items individuales (no agrupados), ordenados del más reciente al más antiguo
+    const sortedNoFolder = [...noFolderItems].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    for (const calc of sortedNoFolder) {
+      out.push({
+        key: `__individual__:${calc.id || calc.title}`,
+        label: '',
+        items: [calc],
+        isIndividual: true
+      });
+    }
+
+    // 2. Después: carpetas con nombre (A-Z)
+    const folderGroups: { key: string; label: string; items: CostCalculation[] }[] = [];
     for (const [key, items] of groups.entries()) {
-      // ordenar dentro del grupo por fecha desc (por seguridad)
+      // ordenar dentro del grupo por fecha desc
       const ordered = [...items].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      out.push({ key, label: key ? key : 'Sin carpeta', items: ordered });
+      folderGroups.push({ key, label: key, items: ordered });
     }
+    folderGroups.sort((a, b) => a.label.localeCompare(b.label));
+    out.push(...folderGroups);
 
-    // Orden: carpetas con nombre primero (A-Z), luego "Sin carpeta" al final
-    out.sort((a, b) => {
-      if (a.key === '' && b.key !== '') return 1;
-      if (a.key !== '' && b.key === '') return -1;
-      return a.label.localeCompare(b.label);
-    });
-
-    // Inicializar defaults de expand/collapse (por UX: expandido por defecto)
+    // Inicializar defaults de expand/collapse (por UX: colapsado por defecto para carpetas)
     for (const g of out) {
-      // Por defecto: colapsado
-      if (this.folderExpandedByKey[g.key] === undefined) this.folderExpandedByKey[g.key] = false;
+      if (!g.isIndividual && this.folderExpandedByKey[g.key] === undefined) {
+        this.folderExpandedByKey[g.key] = false;
+      }
     }
 
     return out;

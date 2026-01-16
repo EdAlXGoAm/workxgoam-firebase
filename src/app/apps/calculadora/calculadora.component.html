@@ -924,19 +924,21 @@
     <div class="flex-1 overflow-auto p-4" style="overscroll-behavior: contain; -webkit-overflow-scrolling: touch;">
       <div *ngIf="savedCalculations.length > 0; else noSavedModal">
         <div *ngFor="let group of groupedSavedCalculations; trackBy: trackByFolderKey" class="mb-3">
-          <!-- Header de carpeta -->
-          <button
-            type="button"
-            (click)="toggleFolder(group.key)"
-            class="w-full flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg text-left hover:bg-gray-200 transition"
-          >
-            <span class="font-mono text-sm">{{ isFolderExpanded(group.key) ? '▾' : '▸' }}</span>
-            <span class="font-semibold text-gray-800 flex-1">{{ group.label }}</span>
-            <span class="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{{ group.items.length }}</span>
-          </button>
+          <!-- Header de carpeta (solo para grupos, no para items individuales) -->
+          <ng-container *ngIf="!group.isIndividual">
+            <button
+              type="button"
+              (click)="toggleFolder(group.key)"
+              class="w-full flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg text-left hover:bg-gray-200 transition"
+            >
+              <span class="font-mono text-sm">{{ isFolderExpanded(group.key) ? '▾' : '▸' }}</span>
+              <span class="font-semibold text-gray-800 flex-1">{{ group.label }}</span>
+              <span class="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{{ group.items.length }}</span>
+            </button>
+          </ng-container>
           
-          <!-- Items de la carpeta -->
-          <div *ngIf="isFolderExpanded(group.key)" class="mt-2 space-y-2 pl-2">
+          <!-- Items de la carpeta (o item individual) -->
+          <div *ngIf="group.isIndividual || isFolderExpanded(group.key)" [class.mt-2]="!group.isIndividual" [class.pl-2]="!group.isIndividual" class="space-y-2">
             <div *ngFor="let calc of group.items; trackBy: trackByCalcId" 
               class="bg-white border rounded-lg p-3 shadow-sm hover:shadow-md transition">
               <div class="flex flex-col sm:flex-row sm:items-center gap-2">

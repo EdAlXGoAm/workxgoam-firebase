@@ -225,6 +225,10 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
       if (changes.showModal && changes.showModal.currentValue) {
         await this.loadInitialData();
       }
+      // Detectar cambios en la lista de proyectos para actualizar los selectores
+      if (changes.projects) {
+        this.refreshProjects();
+      }
     } else {
       this.enableBodyScroll();
       // Limpiar tareas recientes al cerrar

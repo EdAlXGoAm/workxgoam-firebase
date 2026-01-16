@@ -59,7 +59,9 @@
               <span *ngIf="env.emoji" class="text-xl mr-2">{{ env.emoji }}</span>
             <div>
               <p class="font-semibold text-gray-800">{{ env.name }}</p>
-                <p class="text-xs text-gray-500">{{ getProjectCountByEnvironment(env.id) }} proyecto(s)</p>
+                <p class="text-xs text-gray-500 cursor-pointer hover:text-indigo-600 hover:underline transition-colors" 
+                   (click)="selectTab('projects'); $event.stopPropagation()"
+                   title="Ver proyectos">{{ getProjectCountByEnvironment(env.id) }} proyecto(s)</p>
               </div>
             </div>
             <div class="space-x-2 flex-shrink-0">

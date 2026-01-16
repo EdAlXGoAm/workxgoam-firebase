@@ -124,8 +124,8 @@
             <div class="flex gap-0">
               <!-- Selector nativo para desktop (≥768px) -->
               <select [(ngModel)]="task.type" name="type" class="hidden md:block w-full px-3 py-2 border rounded-lg rounded-r-none bg-white" [disabled]="!task.project">
-                <option [value]="undefined">Sin tipo</option>
-                <option *ngFor="let type of selectableTaskTypes" [value]="type.id">
+                <option [ngValue]="undefined">Sin tipo</option>
+                <option *ngFor="let type of selectableTaskTypes" [ngValue]="type.id">
                   {{type.name}}
                 </option>
               </select>

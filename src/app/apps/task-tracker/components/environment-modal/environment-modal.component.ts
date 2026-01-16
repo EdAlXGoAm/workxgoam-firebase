@@ -78,7 +78,7 @@ import { FormsModule } from '@angular/forms';
                     *ngFor="let colorOpt of suggestedColors"
                     type="button"
                     (click)="selectSuggestedColor(colorOpt)"
-                    class="w-8 h-8 rounded-full border-2 hover:scale-110 transition-transform focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                    class="w-8 h-8 rounded-full border-2 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                     [style.background-color]="colorOpt"
                     [class.border-gray-800]="color === colorOpt"
                     [class.border-gray-300]="color !== colorOpt"

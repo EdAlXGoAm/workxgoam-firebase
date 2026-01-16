@@ -32,6 +32,9 @@ export class TaskService {
       hidden: false
     };
 
+    // Eliminar campos con valor undefined (Firebase no los acepta)
+    const cleanedTask = this.removeUndefinedFields(newTask);
+
     // Construir ID personalizado: YYYYMMDD-HHmmss+<autoId>
     const pad = (n: number) => n.toString().padStart(2, '0');
     const yyyy = nowDate.getFullYear();
@@ -44,7 +47,7 @@ export class TaskService {
     const autoId = doc(tasksRef).id; // genera un id único como el de addDoc
     const customId = `${ts}+${autoId}`;
 
-    await setDoc(doc(tasksRef, customId), newTask);
+    await setDoc(doc(tasksRef, customId), cleanedTask);
     return customId;
   }
 
@@ -55,10 +58,13 @@ export class TaskService {
     const taskRef = doc(this.firestore, `${EnvironmentService.COLLECTION_PREFIX}tasks`, taskId);
     const now = new Date().toISOString();
 
-    await updateDoc(taskRef, {
+    // Eliminar campos con valor undefined (Firebase no los acepta)
+    const cleanedUpdates = this.removeUndefinedFields({
       ...updates,
       updatedAt: now
     });
+
+    await updateDoc(taskRef, cleanedUpdates);
   }
 
   async deleteTask(taskId: string): Promise<void> {
@@ -191,5 +197,19 @@ export class TaskService {
         return dateB - dateA; // Más reciente primero
       })
       .slice(0, limit);
+  }
+
+  /**
+   * Elimina los campos con valor undefined de un objeto
+   * Firebase/Firestore no acepta valores undefined
+   */
+  private removeUndefinedFields<T extends Record<string, any>>(obj: T): T {
+    const result = { ...obj };
+    Object.keys(result).forEach(key => {
+      if (result[key] === undefined) {
+        delete result[key];
+      }
+    });
+    return result;
   }
 } 
