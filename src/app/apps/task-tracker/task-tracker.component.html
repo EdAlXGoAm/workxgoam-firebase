@@ -402,6 +402,7 @@
 
   <!-- Environment Context Menu -->
   <div *ngIf="showEnvironmentContextMenu" 
+       #environmentContextMenu
        class="context-menu environment-context-menu" 
        [style.left]="environmentContextMenuPosition.x + 'px'" 
        [style.top]="environmentContextMenuPosition.y + 'px'"
@@ -470,6 +471,7 @@
 
   <!-- Project Context Menu -->
   <div *ngIf="showProjectContextMenu" 
+       #projectContextMenu
        class="context-menu project-context-menu" 
        [style.left]="projectContextMenuPosition.x + 'px'" 
        [style.top]="projectContextMenuPosition.y + 'px'"

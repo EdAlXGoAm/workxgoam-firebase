@@ -145,6 +145,7 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
   showEnvironmentContextMenu = false;
   environmentContextMenuPosition = { x: 0, y: 0 };
   selectedEnvironment: Environment | null = null;
+  environmentContextMenuSourceElement: HTMLElement | null = null; // Elemento que abrió el menú
   
   // Variables para modal de edición de environment
   showEditEnvironmentModal = false;
@@ -158,6 +159,7 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
   showProjectContextMenu = false;
   projectContextMenuPosition = { x: 0, y: 0 };
   selectedProject: Project | null = null;
+  projectContextMenuSourceElement: HTMLElement | null = null; // Elemento que abrió el menú
   
   // Variables para modal de edición de proyecto
   showEditProjectModal = false;
@@ -1264,49 +1266,75 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     event.stopPropagation();
     this.selectedEnvironment = environment;
     
-    // Calcular la altura del menú de ambiente (2 elementos: Crear Proyecto, Eliminar Ambiente)
-    const menuHeight = 2 * 40 + 16; // 2 items * 40px + padding
+    // Guardar referencia al elemento que disparó el menú
+    this.environmentContextMenuSourceElement = event.currentTarget as HTMLElement;
     
-    // Obtener dimensiones del viewport
-    const viewportHeight = window.innerHeight;
+    // Calcular posición inicial
+    this.updateEnvironmentContextMenuPosition(true);
+  }
+
+  private updateEnvironmentContextMenuPosition(isInitial = false) {
+    if (!this.environmentContextMenuSourceElement) return;
     
-    // Coordenadas del click
-    const clickX = event.clientX;
-    const clickY = event.clientY;
+    const sourceRect = this.environmentContextMenuSourceElement.getBoundingClientRect();
+    const clickX = sourceRect.left + sourceRect.width / 2; // Centro del botón
+    const clickY = sourceRect.top + sourceRect.height / 2; // Centro del botón
     
-    // Verificar espacio disponible
-    const spaceBelow = viewportHeight - clickY;
-    const spaceAbove = clickY;
+    if (isInitial) {
+      // Establecer posición temporal para renderizar el menú
+      this.environmentContextMenuPosition = { x: clickX, y: clickY };
+      this.showEnvironmentContextMenu = true;
+    }
     
-    let finalY = clickY;
-    
-    // Lógica de posicionamiento inteligente
-    if (spaceBelow < menuHeight && spaceAbove >= menuHeight) {
-      finalY = clickY - menuHeight;
-    } else if (spaceBelow < menuHeight && spaceAbove > spaceBelow) {
-      finalY = clickY - menuHeight;
-    } else if (spaceBelow < menuHeight && spaceAbove < menuHeight) {
-      if (spaceAbove > spaceBelow) {
-        finalY = 10;
-      } else {
-        finalY = viewportHeight - menuHeight - 10;
+    // Esperar a que el menú se renderice y calcular altura real
+    setTimeout(() => {
+      const menuElement = document.querySelector('.environment-context-menu') as HTMLElement;
+      if (menuElement && this.environmentContextMenuSourceElement) {
+        const menuRect = menuElement.getBoundingClientRect();
+        const menuHeight = menuRect.height;
+        const menuWidth = menuRect.width;
+        
+        // Obtener posición actual del elemento fuente
+        const currentSourceRect = this.environmentContextMenuSourceElement.getBoundingClientRect();
+        const currentX = currentSourceRect.left + currentSourceRect.width / 2;
+        const currentY = currentSourceRect.top + currentSourceRect.height / 2;
+        
+        // Recalcular posición con altura real
+        const viewportHeight = window.innerHeight;
+        const spaceBelow = viewportHeight - currentY;
+        const spaceAbove = currentY;
+        
+        let finalY = currentY;
+        
+        // Si no cabe abajo pero sí arriba, mostrar arriba
+        if (spaceBelow < menuHeight && spaceAbove >= menuHeight) {
+          finalY = currentY - menuHeight;
+        } 
+        // Si no cabe en ningún lado, ajustar para que quepa
+        else if (spaceBelow < menuHeight && spaceAbove < menuHeight) {
+          if (spaceAbove > spaceBelow) {
+            finalY = 10; // Pegarlo arriba con margen
+          } else {
+            finalY = viewportHeight - menuHeight - 10; // Pegarlo abajo con margen
+          }
+        }
+        
+        // Ajustar posición horizontal si es necesario
+        let finalX = currentX;
+        const spaceRight = window.innerWidth - currentX;
+        
+        if (spaceRight < menuWidth) {
+          finalX = currentX - menuWidth;
+        }
+        if (finalX < 0) {
+          finalX = 10;
+        }
+        
+        // Aplicar posición corregida
+        this.environmentContextMenuPosition = { x: finalX, y: finalY };
+        this.cdr.detectChanges();
       }
-    }
-    
-    // Verificar posición horizontal
-    let finalX = clickX;
-    const menuWidth = 200;
-    const spaceRight = window.innerWidth - clickX;
-    
-    if (spaceRight < menuWidth) {
-      finalX = clickX - menuWidth;
-    }
-    if (finalX < 0) {
-      finalX = 10;
-    }
-    
-    this.environmentContextMenuPosition = { x: finalX, y: finalY };
-    this.showEnvironmentContextMenu = true;
+    }, 0);
   }
 
   onProjectContextMenu(event: MouseEvent, project: Project) {
@@ -1314,49 +1342,75 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     event.stopPropagation();
     this.selectedProject = project;
     
-    // Calcular la altura del menú de proyecto (2 elementos: Ver Tareas del Proyecto, Eliminar Proyecto + separador)
-    const menuHeight = 2 * 40 + 16 + 8; // 2 items * 40px + padding + separador
+    // Guardar referencia al elemento que disparó el menú
+    this.projectContextMenuSourceElement = event.currentTarget as HTMLElement;
     
-    // Obtener dimensiones del viewport
-    const viewportHeight = window.innerHeight;
+    // Calcular posición inicial
+    this.updateProjectContextMenuPosition(true);
+  }
+
+  private updateProjectContextMenuPosition(isInitial = false) {
+    if (!this.projectContextMenuSourceElement) return;
     
-    // Coordenadas del click
-    const clickX = event.clientX;
-    const clickY = event.clientY;
+    const sourceRect = this.projectContextMenuSourceElement.getBoundingClientRect();
+    const clickX = sourceRect.left + sourceRect.width / 2; // Centro del botón
+    const clickY = sourceRect.top + sourceRect.height / 2; // Centro del botón
     
-    // Verificar espacio disponible
-    const spaceBelow = viewportHeight - clickY;
-    const spaceAbove = clickY;
+    if (isInitial) {
+      // Establecer posición temporal para renderizar el menú
+      this.projectContextMenuPosition = { x: clickX, y: clickY };
+      this.showProjectContextMenu = true;
+    }
     
-    let finalY = clickY;
-    
-    // Lógica de posicionamiento inteligente
-    if (spaceBelow < menuHeight && spaceAbove >= menuHeight) {
-      finalY = clickY - menuHeight;
-    } else if (spaceBelow < menuHeight && spaceAbove > spaceBelow) {
-      finalY = clickY - menuHeight;
-    } else if (spaceBelow < menuHeight && spaceAbove < menuHeight) {
-      if (spaceAbove > spaceBelow) {
-        finalY = 10;
-      } else {
-        finalY = viewportHeight - menuHeight - 10;
+    // Esperar a que el menú se renderice y calcular altura real
+    setTimeout(() => {
+      const menuElement = document.querySelector('.project-context-menu') as HTMLElement;
+      if (menuElement && this.projectContextMenuSourceElement) {
+        const menuRect = menuElement.getBoundingClientRect();
+        const menuHeight = menuRect.height;
+        const menuWidth = menuRect.width;
+        
+        // Obtener posición actual del elemento fuente
+        const currentSourceRect = this.projectContextMenuSourceElement.getBoundingClientRect();
+        const currentX = currentSourceRect.left + currentSourceRect.width / 2;
+        const currentY = currentSourceRect.top + currentSourceRect.height / 2;
+        
+        // Recalcular posición con altura real
+        const viewportHeight = window.innerHeight;
+        const spaceBelow = viewportHeight - currentY;
+        const spaceAbove = currentY;
+        
+        let finalY = currentY;
+        
+        // Si no cabe abajo pero sí arriba, mostrar arriba
+        if (spaceBelow < menuHeight && spaceAbove >= menuHeight) {
+          finalY = currentY - menuHeight;
+        } 
+        // Si no cabe en ningún lado, ajustar para que quepa
+        else if (spaceBelow < menuHeight && spaceAbove < menuHeight) {
+          if (spaceAbove > spaceBelow) {
+            finalY = 10; // Pegarlo arriba con margen
+          } else {
+            finalY = viewportHeight - menuHeight - 10; // Pegarlo abajo con margen
+          }
+        }
+        
+        // Ajustar posición horizontal si es necesario
+        let finalX = currentX;
+        const spaceRight = window.innerWidth - currentX;
+        
+        if (spaceRight < menuWidth) {
+          finalX = currentX - menuWidth;
+        }
+        if (finalX < 0) {
+          finalX = 10;
+        }
+        
+        // Aplicar posición corregida
+        this.projectContextMenuPosition = { x: finalX, y: finalY };
+        this.cdr.detectChanges();
       }
-    }
-    
-    // Verificar posición horizontal
-    let finalX = clickX;
-    const menuWidth = 200;
-    const spaceRight = window.innerWidth - clickX;
-    
-    if (spaceRight < menuWidth) {
-      finalX = clickX - menuWidth;
-    }
-    if (finalX < 0) {
-      finalX = 10;
-    }
-    
-    this.projectContextMenuPosition = { x: finalX, y: finalY };
-    this.showProjectContextMenu = true;
+    }, 0);
   }
 
   @HostListener('document:click', ['$event'])
@@ -1387,10 +1441,12 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
 
   closeEnvironmentContextMenu() {
     this.showEnvironmentContextMenu = false;
+    this.environmentContextMenuSourceElement = null;
   }
 
   closeProjectContextMenu() {
     this.showProjectContextMenu = false;
+    this.projectContextMenuSourceElement = null;
   }
 
   openProjectTasksModal(project: Project) {
@@ -2686,6 +2742,30 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
   }
 
   // Detectar Escape key para cerrar modales
+  @HostListener('window:scroll', ['$event'])
+  onWindowScroll() {
+    // Actualizar posición del menú contextual de environment si está abierto
+    if (this.showEnvironmentContextMenu && this.environmentContextMenuSourceElement) {
+      // Verificar que el elemento todavía existe en el DOM
+      if (document.contains(this.environmentContextMenuSourceElement)) {
+        this.updateEnvironmentContextMenuPosition();
+      } else {
+        // Si el elemento ya no existe, cerrar el menú
+        this.closeEnvironmentContextMenu();
+      }
+    }
+    // Actualizar posición del menú contextual de project si está abierto
+    if (this.showProjectContextMenu && this.projectContextMenuSourceElement) {
+      // Verificar que el elemento todavía existe en el DOM
+      if (document.contains(this.projectContextMenuSourceElement)) {
+        this.updateProjectContextMenuPosition();
+      } else {
+        // Si el elemento ya no existe, cerrar el menú
+        this.closeProjectContextMenu();
+      }
+    }
+  }
+
   @HostListener('document:keydown.escape')
   onEscapeKey() {
     if (this.showTimeCalculatorModal) {
