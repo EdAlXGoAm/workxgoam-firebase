@@ -1135,6 +1135,12 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     });
   }
 
+  getWeekdayName(): string {
+    return this.selectedDate.toLocaleDateString('es-ES', {
+      weekday: 'long'
+    });
+  }
+
   getDateInputValue() {
     const year = this.selectedDate.getFullYear();
     const month = String(this.selectedDate.getMonth() + 1).padStart(2, '0');
