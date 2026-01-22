@@ -92,8 +92,18 @@
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Proyecto</label>
               <div class="flex gap-0">
+                <!-- Imagen del proyecto seleccionado (desktop) -->
+                <div *ngIf="getSelectedProjectImage()" class="hidden md:flex items-center justify-center px-2 border border-r-0 rounded-l-lg bg-white">
+                  <img [src]="getSelectedProjectImage()" class="w-8 h-8 rounded-md object-cover" alt="">
+                </div>
+                
                 <!-- Selector nativo para desktop (≥768px) -->
-                <select [(ngModel)]="task.project" (ngModelChange)="onProjectChange()" name="project" class="hidden md:block w-full px-3 py-2 border rounded-lg rounded-r-none bg-white" [disabled]="!task.environment || selectableProjects.length === 0">
+                <select [(ngModel)]="task.project" (ngModelChange)="onProjectChange()" name="project" 
+                        class="hidden md:block w-full px-3 py-2 border bg-white"
+                        [class.rounded-lg]="!getSelectedProjectImage()"
+                        [class.rounded-r-none]="true"
+                        [class.rounded-l-none]="getSelectedProjectImage()"
+                        [disabled]="!task.environment || selectableProjects.length === 0">
                   <option value="">Seleccionar proyecto</option>
                   <option *ngFor="let proj of selectableProjects" [value]="proj.id">{{proj.name}}</option>
                 </select>

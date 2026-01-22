@@ -460,12 +460,27 @@
       <i class="fas fa-list"></i>
       <span>Ver Tareas del Proyecto</span>
     </div>
+    <div class="context-menu-item" (click)="editProjectFromContextMenu(selectedProject!)">
+      <i class="fas fa-pencil-alt"></i>
+      <span>Editar Proyecto</span>
+    </div>
     <hr class="my-1 border-gray-200">
     <div class="context-menu-item context-menu-item-danger" (click)="deleteProject(selectedProject!)">
       <i class="fas fa-trash"></i>
       <span>Eliminar Proyecto</span>
     </div>
   </div>
+
+  <!-- Edit Project Modal -->
+  <app-project-modal
+    *ngIf="showEditProjectModal"
+    [showModal]="showEditProjectModal"
+    [isEditing]="true"
+    [project]="projectToEdit"
+    [environments]="orderedEnvironments"
+    (closeModal)="closeEditProjectModal()"
+    (saveProject)="onProjectSaved($event)">
+  </app-project-modal>
 
   <!-- Edit Task Modal -->
   <app-task-modal

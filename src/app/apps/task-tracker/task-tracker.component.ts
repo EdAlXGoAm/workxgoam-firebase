@@ -31,11 +31,12 @@ import { WeekTimelineSvgComponent } from './components/week-timeline-svg/week-ti
 import { TaskSumTemplateService } from './services/task-sum-template.service';
 import { TaskSumTemplate } from './models/task-sum-template.model';
 import { SumsBubbleComponent } from './components/sums-bubble/sums-bubble.component';
+import { ProjectModalComponent } from './components/project-modal/project-modal.component';
 
 @Component({
   selector: 'app-task-tracker',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, CurrentTaskInfoComponent, PendingTasksBubbleComponent, TaskModalComponent, RemindersModalComponent, TaskTrackerHeaderComponent, EnvironmentModalComponent, BoardViewComponent, WeekViewComponent, ChangeStatusModalComponent, DateRangeModalComponent, TaskTypeModalComponent, CustomSelectComponent, WeekTimelineSvgComponent, SumsBubbleComponent],
+  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, CurrentTaskInfoComponent, PendingTasksBubbleComponent, TaskModalComponent, RemindersModalComponent, TaskTrackerHeaderComponent, EnvironmentModalComponent, BoardViewComponent, WeekViewComponent, ChangeStatusModalComponent, DateRangeModalComponent, TaskTypeModalComponent, CustomSelectComponent, WeekTimelineSvgComponent, SumsBubbleComponent, ProjectModalComponent],
   templateUrl: './task-tracker.component.html',
   styleUrls: ['./task-tracker.component.css']
 })
@@ -153,6 +154,10 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
   showProjectContextMenu = false;
   projectContextMenuPosition = { x: 0, y: 0 };
   selectedProject: Project | null = null;
+  
+  // Variables para modal de edición de proyecto
+  showEditProjectModal = false;
+  projectToEdit: Partial<Project> | null = null;
   
   // Variables para modal de tareas del proyecto
   showProjectTasksModal = false;
@@ -2249,6 +2254,32 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
       }
     }
     this.closeProjectContextMenu();
+  }
+
+  editProjectFromContextMenu(project: Project): void {
+    this.projectToEdit = { ...project };
+    this.showEditProjectModal = true;
+    this.closeProjectContextMenu();
+  }
+
+  closeEditProjectModal(): void {
+    this.showEditProjectModal = false;
+    this.projectToEdit = null;
+  }
+
+  async onProjectSaved(projectData: Partial<Project>): Promise<void> {
+    try {
+      if (projectData.id) {
+        // Editar proyecto existente
+        const { id, userId, createdAt, ...updates } = projectData;
+        await this.projectService.updateProject(id, updates);
+      }
+      this.closeEditProjectModal();
+      await this.loadInitialData();
+    } catch (error) {
+      console.error('Error al guardar el proyecto:', error);
+      alert(`Error al guardar el proyecto: ${error}`);
+    }
   }
 
   private loadShowHiddenState(): void {

@@ -10,11 +10,12 @@ import { Environment } from '../../models/environment.model';
 import { CustomSelectComponent, SelectOption } from '../custom-select/custom-select.component';
 import { EnvironmentModalComponent } from '../environment-modal/environment-modal.component';
 import { ProjectImageQuickEditComponent } from '../project-image-quick-edit/project-image-quick-edit.component';
+import { ProjectModalComponent } from '../project-modal/project-modal.component';
 
 @Component({
   selector: 'app-management-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule, CustomSelectComponent, EnvironmentModalComponent, ProjectImageQuickEditComponent],
+  imports: [CommonModule, FormsModule, CustomSelectComponent, EnvironmentModalComponent, ProjectImageQuickEditComponent, ProjectModalComponent],
   templateUrl: './management-modal.component.html',
   styleUrls: ['./management-modal.component.css']
 })
@@ -231,6 +232,11 @@ export class ManagementModalComponent implements OnInit, OnDestroy {
       console.error('Error saving project:', error);
       alert(`Error al guardar el proyecto: ${error}`);
     }
+  }
+
+  async onProjectModalSave(projectData: Partial<Project>): Promise<void> {
+    this.currentProject = projectData;
+    await this.saveProject();
   }
 
   async deleteProject(projId: string): Promise<void> {

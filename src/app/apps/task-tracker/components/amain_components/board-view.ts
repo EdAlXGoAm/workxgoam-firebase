@@ -146,8 +146,12 @@ import { TaskType } from '../../models/task-type.model';
                     <button (click)="projectContextMenu.emit({ mouseEvent: $event, project })" class="p-1 text-gray-500 hover:text-gray-700">
                       <i class="fas fa-ellipsis-v"></i>
                     </button>
-                    <h4 class="text-sm font-medium text-gray-700">
-                      <i class="fas fa-folder mr-1"></i>{{project.name}}
+                    <img *ngIf="project.image" 
+                         [src]="project.image" 
+                         class="w-8 h-8 rounded-md object-cover flex-shrink-0 border border-gray-200"
+                         alt="">
+                    <h4 class="text-sm font-semibold px-2.5 py-1 rounded-md bg-gray-700 text-white shadow-sm">
+                      <i *ngIf="!project.image" class="fas fa-folder mr-1.5 opacity-80"></i>{{project.name}}
                     </h4>
                     <button *ngIf="getTasksByProject(project.id).length > 0"
                             (click)="toggleProjectCollapse(project.id)"
@@ -237,11 +241,17 @@ import { TaskType } from '../../models/task-type.model';
                 <div class="grid grid-cols-2 gap-2">
                   <div *ngFor="let project of getProjectsWithoutTasksInEnv(env.id)" 
                        class="flex items-center justify-between p-2 bg-gray-50 rounded-lg text-xs">
-                    <div class="flex items-center gap-1 min-w-0 flex-1">
+                    <div class="flex items-center gap-1.5 min-w-0 flex-1">
                       <button (click)="projectContextMenu.emit({ mouseEvent: $event, project })" class="p-0.5 text-gray-400 hover:text-gray-600 flex-shrink-0">
                         <i class="fas fa-ellipsis-v text-xs"></i>
                       </button>
-                      <span class="text-gray-600 truncate"><i class="fas fa-folder mr-1 text-gray-400"></i>{{project.name}}</span>
+                      <img *ngIf="project.image" 
+                           [src]="project.image" 
+                           class="w-6 h-6 rounded object-cover flex-shrink-0 border border-gray-200"
+                           alt="">
+                      <span class="px-2 py-0.5 rounded bg-gray-600 text-white font-medium truncate shadow-sm">
+                        <i *ngIf="!project.image" class="fas fa-folder mr-1 opacity-80"></i>{{project.name}}
+                      </span>
                     </div>
                     <button 
                       (click)="addTaskToProject.emit({ environmentId: env.id, projectId: project.id })"

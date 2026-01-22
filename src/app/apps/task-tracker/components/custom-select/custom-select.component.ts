@@ -6,6 +6,7 @@ export interface SelectOption {
   value: string | number;
   label: string;
   subtitle?: string; // Para mostrar información adicional como fecha
+  image?: string; // URL o base64 de imagen (para proyectos con imagen)
 }
 
 @Component({
@@ -21,7 +22,11 @@ export interface SelectOption {
         [class.disabled]="disabled"
         [class.rounded-r-none]="!roundedRight"
         (click)="toggleDropdown($event)">
-        <div class="flex-1 truncate">
+        <div class="flex-1 truncate flex items-center gap-2">
+          <img *ngIf="selectedOption?.image" 
+               [src]="selectedOption.image" 
+               class="w-6 h-6 rounded-md object-cover flex-shrink-0"
+               alt="">
           <span *ngIf="selectedOption" class="selected-text">{{ selectedOption.label }}</span>
           <span *ngIf="!selectedOption" class="placeholder-text">{{ placeholder }}</span>
         </div>
@@ -45,6 +50,10 @@ export interface SelectOption {
             class="option-item"
             [class.selected]="value === option.value"
             (click)="selectOption(option, $event)">
+            <img *ngIf="option.image" 
+                 [src]="option.image" 
+                 class="w-8 h-8 rounded-md object-cover flex-shrink-0"
+                 alt="">
             <div class="option-content">
               <span class="option-label">{{ option.label }}</span>
               <span *ngIf="option.subtitle" class="option-subtitle">{{ option.subtitle }}</span>

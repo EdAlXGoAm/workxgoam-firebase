@@ -727,8 +727,15 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   buildProjectOptions(): void {
     this.projectOptions = this.selectableProjects.map(proj => ({
       value: proj.id || '',
-      label: proj.name
+      label: proj.name,
+      image: proj.image
     }));
+  }
+  
+  getSelectedProjectImage(): string | undefined {
+    if (!this.task.project) return undefined;
+    const selectedProject = this.selectableProjects.find(p => p.id === this.task.project);
+    return selectedProject?.image;
   }
   
   buildTaskTypeOptions(): void {
