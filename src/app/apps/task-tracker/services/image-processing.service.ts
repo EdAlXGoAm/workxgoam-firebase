@@ -75,16 +75,58 @@ export class ImageProcessingService {
 
   /**
    * Procesa una imagen desde una URL y la redimensiona
+   * Intenta múltiples métodos incluyendo proxy CORS si falla la carga directa
    */
   async processImageFromUrl(
     imageUrl: string,
     maxDimension: number = 200
   ): Promise<{ base64: string; contentType: string; dataUrl: string }> {
+    // Si es un data URL, procesarlo directamente
+    if (imageUrl.startsWith('data:')) {
+      return this.loadImageAndProcess(imageUrl, maxDimension);
+    }
+
+    // Intentar carga directa primero
+    try {
+      return await this.loadImageAndProcess(imageUrl, maxDimension);
+    } catch (directError) {
+      console.log('Carga directa falló, intentando con proxy CORS...');
+    }
+
+    // Intentar con proxy CORS (corsproxy.io)
+    const corsProxyUrl = `https://corsproxy.io/?${encodeURIComponent(imageUrl)}`;
+    try {
+      return await this.loadImageAndProcess(corsProxyUrl, maxDimension);
+    } catch (proxyError) {
+      console.log('Proxy CORS falló, intentando con fetch y blob...');
+    }
+
+    // Último intento: usar fetch con blob
+    try {
+      return await this.fetchImageAsBlob(imageUrl, maxDimension);
+    } catch (fetchError) {
+      throw new Error('No se pudo cargar la imagen. Intenta con otra imagen o usa "Pegar" para copiar la imagen manualmente.');
+    }
+  }
+
+  /**
+   * Carga una imagen desde URL y la procesa
+   */
+  private loadImageAndProcess(
+    imageUrl: string,
+    maxDimension: number
+  ): Promise<{ base64: string; contentType: string; dataUrl: string }> {
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       
+      // Timeout de 10 segundos
+      const timeout = setTimeout(() => {
+        reject(new Error('Timeout al cargar la imagen'));
+      }, 10000);
+      
       img.onload = () => {
+        clearTimeout(timeout);
         try {
           const result = this.resizeImageToBase64(img, maxDimension);
           resolve(result);
@@ -93,8 +135,47 @@ export class ImageProcessingService {
         }
       };
       
-      img.onerror = () => reject(new Error('No se pudo cargar la imagen desde la URL'));
+      img.onerror = () => {
+        clearTimeout(timeout);
+        reject(new Error('No se pudo cargar la imagen desde la URL'));
+      };
+      
       img.src = imageUrl;
+    });
+  }
+
+  /**
+   * Intenta descargar la imagen usando fetch y convertirla a blob
+   */
+  private async fetchImageAsBlob(
+    imageUrl: string,
+    maxDimension: number
+  ): Promise<{ base64: string; contentType: string; dataUrl: string }> {
+    // Intentar con un proxy alternativo
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(imageUrl)}`;
+    
+    const response = await fetch(proxyUrl);
+    if (!response.ok) {
+      throw new Error('No se pudo descargar la imagen');
+    }
+    
+    const blob = await response.blob();
+    const dataUrl = await this.blobToDataUrl(blob);
+    
+    return this.loadImageAndProcess(dataUrl, maxDimension);
+  }
+
+  /**
+   * Convierte un Blob a data URL completo
+   */
+  private blobToDataUrl(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        resolve(String(reader.result || ''));
+      };
+      reader.onerror = () => reject(reader.error || new Error('Error leyendo blob'));
+      reader.readAsDataURL(blob);
     });
   }
 

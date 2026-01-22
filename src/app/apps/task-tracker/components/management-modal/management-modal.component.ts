@@ -66,12 +66,23 @@ export class ManagementModalComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    const scrollY = window.scrollY;
     document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    (document.body as any).__scrollY = scrollY;
     this.loadTasksForDeletionLogic();
   }
 
   ngOnDestroy(): void {
+    const scrollY = (document.body as any).__scrollY || 0;
     document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    window.scrollTo(0, scrollY);
+    delete (document.body as any).__scrollY;
   }
 
   async loadTasksForDeletionLogic(): Promise<void> {

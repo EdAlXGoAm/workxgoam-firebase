@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges, OnDestroy, HostListener, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Project } from '../../models/project.model';
@@ -11,8 +11,13 @@ import { ProjectImageQuickEditComponent } from '../project-image-quick-edit/proj
   standalone: true,
   imports: [CommonModule, FormsModule, CustomSelectComponent, ProjectImageQuickEditComponent],
   template: `
-    <div *ngIf="showModal" class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-[60] p-4">
-      <div class="bg-white rounded-xl shadow-2xl w-full max-w-md transition-all" (click)="$event.stopPropagation()">
+    <div *ngIf="showModal" 
+         #backdrop
+         class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-[60] p-4" 
+         style="overflow: hidden; touch-action: none;"
+         (wheel)="$event.preventDefault()"
+         (touchmove)="$event.preventDefault()">
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto transition-all" (click)="$event.stopPropagation()">
         <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200">
           <h3 class="text-xl font-semibold text-gray-800">{{ isEditing ? 'Editar Proyecto' : 'Agregar Nuevo Proyecto' }}</h3>
           <button (click)="close()" class="text-gray-400 hover:text-gray-600 transition">
@@ -100,7 +105,7 @@ import { ProjectImageQuickEditComponent } from '../project-image-quick-edit/proj
     </app-project-image-quick-edit>
   `
 })
-export class ProjectModalComponent implements OnInit, OnChanges {
+export class ProjectModalComponent implements OnInit, OnChanges, OnDestroy {
   @Input() showModal: boolean = false;
   @Input() isEditing: boolean = false;
   @Input() project: Partial<Project> | null = null;
@@ -112,6 +117,20 @@ export class ProjectModalComponent implements OnInit, OnChanges {
   currentProject: Partial<Project> = {};
   environmentOptions: SelectOption[] = [];
   showImageModal: boolean = false;
+  @ViewChild('backdrop', { static: false }) backdropElement?: ElementRef<HTMLDivElement>;
+  
+  @HostListener('wheel', ['$event'])
+  @HostListener('touchmove', ['$event'])
+  preventScroll(event: Event): void {
+    if (this.showModal && this.backdropElement) {
+      const target = event.target as HTMLElement;
+      const modalContent = this.backdropElement.nativeElement.querySelector('.bg-white');
+      if (modalContent && !modalContent.contains(target)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }
+  }
   
   ngOnInit(): void {
     this.initializeProject();
@@ -125,6 +144,38 @@ export class ProjectModalComponent implements OnInit, OnChanges {
     if (changes['environments']) {
       this.buildEnvironmentOptions();
     }
+    if (changes['showModal']) {
+      if (this.showModal) {
+        // Bloquear scroll del body
+        const scrollY = window.scrollY;
+        document.body.style.overflow = 'hidden';
+        document.body.style.position = 'fixed';
+        document.body.style.top = `-${scrollY}px`;
+        document.body.style.width = '100%';
+        // Guardar la posición del scroll para restaurarla después
+        (document.body as any).__scrollY = scrollY;
+      } else {
+        // Restaurar scroll del body
+        const scrollY = (document.body as any).__scrollY || 0;
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        window.scrollTo(0, scrollY);
+        delete (document.body as any).__scrollY;
+      }
+    }
+  }
+  
+  ngOnDestroy(): void {
+    // Restaurar scroll del body si el modal se destruye mientras está abierto
+    const scrollY = (document.body as any).__scrollY || 0;
+    document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    window.scrollTo(0, scrollY);
+    delete (document.body as any).__scrollY;
   }
   
   private initializeProject(): void {

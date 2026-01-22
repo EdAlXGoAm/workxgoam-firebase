@@ -7,7 +7,7 @@ import { Task } from '../../models/task.model';
   standalone: true,
   imports: [CommonModule],
   template: `
-   <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+   <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" style="overflow: hidden;">
     <div class="bg-white rounded-lg shadow-xl w-full max-w-md" (click)="$event.stopPropagation()">
       <div class="p-6">
         <div class="flex justify-between items-center mb-4">
@@ -61,11 +61,22 @@ export class ChangeStatusModalComponent implements OnInit, OnDestroy {
   @Output() confirmChangeVisibility = new EventEmitter<boolean>();
 
   ngOnInit() {
+    const scrollY = window.scrollY;
     document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    (document.body as any).__scrollY = scrollY;
   }
 
   ngOnDestroy() {
+    const scrollY = (document.body as any).__scrollY || 0;
     document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    window.scrollTo(0, scrollY);
+    delete (document.body as any).__scrollY;
   }
 
   close() {

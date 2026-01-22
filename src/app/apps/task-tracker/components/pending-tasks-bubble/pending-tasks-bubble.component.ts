@@ -518,14 +518,35 @@ export class PendingTasksBubbleComponent implements OnInit, OnDestroy, OnChanges
     this.updatePendingTasks();
   }
 
+  private disableBodyScroll(): void {
+    const scrollY = window.scrollY;
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    (document.body as any).__scrollY = scrollY;
+  }
+
+  private enableBodyScroll(): void {
+    const scrollY = (document.body as any).__scrollY || 0;
+    document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    window.scrollTo(0, scrollY);
+    delete (document.body as any).__scrollY;
+  }
+
   ngOnDestroy() {
     // Cancelar timer de hold-to-drag si existe
     if (this.bubbleHoldTimer) {
       clearTimeout(this.bubbleHoldTimer);
       this.bubbleHoldTimer = null;
     }
-    // Restaurar overflow del body por si acaso
-    document.body.style.overflow = '';
+    // Restaurar scroll si el modal está abierto
+    if (this.isModalOpen) {
+      this.enableBodyScroll();
+    }
     // Cerrar dropdown si está abierto
     this.openDropdownTaskId = null;
     this.dropdownPositions = {};
@@ -855,9 +876,9 @@ export class PendingTasksBubbleComponent implements OnInit, OnDestroy, OnChanges
     this.isModalOpen = !this.isModalOpen;
     this.cdr.markForCheck();
     if (this.isModalOpen) {
-      document.body.style.overflow = 'hidden';
+      this.disableBodyScroll();
     } else {
-      document.body.style.overflow = '';
+      this.enableBodyScroll();
     }
   }
 
@@ -868,7 +889,7 @@ export class PendingTasksBubbleComponent implements OnInit, OnDestroy, OnChanges
     this.sortDropdownPosition = null;
     this.cdr.markForCheck();
     this.dropdownPositions = {};
-    document.body.style.overflow = '';
+    this.enableBodyScroll();
   }
 
   onEditTask(task: Task): void {

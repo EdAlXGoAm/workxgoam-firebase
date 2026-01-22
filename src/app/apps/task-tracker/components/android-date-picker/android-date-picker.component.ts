@@ -34,8 +34,7 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
       <!-- Popup del date picker estilo Android -->
       <div *ngIf="isOpen" 
            class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4"
-           (mousedown)="onBackdropMouseDown($event)"
-           (mouseup)="onBackdropMouseUp($event)">
+           style="overflow: hidden;">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
              (mousedown)="$event.stopPropagation()"
              (mouseup)="$event.stopPropagation()">
@@ -138,7 +137,6 @@ export class AndroidDatePickerComponent implements OnInit, OnDestroy, ControlVal
   
   private tempSelectedDate: Date | null = null;
   private originalDate: Date | null = null;
-  private backdropMouseDownPos: { x: number, y: number } | null = null;
   private modalElement: HTMLElement | null = null;
   private modalContainer: HTMLElement | null = null;
   
@@ -154,21 +152,7 @@ export class AndroidDatePickerComponent implements OnInit, OnDestroy, ControlVal
     this.generateCalendar();
   }
 
-  // Detectar clicks fuera del componente
-  @HostListener('document:click', ['$event'])
-  onDocumentClick(event: Event) {
-    if (this.isOpen) {
-      const target = event.target as HTMLElement;
-      // Verificar si el click fue dentro del modal (que ahora puede estar en el body)
-      const modal = this.modalElement || this.elementRef.nativeElement.querySelector('.fixed.inset-0');
-      if (modal && !modal.contains(target)) {
-        // Solo cerrar si el click fue fuera del modal y fuera del botón del componente
-        if (!this.elementRef.nativeElement.contains(target)) {
-          this.cancel();
-        }
-      }
-    }
-  }
+  // Removed: Detectar clicks fuera del componente - Los modales ya no se cierran con click fuera
 
   // Detectar Escape key para cerrar
   @HostListener('document:keydown.escape')
@@ -178,25 +162,7 @@ export class AndroidDatePickerComponent implements OnInit, OnDestroy, ControlVal
     }
   }
 
-  onBackdropMouseDown(event: MouseEvent) {
-    // Guardar la posición del mousedown para comparar con mouseup
-    this.backdropMouseDownPos = { x: event.clientX, y: event.clientY };
-  }
-
-  onBackdropMouseUp(event: MouseEvent) {
-    // Solo cerrar si el mouseup está cerca del mousedown (es un click, no un drag)
-    if (this.backdropMouseDownPos) {
-      const deltaX = Math.abs(event.clientX - this.backdropMouseDownPos.x);
-      const deltaY = Math.abs(event.clientY - this.backdropMouseDownPos.y);
-      const threshold = 5; // Píxeles de tolerancia para considerar que es un click
-      
-      if (deltaX <= threshold && deltaY <= threshold) {
-        this.cancel();
-      }
-    }
-    
-    this.backdropMouseDownPos = null;
-  }
+  // Removed: onBackdropMouseDown y onBackdropMouseUp - Los modales ya no se cierran con click fuera
 
   openPicker() {
     this.isOpen = true;
@@ -218,13 +184,17 @@ export class AndroidDatePickerComponent implements OnInit, OnDestroy, ControlVal
     }, 0);
     
     // Bloquear scroll del body
+    const scrollY = window.scrollY;
     document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    (document.body as any).__scrollY = scrollY;
   }
 
   cancel() {
     this.isOpen = false;
     this.tempSelectedDate = this.originalDate;
-    this.backdropMouseDownPos = null;
     
     // Devolver el modal al contenedor original si fue movido
     if (this.modalElement && this.modalContainer) {
@@ -233,7 +203,13 @@ export class AndroidDatePickerComponent implements OnInit, OnDestroy, ControlVal
       this.modalContainer = null;
     }
     
+    const scrollY = (document.body as any).__scrollY || 0;
     document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    window.scrollTo(0, scrollY);
+    delete (document.body as any).__scrollY;
   }
 
   confirm() {
@@ -244,7 +220,6 @@ export class AndroidDatePickerComponent implements OnInit, OnDestroy, ControlVal
       this.dateChange.emit(dateString);
     }
     this.isOpen = false;
-    this.backdropMouseDownPos = null;
     
     // Devolver el modal al contenedor original si fue movido
     if (this.modalElement && this.modalContainer) {

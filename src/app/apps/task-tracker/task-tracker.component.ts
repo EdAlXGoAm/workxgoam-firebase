@@ -146,6 +146,10 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
   environmentContextMenuPosition = { x: 0, y: 0 };
   selectedEnvironment: Environment | null = null;
   
+  // Variables para modal de edición de environment
+  showEditEnvironmentModal = false;
+  environmentToEdit: Partial<Environment> | null = null;
+  
   // Modal de rango de fechas
   showDateRangeModal = false;
   dateRangeModalEnvironmentId: string = '';
@@ -771,12 +775,23 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     
     this.buildEnvironmentOptionsForNewProject();
     this.showNewProjectModal = true;
+    const scrollY = window.scrollY;
     document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    (document.body as any).__scrollY = scrollY;
   }
 
   closeNewProjectModal() {
     this.showNewProjectModal = false;
+    const scrollY = (document.body as any).__scrollY || 0;
     document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    window.scrollTo(0, scrollY);
+    delete (document.body as any).__scrollY;
   }
   
   // Métodos para selector personalizado de nuevo proyecto
@@ -1460,13 +1475,24 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
       this.newSumTemplateName = '';
     }
     this.showSaveSumTemplateModal = true;
+    const scrollY = window.scrollY;
     document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    (document.body as any).__scrollY = scrollY;
   }
 
   closeSaveSumTemplateModal() {
     this.showSaveSumTemplateModal = false;
     this.newSumTemplateName = '';
+    const scrollY = (document.body as any).__scrollY || 0;
     document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    window.scrollTo(0, scrollY);
+    delete (document.body as any).__scrollY;
     // No limpiar editingTemplateId aquí, se limpia después de guardar exitosamente
   }
 
@@ -2089,12 +2115,23 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     }
     this.projectForAssigningOrphans = '';
     this.showAssignOrphanedTasksModal = true;
+    const scrollY = window.scrollY;
     document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    (document.body as any).__scrollY = scrollY;
   }
 
   closeAssignOrphanedTasksModal(): void {
     this.showAssignOrphanedTasksModal = false;
+    const scrollY = (document.body as any).__scrollY || 0;
     document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    window.scrollTo(0, scrollY);
+    delete (document.body as any).__scrollY;
   }
 
   getSelectedOrphanedTasksIds(): string[] {
@@ -2279,6 +2316,32 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     } catch (error) {
       console.error('Error al guardar el proyecto:', error);
       alert(`Error al guardar el proyecto: ${error}`);
+    }
+  }
+
+  editEnvironmentFromContextMenu(environment: Environment): void {
+    this.environmentToEdit = { ...environment };
+    this.showEditEnvironmentModal = true;
+    this.closeEnvironmentContextMenu();
+  }
+
+  closeEditEnvironmentModal(): void {
+    this.showEditEnvironmentModal = false;
+    this.environmentToEdit = null;
+  }
+
+  async onEnvironmentSaved(environmentData: { id?: string; name: string; color: string; emoji?: string }): Promise<void> {
+    try {
+      if (environmentData.id) {
+        // Editar environment existente
+        const { id, ...updates } = environmentData;
+        await this.environmentService.updateEnvironment(id, updates);
+      }
+      this.closeEditEnvironmentModal();
+      await this.loadInitialData();
+    } catch (error) {
+      console.error('Error al guardar el ambiente:', error);
+      alert(`Error al guardar el ambiente: ${error}`);
     }
   }
 
@@ -2597,7 +2660,12 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     this.showTimeCalculatorModal = true;
     
     // Bloquear scroll del body
+    const scrollY = window.scrollY;
     document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    (document.body as any).__scrollY = scrollY;
   }
 
   closeTimeCalculator() {
@@ -2608,7 +2676,13 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     this.calculatorBackdropMouseDownPos = null;
     
     // Restaurar scroll del body
+    const scrollY = (document.body as any).__scrollY || 0;
     document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    window.scrollTo(0, scrollY);
+    delete (document.body as any).__scrollY;
   }
 
   // Detectar Escape key para cerrar modales

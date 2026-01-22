@@ -17,7 +17,7 @@ import { ImageProcessingService } from '../../services/image-processing.service'
     CameraCaptureComponent
   ],
   template: `
-    <div *ngIf="isOpen" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[60] p-4" (click)="handleClose()">
+    <div *ngIf="isOpen" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[60] p-4" style="overflow: hidden;">
       <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden" (click)="$event.stopPropagation()">
         <!-- Header -->
         <div class="flex justify-between items-center px-4 py-3 border-b border-gray-200 bg-gray-50">
@@ -170,14 +170,33 @@ export class ProjectImageQuickEditComponent implements OnInit, OnDestroy {
 
   constructor(private imageProcessingService: ImageProcessingService) {}
 
+  private disableBodyScroll(): void {
+    const scrollY = window.scrollY;
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    (document.body as any).__scrollY = scrollY;
+  }
+
+  private enableBodyScroll(): void {
+    const scrollY = (document.body as any).__scrollY || 0;
+    document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    window.scrollTo(0, scrollY);
+    delete (document.body as any).__scrollY;
+  }
+
   ngOnInit(): void {
     if (this.isOpen) {
-      document.body.style.overflow = 'hidden';
+      this.disableBodyScroll();
     }
   }
 
   ngOnDestroy(): void {
-    document.body.style.overflow = '';
+    this.enableBodyScroll();
   }
 
   // Open sub-modals
@@ -348,7 +367,7 @@ export class ProjectImageQuickEditComponent implements OnInit, OnDestroy {
   handleClose(): void {
     if (!this.isProcessing && !this.isRemoving) {
       this.error = null;
-      document.body.style.overflow = '';
+      this.enableBodyScroll();
       this.closeModal.emit();
     }
   }

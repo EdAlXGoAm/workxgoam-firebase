@@ -14,7 +14,7 @@ interface CropArea {
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div *ngIf="isOpen" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[70] p-4" (click)="$event.stopPropagation()">
+    <div *ngIf="isOpen" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[70] p-4" style="overflow: hidden;">
       <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden" (click)="$event.stopPropagation()">
         <!-- Header -->
         <div class="flex justify-between items-center px-4 py-3 border-b border-gray-200 bg-gray-50 flex-shrink-0">
@@ -140,20 +140,39 @@ export class ImageEditorComponent implements OnInit, OnDestroy, OnChanges {
 
   constructor(private openAIService: OpenAIService) {}
 
+  private disableBodyScroll(): void {
+    const scrollY = window.scrollY;
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    (document.body as any).__scrollY = scrollY;
+  }
+
+  private enableBodyScroll(): void {
+    const scrollY = (document.body as any).__scrollY || 0;
+    document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    window.scrollTo(0, scrollY);
+    delete (document.body as any).__scrollY;
+  }
+
   ngOnInit(): void {
     if (this.isOpen) {
-      document.body.style.overflow = 'hidden';
+      this.disableBodyScroll();
     }
   }
 
   ngOnDestroy(): void {
-    document.body.style.overflow = '';
+    this.enableBodyScroll();
     this.removeGlobalListeners();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['isOpen'] && this.isOpen && this.imageUrl) {
-      document.body.style.overflow = 'hidden';
+      this.disableBodyScroll();
       setTimeout(() => this.loadImage(), 100);
     }
     if (changes['imageUrl'] && this.isOpen && this.imageUrl) {
@@ -584,7 +603,7 @@ export class ImageEditorComponent implements OnInit, OnDestroy, OnChanges {
 
   onClose(): void {
     if (!this.isProcessing) {
-      document.body.style.overflow = '';
+      this.enableBodyScroll();
       this.closeModal.emit();
     }
   }

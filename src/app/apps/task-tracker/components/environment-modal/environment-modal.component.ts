@@ -7,7 +7,7 @@ import { FormsModule } from '@angular/forms';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
+    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]" style="overflow: hidden;">
       <div class="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all max-h-[90vh] overflow-y-auto" (click)="$event.stopPropagation()">
         <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200">
           <h3 class="text-xl font-semibold text-gray-800">{{ isEditing ? 'Editar Entorno' : 'Nuevo Entorno' }}</h3>
@@ -228,11 +228,22 @@ export class EnvironmentModalComponent implements OnChanges, OnInit, OnDestroy {
   colorPickerLightness: number = 60;
 
   ngOnInit(): void {
+    const scrollY = window.scrollY;
     document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    (document.body as any).__scrollY = scrollY;
   }
 
   ngOnDestroy(): void {
+    const scrollY = (document.body as any).__scrollY || 0;
     document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    window.scrollTo(0, scrollY);
+    delete (document.body as any).__scrollY;
   }
 
   ngOnChanges(changes: SimpleChanges): void {

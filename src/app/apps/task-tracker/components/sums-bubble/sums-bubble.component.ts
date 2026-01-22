@@ -280,6 +280,25 @@ export class SumsBubbleComponent implements OnInit, OnDestroy, OnChanges {
   contextMenuY = 0;
   selectedTemplate: TaskSumTemplate | null = null;
 
+  private disableBodyScroll(): void {
+    const scrollY = window.scrollY;
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    (document.body as any).__scrollY = scrollY;
+  }
+
+  private enableBodyScroll(): void {
+    const scrollY = (document.body as any).__scrollY || 0;
+    document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    window.scrollTo(0, scrollY);
+    delete (document.body as any).__scrollY;
+  }
+
   ngOnInit() {
     this.loadBubblePosition();
   }
@@ -295,6 +314,10 @@ export class SumsBubbleComponent implements OnInit, OnDestroy, OnChanges {
       this.bubbleHoldTimer = null;
     }
     this.saveBubblePosition();
+    // Restaurar scroll si el modal está abierto
+    if (this.isModalOpen) {
+      this.enableBodyScroll();
+    }
   }
 
   onBubbleClick(event: MouseEvent) {
@@ -308,6 +331,7 @@ export class SumsBubbleComponent implements OnInit, OnDestroy, OnChanges {
     // Fallback: solo abrir si mouseUpHandler no lo manejó (caso raro)
     // Esto es principalmente para móviles donde el evento click puede dispararse sin mouseup
     this.isModalOpen = true;
+    this.disableBodyScroll();
     this.cdr.markForCheck();
   }
 
@@ -431,6 +455,7 @@ export class SumsBubbleComponent implements OnInit, OnDestroy, OnChanges {
         const tapTime = Date.now() - startTime;
         if (tapTime < this.HOLD_TO_DRAG_DELAY + 100) { // +100ms de tolerancia
           this.isModalOpen = true;
+          this.disableBodyScroll();
           // Marcar tiempo para prevenir doble toggle si click se dispara después
           this.lastClickTime = Date.now();
           this.cdr.markForCheck();
@@ -449,6 +474,7 @@ export class SumsBubbleComponent implements OnInit, OnDestroy, OnChanges {
     this.isModalOpen = false;
     this.showContextMenu = false;
     this.selectedTemplate = null;
+    this.enableBodyScroll();
     this.cdr.markForCheck();
   }
 

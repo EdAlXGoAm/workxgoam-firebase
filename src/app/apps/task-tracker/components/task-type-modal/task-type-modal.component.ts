@@ -9,7 +9,7 @@ import { TaskType } from '../../models/task-type.model';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div *ngIf="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
+    <div *ngIf="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]" style="overflow: hidden;">
       <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" (click)="$event.stopPropagation()">
         <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200 flex-shrink-0">
           <h3 class="text-xl font-semibold text-gray-800">Gestionar Tipos de Tarea</h3>
@@ -183,11 +183,22 @@ export class TaskTypeModalComponent implements OnInit, OnChanges, OnDestroy {
 
   ngOnInit() {
     this.loadTaskTypes();
+    const scrollY = window.scrollY;
     document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    (document.body as any).__scrollY = scrollY;
   }
 
   ngOnDestroy() {
+    const scrollY = (document.body as any).__scrollY || 0;
     document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    window.scrollTo(0, scrollY);
+    delete (document.body as any).__scrollY;
   }
 
   ngOnChanges(changes: SimpleChanges): void {
