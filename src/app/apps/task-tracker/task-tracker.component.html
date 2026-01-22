@@ -1,4 +1,4 @@
-<div class="min-h-screen bg-gray-50">
+<div class="bg-gray-50 w-full">
   <!-- Header -->
   <app-task-tracker-header
     [userName]="userName"
@@ -7,7 +7,7 @@
   </app-task-tracker-header>
 
   <!-- Main Content con padding-top para compensar el header fijo -->
-  <main class="max-w-7xl mx-auto px-4 py-6 pt-20">
+  <main class="w-full px-2 md:px-4 lg:px-6 py-6 pt-20">
     <!-- Current Task Info Card -->
     <app-current-task-info 
       [tasks]="tasks" 
@@ -135,7 +135,7 @@
   </main>
 
   <!-- Tareas Huérfanas Section -->
-  <section *ngIf="orphanedTasks.length > 0" class="max-w-7xl mx-auto px-4 py-6">
+  <section *ngIf="orphanedTasks.length > 0" class="w-full px-4 py-6">
     <div class="bg-white rounded-lg shadow-md p-4">
       <h2 class="text-xl font-bold mb-4 text-orange-600">Tareas Sin Asignar (Huérfanas)</h2>
       <p class="text-sm text-gray-600 mb-4">

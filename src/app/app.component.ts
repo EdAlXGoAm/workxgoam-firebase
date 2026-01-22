@@ -1,9 +1,11 @@
-import { Component, HostListener } from '@angular/core';
-import { RouterOutlet, RouterModule, Router } from '@angular/router';
+import { Component, HostListener, OnInit, OnDestroy } from '@angular/core';
+import { RouterOutlet, RouterModule, Router, NavigationEnd } from '@angular/router';
 import { NavComponent } from './components/nav/nav.component';
 import { CommonModule } from '@angular/common';
 import { AuthService } from './services/auth.service';
 import { LoginGlowService } from './services/login-glow.service';
+import { filter } from 'rxjs/operators';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-root',
@@ -12,16 +14,41 @@ import { LoginGlowService } from './services/login-glow.service';
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.css']
 })
-export class AppComponent {
+export class AppComponent implements OnInit, OnDestroy {
   title = 'AixGoam';
   isUserMenuOpen = false;
   menuPosition = { top: '0px', right: '0px' };
+  isTaskTrackerRoute: boolean = false;
+  private routerSubscription?: Subscription;
   
   constructor(
     public authService: AuthService,
     private router: Router,
     private loginGlowService: LoginGlowService
   ) {}
+  
+  ngOnInit(): void {
+    // Verificar la ruta inicial
+    this.checkTaskTrackerRoute();
+    
+    // Suscribirse a los cambios de ruta
+    this.routerSubscription = this.router.events
+      .pipe(filter(event => event instanceof NavigationEnd))
+      .subscribe(() => {
+        this.checkTaskTrackerRoute();
+      });
+  }
+  
+  ngOnDestroy(): void {
+    if (this.routerSubscription) {
+      this.routerSubscription.unsubscribe();
+    }
+  }
+  
+  // Verificar si estamos en la ruta de task-tracker
+  private checkTaskTrackerRoute(): void {
+    this.isTaskTrackerRoute = this.router.url.includes('/apps/task-tracker');
+  }
   
   // Cerrar el menú al hacer clic en cualquier parte fuera de él
   @HostListener('document:click', ['$event'])
@@ -101,4 +128,5 @@ export class AppComponent {
       this.router.navigate(['/login']);
     }
   }
+  
 }

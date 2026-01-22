@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnChanges, SimpleChanges, AfterViewInit, AfterViewChecked, OnDestroy, ViewChild, ElementRef, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { WeekTimelineSvgComponent } from '../week-timeline-svg/week-timeline-svg.component';
@@ -12,7 +12,7 @@ import { TaskType } from '../../models/task-type.model';
   standalone: true,
   imports: [CommonModule, FormsModule, WeekTimelineSvgComponent],
   template: `
-    <div class="w-full bg-white rounded-lg shadow-md p-3 md:p-4">
+    <div class="w-full bg-white rounded-lg shadow-md p-3 md:p-4 lg:p-6 week-view-container">
       <div class="flex flex-wrap justify-between items-center gap-2 mb-3 md:mb-4">
         <h2 class="text-lg md:text-xl font-bold">Vista Semanal</h2>
         <div *ngIf="emptyEnvironmentsCount > 0" class="flex items-center gap-1.5 md:gap-2">
@@ -28,83 +28,85 @@ import { TaskType } from '../../models/task-type.model';
         </div>
       </div>
 
-      <div class="mb-4 md:mb-6">
-        <h3 class="text-base md:text-lg font-semibold mb-2 text-center w-full">Vista Semanal</h3>
-        <app-week-timeline-svg 
-          [tasks]="tasks" 
-          [environments]="environments" 
-          [taskTypes]="taskTypes" 
-          [projects]="projects"
-          (editTask)="editTask.emit($event)" 
-          (deleteTask)="deleteTask.emit($event)"
-          (taskUpdated)="taskUpdated.emit($event)">
-        </app-week-timeline-svg>
-      </div>
+      <div #weekLayoutWrapper class="week-layout-wrapper">
+        <div class="timeline-section">
+          <h3 class="text-base md:text-lg font-semibold mb-2 text-center w-full">Vista Semanal</h3>
+          <app-week-timeline-svg 
+            [tasks]="tasks" 
+            [environments]="environments" 
+            [taskTypes]="taskTypes" 
+            [projects]="projects"
+            (editTask)="editTask.emit($event)" 
+            (deleteTask)="deleteTask.emit($event)"
+            (taskUpdated)="taskUpdated.emit($event)">
+          </app-week-timeline-svg>
+        </div>
 
-      <!-- Sincronización Compacta -->
-      <div class="mb-4">
-        <div class="flex items-center justify-between gap-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
-          <!-- Texto compacto -->
-          <div class="flex items-center gap-2 text-xs text-gray-600">
-            <i class="fas fa-sync-alt text-indigo-600"></i>
-            <span class="hidden sm:inline">Sincronizar orden:</span>
-            <span class="sm:hidden">Sincronizar:</span>
-          </div>
-          
-          <!-- Botones compactos -->
-          <div class="flex items-center gap-1.5">
-            <button 
-              (click)="saveOrderToDatabase.emit()"
-              [disabled]="isSavingOrderToDatabase || isLoadingOrderFromDatabase"
-              [class.opacity-50]="isSavingOrderToDatabase || isLoadingOrderFromDatabase"
-              [class.cursor-not-allowed]="isSavingOrderToDatabase || isLoadingOrderFromDatabase"
-              class="px-2.5 py-1.5 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700 transition-colors flex items-center gap-1.5"
-              [title]="'Guardar orden en base de datos'">
-              <i class="fas text-xs" [class.fa-save]="!isSavingOrderToDatabase" [class.fa-spinner]="isSavingOrderToDatabase" [class.fa-spin]="isSavingOrderToDatabase"></i>
-              <span class="hidden sm:inline">{{ isSavingOrderToDatabase ? 'Guardando...' : 'Guardar' }}</span>
-              <span class="sm:hidden">💾</span>
-            </button>
+        <div class="environments-section">
+          <!-- Sincronización Compacta -->
+          <div class="mb-4">
+            <div class="flex items-center justify-between gap-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
+              <!-- Texto compacto -->
+              <div class="flex items-center gap-2 text-xs text-gray-600">
+                <i class="fas fa-sync-alt text-indigo-600"></i>
+                <span class="hidden sm:inline">Sincronizar orden:</span>
+                <span class="sm:hidden">Sincronizar:</span>
+              </div>
+              
+              <!-- Botones compactos -->
+              <div class="flex items-center gap-1.5">
+                <button 
+                  (click)="saveOrderToDatabase.emit()"
+                  [disabled]="isSavingOrderToDatabase || isLoadingOrderFromDatabase"
+                  [class.opacity-50]="isSavingOrderToDatabase || isLoadingOrderFromDatabase"
+                  [class.cursor-not-allowed]="isSavingOrderToDatabase || isLoadingOrderFromDatabase"
+                  class="px-2.5 py-1.5 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700 transition-colors flex items-center gap-1.5"
+                  [title]="'Guardar orden en base de datos'">
+                  <i class="fas text-xs" [class.fa-save]="!isSavingOrderToDatabase" [class.fa-spinner]="isSavingOrderToDatabase" [class.fa-spin]="isSavingOrderToDatabase"></i>
+                  <span class="hidden sm:inline">{{ isSavingOrderToDatabase ? 'Guardando...' : 'Guardar' }}</span>
+                  <span class="sm:hidden">💾</span>
+                </button>
+                
+                <button 
+                  (click)="loadOrderFromDatabase.emit()"
+                  [disabled]="isSavingOrderToDatabase || isLoadingOrderFromDatabase"
+                  [class.opacity-50]="isSavingOrderToDatabase || isLoadingOrderFromDatabase"
+                  [class.cursor-not-allowed]="isSavingOrderToDatabase || isLoadingOrderFromDatabase"
+                  class="px-2.5 py-1.5 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 transition-colors flex items-center gap-1.5"
+                  [title]="'Cargar orden desde base de datos'">
+                  <i class="fas text-xs" [class.fa-download]="!isLoadingOrderFromDatabase" [class.fa-spinner]="isLoadingOrderFromDatabase" [class.fa-spin]="isLoadingOrderFromDatabase"></i>
+                  <span class="hidden sm:inline">{{ isLoadingOrderFromDatabase ? 'Cargando...' : 'Cargar' }}</span>
+                  <span class="sm:hidden">📥</span>
+                </button>
+              </div>
+            </div>
             
-            <button 
-              (click)="loadOrderFromDatabase.emit()"
-              [disabled]="isSavingOrderToDatabase || isLoadingOrderFromDatabase"
-              [class.opacity-50]="isSavingOrderToDatabase || isLoadingOrderFromDatabase"
-              [class.cursor-not-allowed]="isSavingOrderToDatabase || isLoadingOrderFromDatabase"
-              class="px-2.5 py-1.5 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 transition-colors flex items-center gap-1.5"
-              [title]="'Cargar orden desde base de datos'">
-              <i class="fas text-xs" [class.fa-download]="!isLoadingOrderFromDatabase" [class.fa-spinner]="isLoadingOrderFromDatabase" [class.fa-spin]="isLoadingOrderFromDatabase"></i>
-              <span class="hidden sm:inline">{{ isLoadingOrderFromDatabase ? 'Cargando...' : 'Cargar' }}</span>
-              <span class="sm:hidden">📥</span>
-            </button>
+            <!-- Mensaje de sincronización compacto -->
+            <div *ngIf="orderSyncMessage" 
+                 class="mt-2 p-2 rounded text-xs flex items-center gap-1.5 transition-all duration-300"
+                 [class.bg-green-100]="orderSyncMessageType === 'success'"
+                 [class.text-green-800]="orderSyncMessageType === 'success'"
+                 [class.bg-red-100]="orderSyncMessageType === 'error'"
+                 [class.text-red-800]="orderSyncMessageType === 'error'"
+                 [class.bg-blue-100]="orderSyncMessageType === 'info'"
+                 [class.text-blue-800]="orderSyncMessageType === 'info'">
+              <i class="fas text-xs" 
+                 [class.fa-check-circle]="orderSyncMessageType === 'success'"
+                 [class.fa-exclamation-circle]="orderSyncMessageType === 'error'"
+                 [class.fa-info-circle]="orderSyncMessageType === 'info'"></i>
+              <span>{{ orderSyncMessage }}</span>
+            </div>
           </div>
-        </div>
-        
-        <!-- Mensaje de sincronización compacto -->
-        <div *ngIf="orderSyncMessage" 
-             class="mt-2 p-2 rounded text-xs flex items-center gap-1.5 transition-all duration-300"
-             [class.bg-green-100]="orderSyncMessageType === 'success'"
-             [class.text-green-800]="orderSyncMessageType === 'success'"
-             [class.bg-red-100]="orderSyncMessageType === 'error'"
-             [class.text-red-800]="orderSyncMessageType === 'error'"
-             [class.bg-blue-100]="orderSyncMessageType === 'info'"
-             [class.text-blue-800]="orderSyncMessageType === 'info'">
-          <i class="fas text-xs" 
-             [class.fa-check-circle]="orderSyncMessageType === 'success'"
-             [class.fa-exclamation-circle]="orderSyncMessageType === 'error'"
-             [class.fa-info-circle]="orderSyncMessageType === 'info'"></i>
-          <span>{{ orderSyncMessage }}</span>
-        </div>
-      </div>
 
-      <!-- Spinner de carga mientras se ordenan los environments -->
-      <div *ngIf="isLoadingEnvironmentOrder" class="flex justify-center items-center py-12">
-        <div class="flex flex-col items-center">
-          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
-          <p class="text-gray-600 text-sm">Cargando orden de environments...</p>
-        </div>
-      </div>
+          <!-- Spinner de carga mientras se ordenan los environments -->
+          <div *ngIf="isLoadingEnvironmentOrder" class="flex justify-center items-center py-12">
+            <div class="flex flex-col items-center">
+              <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
+              <p class="text-gray-600 text-sm">Cargando orden de environments...</p>
+            </div>
+          </div>
 
-      <div *ngIf="!isLoadingEnvironmentOrder" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div *ngIf="!isLoadingEnvironmentOrder" class="environments-grid">
         <div *ngFor="let env of orderedEnvironments" class="board-column" [class.board-column-empty]="!environmentHasTasks(env.id)">
           <div class="environment-header p-4 pb-2">
             <div class="flex items-center justify-between">
@@ -291,11 +293,102 @@ import { TaskType } from '../../models/task-type.model';
               </div>
             </div>
           </div>
+          </div>
         </div>
       </div>
     </div>
   `,
   styles: [`
+    .week-view-container {
+      position: relative;
+    }
+    
+    .week-layout-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    .timeline-section {
+      width: 100%;
+    }
+    
+    .environments-section {
+      width: 100%;
+    }
+    
+    .environments-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+    
+    /* Tablet: 2 columnas */
+    @media (min-width: 768px) and (max-width: 1023px) {
+      .environments-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+      }
+    }
+    
+    /* Desktop pequeño: 2 columnas */
+    @media (min-width: 1024px) and (max-width: 1279px) {
+      .environments-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+      }
+    }
+    
+    /* Desktop mediano: 3 columnas */
+    @media (min-width: 1280px) and (max-width: 1919px) {
+      .environments-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+      }
+    }
+    
+    @media (min-width: 1920px) {
+      .week-view-container {
+        padding: 1.5rem;
+      }
+      
+      .week-layout-wrapper {
+        flex-direction: row;
+        align-items: flex-start;
+        min-height: 600px;
+        gap: 1.5rem;
+      }
+      
+      .timeline-section {
+        position: sticky;
+        top: 0;
+        width: 1200px;
+        flex-shrink: 0;
+        height: fit-content;
+        max-height: 100%;
+        overflow-y: auto;
+      }
+      
+      .environments-section {
+        flex: 1;
+        height: 100%;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-right: 0.5rem;
+      }
+      
+      .environments-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+      }
+    }
+    
+    @media (min-width: 1920px) and (min-height: 900px) {
+      .environments-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+    
     .board-column {
       min-height: 200px;
       max-height: 50vh;
@@ -304,6 +397,12 @@ import { TaskType } from '../../models/task-type.model';
       display: flex;
       flex-direction: column;
       overflow: hidden;
+    }
+    
+    @media (min-width: 1920px) {
+      .board-column {
+        max-height: none;
+      }
     }
     .board-column-empty {
       min-height: auto;
@@ -362,7 +461,9 @@ import { TaskType } from '../../models/task-type.model';
     button[disabled]:hover { opacity: 0.4; }
   `]
 })
-export class WeekViewComponent implements OnChanges {
+export class WeekViewComponent implements OnChanges, AfterViewInit, AfterViewChecked, OnDestroy {
+  @ViewChild('weekLayoutWrapper', { static: false }) weekLayoutWrapper!: ElementRef<HTMLDivElement>;
+  
   @Input() tasks: Task[] = [];
   @Input() projects: Project[] = [];
   @Input() environments: Environment[] = [];
@@ -396,10 +497,153 @@ export class WeekViewComponent implements OnChanges {
   collapsedEmptyEnvironments: boolean = true;
   collapsedEnvironments: { [envId: string]: boolean } = {};
   collapsedProjects: { [projectId: string]: boolean } = {};
+  private heightCalculated: boolean = false;
+  private isCalculating: boolean = false;
+  private resizeObserver?: ResizeObserver;
+  private resizeListener?: () => void;
+
+  constructor(private cdr: ChangeDetectorRef, private ngZone: NgZone) {}
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['environments'] || changes['environmentCustomOrder'] || changes['tasks']) {
       this.updateOrderedEnvironmentsCache();
+      // Solo resetear el cálculo si realmente cambió el contenido significativo
+      // No resetear por cambios menores que no afectan la altura
+    }
+  }
+
+  ngAfterViewInit(): void {
+    if (window.innerWidth >= 1920) {
+      this.setupResizeObserver();
+      // Esperar a que el elemento esté disponible y renderizado
+      setTimeout(() => {
+        if (this.weekLayoutWrapper?.nativeElement && !this.heightCalculated && !this.isCalculating) {
+          this.calculateAndSetHeight();
+        }
+      }, 300);
+    }
+  }
+
+  ngAfterViewChecked(): void {
+    // Solo calcular una vez cuando el elemento esté disponible y no se haya calculado aún
+    if (window.innerWidth >= 1920 && 
+        this.weekLayoutWrapper?.nativeElement && 
+        !this.heightCalculated && 
+        !this.isCalculating) {
+      // Usar setTimeout para evitar ejecutarse en cada ciclo
+      setTimeout(() => {
+        if (this.weekLayoutWrapper?.nativeElement && !this.heightCalculated && !this.isCalculating) {
+          this.calculateAndSetHeight();
+        }
+      }, 100);
+    }
+  }
+
+  private calculateAndSetHeight(): void {
+    if (!this.weekLayoutWrapper?.nativeElement || window.innerWidth < 1920 || this.isCalculating) {
+      return;
+    }
+
+    this.isCalculating = true;
+    this.ngZone.runOutsideAngular(() => {
+      const wrapper = this.weekLayoutWrapper.nativeElement;
+      const container = wrapper.closest('.week-view-container') as HTMLElement;
+      
+      if (!container) {
+        this.isCalculating = false;
+        return;
+      }
+
+      // Obtener la posición del wrapper relativa al viewport
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const wrapperTop = wrapperRect.top;
+      
+      // Calcular altura disponible: viewport height - posición del wrapper - margen inferior
+      const viewportHeight = window.innerHeight;
+      const marginBottom = 20; // Margen inferior
+      let availableHeight = viewportHeight - wrapperTop - marginBottom;
+      
+      // Asegurar una altura mínima
+      const minHeight = 600;
+      let calculatedHeight = Math.max(minHeight, availableHeight);
+      
+      // Aplicar la altura calculada inicialmente
+      wrapper.style.height = `${calculatedHeight}px`;
+      wrapper.style.maxHeight = `${calculatedHeight}px`;
+      
+      // Verificar si hay scroll en la página después del renderizado y ajustar iterativamente
+      setTimeout(() => {
+        let iterations = 0;
+        const maxIterations = 5;
+        
+        const adjustHeight = () => {
+          const hasPageScroll = document.documentElement.scrollHeight > window.innerHeight;
+          
+          if (hasPageScroll && iterations < maxIterations) {
+            const scrollDifference = document.documentElement.scrollHeight - window.innerHeight;
+            const currentHeight = parseInt(wrapper.style.height) || calculatedHeight;
+            const newHeight = Math.max(minHeight, currentHeight - scrollDifference - 5);
+            
+            wrapper.style.height = `${newHeight}px`;
+            wrapper.style.maxHeight = `${newHeight}px`;
+            
+            iterations++;
+            
+            // Verificar nuevamente después de un breve delay
+            setTimeout(() => {
+              if (document.documentElement.scrollHeight > window.innerHeight) {
+                adjustHeight();
+              } else {
+                // Marcar como completado cuando ya no hay scroll
+                this.heightCalculated = true;
+                this.isCalculating = false;
+              }
+            }, 50);
+          } else {
+            // Marcar como completado cuando ya no hay scroll o se alcanzó el máximo de iteraciones
+            this.heightCalculated = true;
+            this.isCalculating = false;
+          }
+        };
+        
+        adjustHeight();
+      }, 200);
+    });
+  }
+
+  private setupResizeObserver(): void {
+    // Solo recalcular en resize si realmente cambió el tamaño significativamente
+    let lastWindowWidth = window.innerWidth;
+    let lastWindowHeight = window.innerHeight;
+    
+    this.resizeListener = () => {
+      const currentWidth = window.innerWidth;
+      const currentHeight = window.innerHeight;
+      
+      // Solo recalcular si el cambio es significativo (más de 50px) y estamos en modo desktop
+      if (currentWidth >= 1920 && 
+          (Math.abs(currentWidth - lastWindowWidth) > 50 || Math.abs(currentHeight - lastWindowHeight) > 50)) {
+        if (!this.isCalculating) {
+          this.isCalculating = true;
+          setTimeout(() => {
+            this.calculateAndSetHeight();
+            this.isCalculating = false;
+          }, 100);
+        }
+        lastWindowWidth = currentWidth;
+        lastWindowHeight = currentHeight;
+      }
+    };
+
+    window.addEventListener('resize', this.resizeListener);
+  }
+
+  ngOnDestroy(): void {
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+    }
+    if (this.resizeListener) {
+      window.removeEventListener('resize', this.resizeListener);
     }
   }
 

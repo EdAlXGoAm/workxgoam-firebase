@@ -213,7 +213,7 @@
 </div>
 
 <!-- Main Content -->
-<main class="max-w-7xl xl:max-w-full mx-auto p-0">
+<main [class]="isTaskTrackerRoute ? 'w-full p-0 task-tracker-full-width' : 'max-w-7xl xl:max-w-full mx-auto p-0'">
   <router-outlet></router-outlet>
 </main>
 
