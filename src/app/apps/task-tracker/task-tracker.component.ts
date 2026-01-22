@@ -556,6 +556,34 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     this.showNewTaskModal = true;
   }
 
+  /**
+   * Abre el modal de nueva tarea con un rango de tiempo preseleccionado
+   * Se llama desde el timeline cuando el usuario arrastra para seleccionar un rango
+   */
+  openNewTaskModalWithRange(data: { startTime: Date; endTime: Date }) {
+    this.resetNewTask();
+    
+    const { startTime, endTime } = data;
+    
+    console.log('📅 openNewTaskModalWithRange: Hora inicio:', startTime.toISOString());
+    console.log('📅 openNewTaskModalWithRange: Hora fin:', endTime.toISOString());
+    
+    // Formatear y establecer los valores
+    this.newTask.start = this.formatDateTimeLocalForDefaults(startTime);
+    this.newTask.end = this.formatDateTimeLocalForDefaults(endTime);
+    
+    // Actualizar las fechas y horas separadas usando HORA LOCAL
+    this.newTaskStartDate = `${startTime.getFullYear()}-${String(startTime.getMonth() + 1).padStart(2, '0')}-${String(startTime.getDate()).padStart(2, '0')}`;
+    this.newTaskStartTime = `${startTime.getHours().toString().padStart(2, '0')}:${startTime.getMinutes().toString().padStart(2, '0')}`;
+    this.newTaskEndDate = `${endTime.getFullYear()}-${String(endTime.getMonth() + 1).padStart(2, '0')}-${String(endTime.getDate()).padStart(2, '0')}`;
+    this.newTaskEndTime = `${endTime.getHours().toString().padStart(2, '0')}:${endTime.getMinutes().toString().padStart(2, '0')}`;
+    
+    // Recalcular la duración
+    this.updateNewTaskDuration();
+    
+    this.showNewTaskModal = true;
+  }
+
   closeNewTaskModal() {
     this.showNewTaskModal = false;
   }

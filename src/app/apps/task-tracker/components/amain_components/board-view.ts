@@ -30,7 +30,7 @@ import { TaskType } from '../../models/task-type.model';
 
       <div class="mb-4 md:mb-6">
         <h3 class="text-base md:text-lg font-semibold mb-2 text-center w-full">Línea del Tiempo</h3>
-        <app-timeline-svg [tasks]="tasks" [environments]="environments" [taskTypes]="taskTypes" (editTask)="editTask.emit($event)" (deleteTask)="deleteTask.emit($event)" (toggleHidden)="toggleHidden.emit($event)" (changeStatus)="changeStatus.emit($event)" (taskUpdated)="taskUpdated.emit($event)"></app-timeline-svg>
+        <app-timeline-svg [tasks]="tasks" [environments]="environments" [taskTypes]="taskTypes" (editTask)="editTask.emit($event)" (deleteTask)="deleteTask.emit($event)" (toggleHidden)="toggleHidden.emit($event)" (changeStatus)="changeStatus.emit($event)" (taskUpdated)="taskUpdated.emit($event)" (createTaskWithRange)="createTaskWithRange.emit($event)"></app-timeline-svg>
       </div>
 
       <!-- Sincronización Compacta -->
@@ -413,6 +413,7 @@ export class BoardViewComponent implements OnChanges {
   @Output() moveEnvironmentDown = new EventEmitter<string>();
   @Output() saveOrderToDatabase = new EventEmitter<void>();
   @Output() loadOrderFromDatabase = new EventEmitter<void>();
+  @Output() createTaskWithRange = new EventEmitter<{ startTime: Date; endTime: Date }>();
 
   collapsedEmptyEnvironments: boolean = true;
   collapsedEnvironments: { [envId: string]: boolean } = {};

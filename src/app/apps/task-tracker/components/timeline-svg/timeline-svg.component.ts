@@ -69,6 +69,25 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     section: 0
   };
 
+  // 🆕 Estado de selección de rango para crear nuevas tareas
+  rangeSelectionState = {
+    isSelecting: false,
+    startX: 0,
+    currentX: 0,
+    section: 0,
+    sectionStartHour: 0
+  };
+
+  // Rectángulo visual de selección de rango
+  rangeSelectionRect = {
+    visible: false,
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+    section: 0
+  };
+
   constructor(
     private cdr: ChangeDetectorRef,
     private timelineFocusService: TimelineFocusService,
@@ -82,6 +101,7 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
   @Output() toggleHidden = new EventEmitter<Task>();
   @Output() changeStatus = new EventEmitter<{ task: Task; status: 'pending' | 'in-progress' | 'completed' }>();
   @Output() taskUpdated = new EventEmitter<Task>();
+  @Output() createTaskWithRange = new EventEmitter<{ startTime: Date; endTime: Date }>();
 
   @ViewChild('containerRef') containerRef!: ElementRef<HTMLDivElement>;
   @ViewChildren('taskRect') taskRects!: QueryList<ElementRef<SVGRectElement>>;
@@ -1554,6 +1574,210 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     if (this.showTaskSelector) {
       this.closeTaskSelector();
     }
+  }
+
+  // ========================
+  // 🆕 SELECCIÓN DE RANGO PARA CREAR TAREAS
+  // ========================
+
+  /**
+   * Convertir coordenada X a hora decimal
+   */
+  xToHour(x: number, sectionStartHour: number): number {
+    const effectiveWidth = this.svgWidth - this.hourOffsetStart - this.hourOffsetEnd;
+    const hourInSection = ((x - this.hourOffsetStart) / effectiveWidth) * 8;
+    return sectionStartHour + Math.max(0, Math.min(8, hourInSection));
+  }
+
+  /**
+   * Redondear hora a múltiplos de 15 minutos
+   */
+  snapToQuarterHour(hour: number): number {
+    const totalMinutes = hour * 60;
+    const snappedMinutes = Math.round(totalMinutes / 15) * 15;
+    return snappedMinutes / 60;
+  }
+
+  /**
+   * Determinar la sección del timeline basándose en la coordenada Y
+   */
+  getSectionFromY(localY: number): { sectionIndex: number; sectionStartHour: number } {
+    const sectionIndex = Math.floor(localY / this.sectionHeight);
+    const clampedIndex = Math.max(0, Math.min(2, sectionIndex));
+    return {
+      sectionIndex: clampedIndex,
+      sectionStartHour: clampedIndex * 8
+    };
+  }
+
+  /**
+   * Verificar si el click está en un área vacía (sin tareas)
+   */
+  isClickOnEmptyArea(target: EventTarget | null): boolean {
+    if (!target || !(target instanceof Element)) return true;
+    
+    // Verificar si el target es un elemento de tarea o sus componentes
+    const isTaskElement = target.closest('.task-rect') !== null ||
+                          target.closest('.task-group') !== null ||
+                          target.closest('.task-inner') !== null ||
+                          target.closest('.task-text') !== null ||
+                          target.closest('.task-type-indicator') !== null ||
+                          target.closest('.resize-handle') !== null ||
+                          target.closest('.resize-handle-line') !== null ||
+                          target.closest('.context-menu') !== null ||
+                          target.closest('.task-selector-menu') !== null ||
+                          target.closest('.tooltip-container') !== null ||
+                          target.closest('.date-navigation') !== null ||
+                          target.closest('button') !== null;
+    
+    return !isTaskElement;
+  }
+
+  /**
+   * Handler para mousedown en el SVG - iniciar selección de rango
+   */
+  onSvgMouseDown(event: MouseEvent): void {
+    // Solo procesar click izquierdo
+    if (event.button !== 0) return;
+    
+    // Verificar que sea un área vacía
+    if (!this.isClickOnEmptyArea(event.target)) return;
+    
+    // Obtener coordenadas relativas al SVG
+    const svgElement = this.containerRef?.nativeElement?.querySelector('.timeline-svg');
+    if (!svgElement) return;
+    
+    const svgRect = svgElement.getBoundingClientRect();
+    const localX = event.clientX - svgRect.left;
+    const localY = event.clientY - svgRect.top;
+    
+    // Determinar la sección
+    const { sectionIndex, sectionStartHour } = this.getSectionFromY(localY);
+    
+    // Iniciar estado de selección
+    this.rangeSelectionState = {
+      isSelecting: true,
+      startX: localX,
+      currentX: localX,
+      section: sectionIndex,
+      sectionStartHour: sectionStartHour
+    };
+    
+    // Inicializar rectángulo visual
+    this.updateRangeSelectionRect(localX, localX, sectionIndex);
+    
+    // Prevenir comportamiento por defecto
+    event.preventDefault();
+  }
+
+  /**
+   * Handler para mousemove global durante selección
+   */
+  @HostListener('document:mousemove', ['$event'])
+  onDocumentMouseMove(event: MouseEvent): void {
+    if (!this.rangeSelectionState.isSelecting) return;
+    
+    const svgElement = this.containerRef?.nativeElement?.querySelector('.timeline-svg');
+    if (!svgElement) return;
+    
+    const svgRect = svgElement.getBoundingClientRect();
+    const localX = event.clientX - svgRect.left;
+    
+    // Limitar X a los límites del SVG
+    const clampedX = Math.max(this.hourOffsetStart, Math.min(this.svgWidth - this.hourOffsetEnd, localX));
+    
+    this.rangeSelectionState.currentX = clampedX;
+    this.updateRangeSelectionRect(
+      this.rangeSelectionState.startX, 
+      clampedX, 
+      this.rangeSelectionState.section
+    );
+    
+    this.cdr.detectChanges();
+  }
+
+  /**
+   * Handler para mouseup global - finalizar selección
+   */
+  @HostListener('document:mouseup', ['$event'])
+  onDocumentMouseUp(event: MouseEvent): void {
+    if (!this.rangeSelectionState.isSelecting) return;
+    
+    const startX = this.rangeSelectionState.startX;
+    const endX = this.rangeSelectionState.currentX;
+    const sectionStartHour = this.rangeSelectionState.sectionStartHour;
+    
+    // Calcular horas
+    let startHour = this.xToHour(Math.min(startX, endX), sectionStartHour);
+    let endHour = this.xToHour(Math.max(startX, endX), sectionStartHour);
+    
+    // Redondear a 15 minutos
+    startHour = this.snapToQuarterHour(startHour);
+    endHour = this.snapToQuarterHour(endHour);
+    
+    // Asegurar duración mínima de 15 minutos (0.25 horas)
+    if (endHour - startHour < 0.25) {
+      endHour = startHour + 0.25;
+    }
+    
+    // Limitar a 24 horas
+    endHour = Math.min(24, endHour);
+    
+    // Crear objetos Date con las horas calculadas
+    const startTime = new Date(this.selectedDate);
+    startTime.setHours(Math.floor(startHour), Math.round((startHour % 1) * 60), 0, 0);
+    
+    const endTime = new Date(this.selectedDate);
+    endTime.setHours(Math.floor(endHour), Math.round((endHour % 1) * 60), 0, 0);
+    
+    // Emitir evento solo si hubo una selección significativa (más de un umbral mínimo)
+    const deltaX = Math.abs(endX - startX);
+    if (deltaX > 10) {
+      this.createTaskWithRange.emit({ startTime, endTime });
+    }
+    
+    // Limpiar estado
+    this.resetRangeSelection();
+  }
+
+  /**
+   * Actualizar el rectángulo visual de selección
+   */
+  private updateRangeSelectionRect(startX: number, endX: number, sectionIndex: number): void {
+    const minX = Math.max(this.hourOffsetStart, Math.min(startX, endX));
+    const maxX = Math.min(this.svgWidth - this.hourOffsetEnd, Math.max(startX, endX));
+    const width = maxX - minX;
+    
+    this.rangeSelectionRect = {
+      visible: true,
+      x: minX,
+      y: 20, // Y dentro de la sección (igual que las tareas)
+      width: Math.max(5, width),
+      height: 40,
+      section: sectionIndex * 8 // Convertir índice a hora de inicio de sección
+    };
+  }
+
+  /**
+   * Limpiar estado de selección de rango
+   */
+  private resetRangeSelection(): void {
+    this.rangeSelectionState = {
+      isSelecting: false,
+      startX: 0,
+      currentX: 0,
+      section: 0,
+      sectionStartHour: 0
+    };
+    this.rangeSelectionRect = {
+      visible: false,
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      section: 0
+    };
+    this.cdr.detectChanges();
   }
 
   ngOnDestroy(): void {
