@@ -150,20 +150,25 @@ import { TaskType } from '../../models/task-type.model';
 
           <div class="environment-content px-4">
             <div *ngIf="!isEnvironmentCollapsed(env.id)" class="space-y-4">
-              <div *ngFor="let project of getProjectsByEnvironment(env.id)" class="project-section">
-                <div class="flex items-center justify-between mb-2 p-2 bg-gray-50 rounded-lg">
+              <!-- Proyectos con tareas visibles -->
+              <div *ngFor="let project of getProjectsWithVisibleTasks(env.id)" class="project-section">
+                <div class="flex items-center justify-between mb-2 p-2 rounded-lg" style="background-color: #283E4B;">
                   <div class="flex items-center gap-2">
-                    <button (click)="projectContextMenu.emit({ mouseEvent: $event, project })" class="p-1 text-gray-500 hover:text-gray-700">
+                    <button (click)="projectContextMenu.emit({ mouseEvent: $event, project })" class="p-1 text-white hover:text-gray-300">
                       <i class="fas fa-ellipsis-v"></i>
                     </button>
-                    <h4 class="text-sm font-medium text-gray-700">
-                      <i class="fas fa-folder mr-1"></i>{{project.name}}
+                    <img *ngIf="project.image" 
+                         [src]="project.image" 
+                         class="w-6 h-6 rounded object-cover flex-shrink-0"
+                         alt="">
+                    <h4 class="text-sm font-medium text-white">
+                      <i *ngIf="!project.image" class="fas fa-folder mr-1 text-white"></i>{{project.name}}
                     </h4>
                     <button *ngIf="getTasksByProject(project.id).length > 0"
                             (click)="toggleProjectCollapse(project.id)"
-                            class="p-1 text-gray-500 hover:text-gray-700"
+                            class="p-1 text-white hover:text-gray-300"
                             [title]="isProjectCollapsed(project.id) ? 'Expandir proyecto' : 'Contraer proyecto'">
-                      <i class="fas" [ngClass]="isProjectCollapsed(project.id) ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
+                      <i class="fas text-white" [ngClass]="isProjectCollapsed(project.id) ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
                     </button>
                   </div>
                   <button 
@@ -238,6 +243,34 @@ import { TaskType } from '../../models/task-type.model';
                       </div>
                     </ng-template>
                   </ng-container>
+                </div>
+              </div>
+
+              <!-- Proyectos sin tareas visibles - en doble columna -->
+              <div *ngIf="getProjectsWithoutVisibleTasks(env.id).length > 0" class="project-section">
+                <div class="grid grid-cols-2 gap-2">
+                  <div *ngFor="let project of getProjectsWithoutVisibleTasks(env.id)" class="project-section">
+                    <div class="flex items-center justify-between mb-2 p-2 rounded-lg" style="background-color: #283E4B;">
+                      <div class="flex items-center gap-2 flex-1 min-w-0">
+                        <button (click)="projectContextMenu.emit({ mouseEvent: $event, project })" class="p-1 text-white hover:text-gray-300 flex-shrink-0">
+                          <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <img *ngIf="project.image" 
+                             [src]="project.image" 
+                             class="w-5 h-5 rounded object-cover flex-shrink-0"
+                             alt="">
+                        <h4 class="text-xs font-medium text-white truncate">
+                          <i *ngIf="!project.image" class="fas fa-folder mr-1 text-white"></i>{{project.name}}
+                        </h4>
+                      </div>
+                      <button 
+                        (click)="addTaskToProject.emit({ environmentId: env.id, projectId: project.id })"
+                        class="bg-indigo-600 text-white px-1.5 py-0.5 rounded text-xs hover:bg-indigo-700 transition-colors flex-shrink-0 ml-1"
+                        title="Agregar tarea a {{project.name}}">
+                        <i class="fas fa-plus"></i>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -702,6 +735,20 @@ export class WeekViewComponent implements OnChanges, AfterViewInit, AfterViewChe
 
   getProjectsByEnvironment(environmentId: string): Project[] {
     return this.projects.filter(project => project.environment === environmentId);
+  }
+
+  getProjectsWithVisibleTasks(environmentId: string): Project[] {
+    return this.projects.filter(project => 
+      project.environment === environmentId && 
+      this.getTasksByProject(project.id).length > 0
+    );
+  }
+
+  getProjectsWithoutVisibleTasks(environmentId: string): Project[] {
+    return this.projects.filter(project => 
+      project.environment === environmentId && 
+      this.getTasksByProject(project.id).length === 0
+    );
   }
 
   getEnvironmentViewMode(envId: string): 'cards' | 'list' {

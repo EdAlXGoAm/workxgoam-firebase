@@ -14,6 +14,54 @@
     </button>
   </div>
   
+  <!-- Controles de Zoom y Filtros -->
+  <div class="controls-row mb-3 flex flex-col sm:flex-row items-center justify-center gap-3">
+    <!-- Controles de Zoom -->
+    <div class="zoom-controls flex items-center justify-center gap-2 bg-white rounded-lg p-2 shadow-sm border">
+      <button 
+        (click)="zoomOut()"
+        [disabled]="!canZoomOut()"
+        class="zoom-btn flex items-center justify-center w-8 h-8 rounded-md bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        title="Alejar (Zoom Out)">
+        <i class="fas fa-search-minus text-sm text-gray-600"></i>
+      </button>
+      <span class="text-sm font-medium text-gray-700 px-2 min-w-[60px] text-center">
+        {{ (zoomScale * 100).toFixed(0) }}%
+      </span>
+      <button 
+        (click)="zoomIn()"
+        [disabled]="!canZoomIn()"
+        class="zoom-btn flex items-center justify-center w-8 h-8 rounded-md bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        title="Acercar (Zoom In)">
+        <i class="fas fa-search-plus text-sm text-gray-600"></i>
+      </button>
+      <button 
+        (click)="resetZoom()"
+        [disabled]="isZoomReset()"
+        class="zoom-btn flex items-center justify-center w-8 h-8 rounded-md bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        title="Restablecer zoom">
+        <i class="fas fa-search text-sm text-gray-600"></i>
+      </button>
+    </div>
+
+    <!-- Switch de Días Laborales -->
+    <div class="weekend-toggle flex items-center justify-center gap-2 bg-white rounded-lg p-2 shadow-sm border">
+      <label class="flex items-center gap-2 cursor-pointer">
+        <span class="text-sm font-medium text-gray-700">Solo días laborales</span>
+        <div class="relative inline-block w-12 h-6">
+          <input 
+            type="checkbox" 
+            [checked]="!showWeekends"
+            (change)="toggleWeekends()"
+            class="sr-only peer">
+          <div class="w-12 h-6 bg-gray-300 rounded-full peer peer-checked:bg-indigo-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-500 transition-colors">
+            <div class="absolute top-[2px] left-[2px] bg-white border border-gray-300 rounded-full h-5 w-5 transition-transform peer-checked:translate-x-6"></div>
+          </div>
+        </div>
+      </label>
+    </div>
+  </div>
+
   <!-- Controles de Navegación de Semana -->
   <div class="week-navigation mb-4 flex flex-col md:flex-row items-center justify-between bg-white rounded-lg p-3 shadow-sm border gap-3">
     <!-- Primera fila: Navegador de semanas -->
@@ -88,40 +136,72 @@
 
   <!-- Contenedor con scroll independiente para el SVG -->
   <div class="timeline-wrapper">
-    <!-- Indicador de horas fijo en el lado izquierdo -->
-    <div #hoursIndicator class="hours-indicator">
-      <svg [attr.width]="60" [attr.height]="svgHeight" class="hours-indicator-svg" 
-           [style.height.px]="svgHeight" [attr.viewBox]="'0 0 60 ' + svgHeight">
+    <!-- Indicador de días fijo en la parte superior -->
+    <div #daysIndicator class="days-indicator" [style.transform]="'scale(' + zoomScale + ')'" [style.transform-origin]="'top left'">
+      <svg [attr.width]="svgWidth" [attr.height]="60" class="days-indicator-svg" 
+           [style.width.px]="svgWidth" [attr.viewBox]="'0 0 ' + svgWidth + ' 60'">
         <!-- Fondo del indicador -->
-        <rect x="0" y="0" width="60" height="60" fill="#f9fafb" rx="6" ry="6"/>
-        <line x1="0" y1="60" x2="60" y2="60" stroke="#888" stroke-width="2" />
-        
-        <!-- Etiquetas de horas (solo horas completas: 0-23) -->
-        <g *ngFor="let hour of fullHours">
-          <text x="4" 
-                [attr.y]="(hour * pixelsPerHour) - 1 + 60" 
-                [attr.font-size]="hourFontSize" 
-                fill="#666" 
-                text-anchor="start">
-            {{ formatHour(hour) }}
-          </text>
-        </g>
-      </svg>
-    </div>
-    
-    <div #svgScrollContainer class="svg-scroll-container">
-      <div class="svg-container">
-        <svg [attr.width]="svgWidth" [attr.height]="svgHeight" [attr.viewBox]="'0 0 ' + svgWidth + ' ' + svgHeight" 
-             class="week-timeline-svg" [style.min-width.px]="svgWidth"
-             (mousedown)="onSvgMouseDown($event)">
-      
-      <!-- Encabezado con nombres de días -->
-      <g transform="translate(0, 0)">
         <rect x="0" y="0" [attr.width]="svgWidth" height="60" fill="#f9fafb" rx="6" ry="6"/>
         <line x1="0" y1="60" [attr.x2]="svgWidth" y2="60" stroke="#888" stroke-width="2" />
         
         <!-- Nombres de los días -->
-        <g *ngFor="let day of weekDays; let i = index">
+        <g *ngFor="let day of visibleWeekDays; let i = index">
+          <rect [attr.x]="getDayColumnX(i)" y="0" [attr.width]="dayColumnWidth" height="60" 
+                [attr.fill]="isTodayColumn(i) ? '#e0e7ff' : '#f9fafb'" 
+                rx="4" ry="4"/>
+          <text [attr.x]="getDayColumnX(i) + dayColumnWidth / 2" y="20" 
+                [attr.font-size]="dayNameFontSize" 
+                fill="#333" 
+                font-weight="bold" 
+                text-anchor="middle">
+            {{ day.dayName }}
+          </text>
+          <text [attr.x]="getDayColumnX(i) + dayColumnWidth / 2" y="40" 
+                [attr.font-size]="dayNumberFontSize" 
+                fill="#666" 
+                text-anchor="middle">
+            {{ day.monthDay }}
+          </text>
+        </g>
+      </svg>
+    </div>
+
+    <!-- Contenedor de horas y SVG (horizontal) -->
+    <div class="timeline-content-wrapper">
+      <!-- Indicador de horas fijo en el lado izquierdo -->
+      <div #hoursIndicator class="hours-indicator" [style.transform]="'scale(' + zoomScale + ')'" [style.transform-origin]="'top left'">
+        <svg [attr.width]="60" [attr.height]="svgHeight" class="hours-indicator-svg" 
+             [style.height.px]="svgHeight" [attr.viewBox]="'0 0 60 ' + svgHeight">
+          <!-- Fondo del indicador -->
+          <rect x="0" y="0" width="60" height="60" fill="#f9fafb" rx="6" ry="6"/>
+          <line x1="0" y1="60" x2="60" y2="60" stroke="#888" stroke-width="2" />
+          
+          <!-- Etiquetas de horas (solo horas completas: 0-23) -->
+          <g *ngFor="let hour of fullHours">
+            <text x="4" 
+                  [attr.y]="(hour * pixelsPerHour) - 1 + 60" 
+                  [attr.font-size]="hourFontSize" 
+                  fill="#666" 
+                  text-anchor="start">
+              {{ formatHour(hour) }}
+            </text>
+          </g>
+        </svg>
+      </div>
+      
+      <div #svgScrollContainer class="svg-scroll-container">
+      <div class="svg-container" [style.transform]="'scale(' + zoomScale + ')'" [style.transform-origin]="'top left'" [style.width.px]="svgWidth" [style.height.px]="svgHeight">
+        <svg [attr.width]="svgWidth" [attr.height]="svgHeight" [attr.viewBox]="'0 0 ' + svgWidth + ' ' + svgHeight" 
+             class="week-timeline-svg" [style.min-width.px]="svgWidth"
+             (mousedown)="onSvgMouseDown($event)">
+      
+      <!-- Encabezado con nombres de días (oculto, ahora está en el indicador fijo) -->
+      <g transform="translate(0, 0)" style="opacity: 0; pointer-events: none;">
+        <rect x="0" y="0" [attr.width]="svgWidth" height="60" fill="#f9fafb" rx="6" ry="6"/>
+        <line x1="0" y1="60" [attr.x2]="svgWidth" y2="60" stroke="#888" stroke-width="2" />
+        
+        <!-- Nombres de los días -->
+        <g *ngFor="let day of visibleWeekDays; let i = index">
           <rect [attr.x]="getDayColumnX(i)" y="0" [attr.width]="dayColumnWidth" height="60" 
                 [attr.fill]="isTodayColumn(i) ? '#e0e7ff' : '#f9fafb'" 
                 rx="4" ry="4"/>
@@ -142,7 +222,7 @@
       </g>
 
       <!-- Columnas de días con divisiones de horas -->
-      <g *ngFor="let day of weekDays; let dayIndex = index" [attr.transform]="'translate(' + getDayColumnX(dayIndex) + ', 60)'">
+      <g *ngFor="let day of visibleWeekDays; let dayIndex = index" [attr.transform]="'translate(' + getDayColumnX(dayIndex) + ', 60)'">
         <!-- Fondo de la columna -->
         <rect x="0" y="0" [attr.width]="dayColumnWidth" [attr.height]="hoursAreaHeight" 
               [attr.fill]="isTodayColumn(dayIndex) ? '#f0f4ff' : '#ffffff'" 
@@ -315,7 +395,8 @@
       </g>
       </svg>
     </div>
-  </div>
+      </div>
+    </div>
   </div>
 
   <!-- Menú contextual -->

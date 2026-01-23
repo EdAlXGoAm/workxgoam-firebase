@@ -7,7 +7,7 @@ import { EnvironmentService } from '../../services/environment.service';
 import { Task } from '../../models/task.model';
 import { Project } from '../../models/project.model';
 import { Environment } from '../../models/environment.model';
-import { CustomSelectComponent, SelectOption } from '../custom-select/custom-select.component';
+import { SelectOption } from '../custom-select/custom-select.component';
 import { EnvironmentModalComponent } from '../environment-modal/environment-modal.component';
 import { ProjectImageQuickEditComponent } from '../project-image-quick-edit/project-image-quick-edit.component';
 import { ProjectModalComponent } from '../project-modal/project-modal.component';
@@ -15,7 +15,7 @@ import { ProjectModalComponent } from '../project-modal/project-modal.component'
 @Component({
   selector: 'app-management-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule, CustomSelectComponent, EnvironmentModalComponent, ProjectImageQuickEditComponent, ProjectModalComponent],
+  imports: [CommonModule, FormsModule, EnvironmentModalComponent, ProjectImageQuickEditComponent, ProjectModalComponent],
   templateUrl: './management-modal.component.html',
   styleUrls: ['./management-modal.component.css']
 })

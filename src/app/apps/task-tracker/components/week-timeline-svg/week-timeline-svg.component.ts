@@ -117,12 +117,16 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   @ViewChild('containerRef') containerRef!: ElementRef<HTMLDivElement>;
   @ViewChild('svgScrollContainer') svgScrollContainer!: ElementRef<HTMLDivElement>;
   @ViewChild('hoursIndicator') hoursIndicator!: ElementRef<HTMLDivElement>;
+  @ViewChild('daysIndicator') daysIndicator!: ElementRef<HTMLDivElement>;
   @ViewChildren('taskRect') taskRects!: QueryList<ElementRef<SVGRectElement>>;
   @ViewChildren('resizeHandleStart') resizeHandlesStart!: QueryList<ElementRef<SVGRectElement>>;
   @ViewChildren('resizeHandleEnd') resizeHandlesEnd!: QueryList<ElementRef<SVGRectElement>>;
 
   // 📅 NAVEGACIÓN DE SEMANA
   currentWeekStart: Date = this.getWeekStart(new Date());
+  
+  // 🔄 FILTRO DE FINES DE SEMANA
+  showWeekends: boolean = true;
   
   // 💡 SISTEMA DE TOOLTIP
   showTooltip: boolean = false;
@@ -205,6 +209,66 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     return 37.5; // 900px / 24 horas
   }
 
+  // Sistema de zoom (incrementos de 5%)
+  zoomScale: number = 1.0;
+  readonly zoomStep = 0.05; // 5%
+  readonly minZoom = 0.5; // 50%
+  readonly maxZoom = 2.0; // 200%
+
+  zoomOut(): void {
+    const newScale = this.zoomScale - this.zoomStep;
+    if (newScale >= this.minZoom) {
+      this.zoomScale = Math.round(newScale * 100) / 100; // Redondear a 2 decimales
+      this.applyZoom();
+    }
+  }
+
+  zoomIn(): void {
+    const newScale = this.zoomScale + this.zoomStep;
+    if (newScale <= this.maxZoom) {
+      this.zoomScale = Math.round(newScale * 100) / 100; // Redondear a 2 decimales
+      this.applyZoom();
+    }
+  }
+
+  resetZoom(): void {
+    this.zoomScale = 1.0;
+    this.applyZoom();
+  }
+
+  private applyZoom(): void {
+    // El zoom se aplica mediante CSS transform en el template
+    // Actualizar sincronización del indicador de horas y días
+    setTimeout(() => {
+      if (this.hoursIndicator?.nativeElement && this.svgScrollContainer?.nativeElement) {
+        const hoursIndicator = this.hoursIndicator.nativeElement;
+        const scrollContainer = this.svgScrollContainer.nativeElement;
+        // Ajustar altura del indicador para que coincida con el contenedor escalado
+        hoursIndicator.style.height = scrollContainer.offsetHeight + 'px';
+        hoursIndicator.style.width = (60 * this.zoomScale) + 'px';
+      }
+      if (this.daysIndicator?.nativeElement && this.svgScrollContainer?.nativeElement) {
+        const daysIndicator = this.daysIndicator.nativeElement;
+        const scrollContainer = this.svgScrollContainer.nativeElement;
+        // Ajustar ancho del indicador para que coincida con el contenedor
+        daysIndicator.style.width = scrollContainer.offsetWidth + 'px';
+      }
+    }, 0);
+    this.cdr.detectChanges();
+  }
+
+  canZoomOut(): boolean {
+    return this.zoomScale > this.minZoom;
+  }
+
+  canZoomIn(): boolean {
+    return this.zoomScale < this.maxZoom;
+  }
+
+  isZoomReset(): boolean {
+    return Math.abs(this.zoomScale - 1.0) < 0.01; // Permitir pequeña diferencia por redondeo
+  }
+
   private getWeekStart(date: Date): Date {
     const d = new Date(date);
     const day = d.getDay();
@@ -233,7 +297,66 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     }
   }
 
+  /**
+   * Obtener los días visibles según el filtro de fines de semana
+   */
+  get visibleWeekDays(): WeekDay[] {
+    if (this.showWeekends) {
+      return this.weekDays;
+    }
+    // Filtrar sábado (índice 6) y domingo (índice 0)
+    return this.weekDays.filter((day, index) => index !== 0 && index !== 6);
+  }
+
+  /**
+   * Convertir índice visual (0-4 cuando no hay fines de semana) a índice real del día (0-6)
+   */
+  getRealDayIndex(visualIndex: number): number {
+    if (this.showWeekends) {
+      return visualIndex;
+    }
+    // Mapear: 0->1(Lun), 1->2(Mar), 2->3(Mié), 3->4(Jue), 4->5(Vie)
+    return visualIndex + 1;
+  }
+
+  /**
+   * Convertir índice real del día (0-6) a índice visual (0-4 cuando no hay fines de semana)
+   */
+  getVisualDayIndex(realIndex: number): number {
+    if (this.showWeekends) {
+      return realIndex;
+    }
+    // Mapear: 1(Lun)->0, 2(Mar)->1, 3(Mié)->2, 4(Jue)->3, 5(Vie)->4
+    // Si es domingo (0) o sábado (6), retornar -1 (no visible)
+    if (realIndex === 0 || realIndex === 6) {
+      return -1;
+    }
+    return realIndex - 1;
+  }
+
+  /**
+   * Obtener el número de días visibles
+   */
+  get visibleDaysCount(): number {
+    return this.showWeekends ? 7 : 5;
+  }
+
+  toggleWeekends(): void {
+    this.showWeekends = !this.showWeekends;
+    this.updateSvgDimensions();
+    // Actualizar ancho del indicador de días
+    setTimeout(() => {
+      if (this.daysIndicator?.nativeElement && this.svgScrollContainer?.nativeElement) {
+        const daysIndicator = this.daysIndicator.nativeElement;
+        const scrollContainer = this.svgScrollContainer.nativeElement;
+        daysIndicator.style.width = scrollContainer.offsetWidth + 'px';
+      }
+    }, 0);
+    this.cdr.detectChanges();
+  }
+
   getDayColumnX(dayIndex: number): number {
+    // dayIndex aquí es el índice visual (0-4 o 0-6)
     return dayIndex * (this.dayColumnWidth + this.columnGap);
   }
 
@@ -242,8 +365,10 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   }
 
   isTodayColumn(dayIndex: number): boolean {
+    // dayIndex es el índice visual, convertir a índice real
+    const realIndex = this.getRealDayIndex(dayIndex);
     const today = new Date();
-    const day = this.weekDays[dayIndex];
+    const day = this.weekDays[realIndex];
     if (!day) return false;
     return day.date.toDateString() === today.toDateString();
   }
@@ -340,6 +465,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     this.initializePanHandlers();
     this.initializeRangeSelectionHandlers();
     this.initializeHoursIndicatorSync();
+    this.initializeDaysIndicatorSync();
     setTimeout(() => {
       this.updateSvgDimensions();
       this.registerTaskGestures();
@@ -505,6 +631,65 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   private panCleanup?: () => void;
   private rangeSelectionCleanup?: () => void;
   private hoursIndicatorSyncCleanup?: () => void;
+  private daysIndicatorSyncCleanup?: () => void;
+
+  /**
+   * Sincronizar el scroll horizontal del indicador de días con el contenedor SVG
+   */
+  private initializeDaysIndicatorSync(): void {
+    if (!this.svgScrollContainer?.nativeElement || !this.daysIndicator?.nativeElement) return;
+    
+    const scrollContainer = this.svgScrollContainer.nativeElement;
+    const daysIndicator = this.daysIndicator.nativeElement;
+    
+    // Sincronizar ancho del indicador con el contenedor (ajustado por zoom)
+    const updateWidth = () => {
+      // El ancho debe ser el mismo que el contenedor, pero el SVG dentro se escala
+      daysIndicator.style.width = scrollContainer.offsetWidth + 'px';
+    };
+    updateWidth();
+    
+    // Sincronizar scroll del contenedor al indicador (ajustado por zoom)
+    let isScrollingContainer = false;
+    const handleContainerScroll = () => {
+      if (!isScrollingContainer) {
+        isScrollingContainer = true;
+        // El scroll del contenedor escalado necesita ajustarse por el zoom
+        daysIndicator.scrollLeft = scrollContainer.scrollLeft / this.zoomScale;
+        requestAnimationFrame(() => {
+          isScrollingContainer = false;
+        });
+      }
+    };
+    
+    // Sincronizar scroll del indicador al contenedor (ajustado por zoom)
+    let isScrollingIndicator = false;
+    const handleIndicatorScroll = () => {
+      if (!isScrollingIndicator) {
+        isScrollingIndicator = true;
+        // El scroll del indicador necesita escalarse para el contenedor
+        scrollContainer.scrollLeft = daysIndicator.scrollLeft * this.zoomScale;
+        requestAnimationFrame(() => {
+          isScrollingIndicator = false;
+        });
+      }
+    };
+    
+    scrollContainer.addEventListener('scroll', handleContainerScroll);
+    daysIndicator.addEventListener('scroll', handleIndicatorScroll);
+    
+    // Observar cambios de tamaño
+    const resizeObserver = new ResizeObserver(() => {
+      updateWidth();
+    });
+    resizeObserver.observe(scrollContainer);
+    
+    this.daysIndicatorSyncCleanup = () => {
+      scrollContainer.removeEventListener('scroll', handleContainerScroll);
+      daysIndicator.removeEventListener('scroll', handleIndicatorScroll);
+      resizeObserver.disconnect();
+    };
+  }
 
   /**
    * Sincronizar el scroll vertical del indicador de horas con el contenedor SVG
@@ -518,6 +703,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     // Sincronizar altura del indicador con el contenedor
     const updateHeight = () => {
       hoursIndicator.style.height = scrollContainer.offsetHeight + 'px';
+      hoursIndicator.style.width = (60 * this.zoomScale) + 'px';
     };
     updateHeight();
     
@@ -773,7 +959,8 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
           // Calcular nuevo día basándose en deltaX
           const dayColumnWidth = this.dayColumnWidth + this.columnGap;
           const dayOffset = Math.round(event.deltaX / dayColumnWidth);
-          newDayIndex = Math.max(0, Math.min(6, dayIndex + dayOffset));
+          const maxVisualIndex = this.visibleDaysCount - 1;
+          newDayIndex = Math.max(0, Math.min(maxVisualIndex, dayIndex + dayOffset));
           
           // Si cambió de día, mostrar previsualización secundaria
           if (newDayIndex !== dayIndex) {
@@ -841,7 +1028,8 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
         const bottomY = newY + newHeight;
         if (bottomY > this.hoursAreaHeight) {
           // Mostrar previsualización secundaria en el día siguiente
-          if (dayIndex < 6) {
+          const maxVisualIndex = this.visibleDaysCount - 1;
+          if (dayIndex < maxVisualIndex) {
             const overflow = bottomY - this.hoursAreaHeight;
             const nextDayIndex = dayIndex + 1;
             const nextDayX = this.getDayColumnX(nextDayIndex) + this.dayColumnPadding;
@@ -1062,33 +1250,46 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     }
 
     const availableWidth = Math.max(containerWidth - this.containerPadding, this.minSvgWidth);
-    const minRequiredWidth = 7 * (this.dayColumnWidth + this.columnGap) - this.columnGap;
+    const daysCount = this.visibleDaysCount;
+    const gapsCount = daysCount - 1;
+    const minRequiredWidth = daysCount * (this.dayColumnWidth + this.columnGap) - this.columnGap;
     
     if (screenWidth <= 640) {
-      this.dayColumnWidth = Math.max(120, (availableWidth - 6 * this.columnGap) / 7);
+      this.dayColumnWidth = Math.max(120, (availableWidth - gapsCount * this.columnGap) / daysCount);
       this.dayNameFontSize = 11;
       this.dayNumberFontSize = 10;
       this.hourFontSize = 8;
       this.taskFontSize = 9;
     } else if (screenWidth <= 1024) {
-      this.dayColumnWidth = Math.max(140, (availableWidth - 6 * this.columnGap) / 7);
+      this.dayColumnWidth = Math.max(140, (availableWidth - gapsCount * this.columnGap) / daysCount);
       this.dayNameFontSize = 12;
       this.dayNumberFontSize = 11;
       this.hourFontSize = 9;
       this.taskFontSize = 10;
     } else {
-      this.dayColumnWidth = Math.max(180, Math.min(200, (availableWidth - 6 * this.columnGap) / 7));
+      this.dayColumnWidth = Math.max(180, Math.min(200, (availableWidth - gapsCount * this.columnGap) / daysCount));
       this.dayNameFontSize = 14;
       this.dayNumberFontSize = 12;
       this.hourFontSize = 10;
       this.taskFontSize = 11;
     }
 
-    this.svgWidth = Math.max(minRequiredWidth, 7 * (this.dayColumnWidth + this.columnGap) - this.columnGap);
+    this.svgWidth = Math.max(minRequiredWidth, daysCount * (this.dayColumnWidth + this.columnGap) - this.columnGap);
+    
+    // Actualizar ancho del indicador de días después de calcular las dimensiones
+    setTimeout(() => {
+      if (this.daysIndicator?.nativeElement && this.svgScrollContainer?.nativeElement) {
+        const daysIndicator = this.daysIndicator.nativeElement;
+        const scrollContainer = this.svgScrollContainer.nativeElement;
+        daysIndicator.style.width = scrollContainer.offsetWidth + 'px';
+      }
+    }, 0);
   }
 
   getRenderableItemsForDay(dayIndex: number): RenderableItem[] {
-    const day = this.weekDays[dayIndex];
+    // dayIndex es el índice visual, convertir a índice real
+    const realIndex = this.getRealDayIndex(dayIndex);
+    const day = this.weekDays[realIndex];
     if (!day) return [];
 
     const dayStart = new Date(day.date);
@@ -1149,8 +1350,10 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   }
 
   getTaskY(item: RenderableItem, dayIndex: number): number {
+    // dayIndex es el índice visual, convertir a índice real
+    const realIndex = this.getRealDayIndex(dayIndex);
     const itemStart = this.parseUTCToLocal(item.start);
-    const day = this.weekDays[dayIndex];
+    const day = this.weekDays[realIndex];
     if (!day) return 0;
 
     const dayStart = new Date(day.date);
@@ -1172,9 +1375,11 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   }
 
   getTaskHeight(item: RenderableItem, dayIndex: number): number {
+    // dayIndex es el índice visual, convertir a índice real
+    const realIndex = this.getRealDayIndex(dayIndex);
     const itemStart = this.parseUTCToLocal(item.start);
     const itemEnd = this.parseUTCToLocal(item.end);
-    const day = this.weekDays[dayIndex];
+    const day = this.weekDays[realIndex];
     if (!day) return 0;
 
     const dayStart = new Date(day.date);
@@ -1404,8 +1609,10 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
 
   formatWeekRange(): string {
     const weekStart = new Date(this.currentWeekStart);
+    // Si no se muestran fines de semana, el último día visible es viernes (día 5)
+    const lastDayOffset = this.showWeekends ? 6 : 4;
     const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setDate(weekStart.getDate() + lastDayOffset);
     
     const startStr = weekStart.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
     const endStr = weekEnd.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -1490,8 +1697,8 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     const localX = clientX - svgRect.left;
     const localY = clientY - svgRect.top;
     
-    // Revisar todos los días de la semana para encontrar tareas superpuestas
-    for (let di = 0; di < 7; di++) {
+    // Revisar todos los días visibles para encontrar tareas superpuestas
+    for (let di = 0; di < this.visibleDaysCount; di++) {
       const dayColumnX = this.getDayColumnX(di);
       const items = this.getRenderableItemsForDay(di);
       
@@ -1704,20 +1911,23 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
 
   /**
    * Determinar el día de la semana basándose en la coordenada X
+   * Retorna el índice visual (0-4 o 0-6)
    */
   getDayFromX(localX: number): { dayIndex: number; dayDate: Date } {
     let dayIndex = 0;
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < this.visibleDaysCount; i++) {
       const dayColumnX = this.getDayColumnX(i);
       if (localX >= dayColumnX && localX < dayColumnX + this.dayColumnWidth) {
         dayIndex = i;
         break;
       }
     }
-    const clampedIndex = Math.max(0, Math.min(6, dayIndex));
-    const day = this.weekDays[clampedIndex];
+    const clampedIndex = Math.max(0, Math.min(this.visibleDaysCount - 1, dayIndex));
+    // Convertir índice visual a índice real para obtener la fecha
+    const realIndex = this.getRealDayIndex(clampedIndex);
+    const day = this.weekDays[realIndex];
     return {
-      dayIndex: clampedIndex,
+      dayIndex: clampedIndex, // Retornar índice visual
       dayDate: day ? new Date(day.date) : new Date(this.currentWeekStart)
     };
   }
@@ -1955,6 +2165,9 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     }
     if (this.hoursIndicatorSyncCleanup) {
       this.hoursIndicatorSyncCleanup();
+    }
+    if (this.daysIndicatorSyncCleanup) {
+      this.daysIndicatorSyncCleanup();
     }
     if (this.focusSubscription) {
       this.focusSubscription.unsubscribe();

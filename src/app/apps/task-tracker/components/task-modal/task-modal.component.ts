@@ -650,6 +650,19 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
       }, 100);
     }
   }
+
+  @HostListener('document:keydown.escape', ['$event'])
+  onEscapeKey(event: KeyboardEvent) {
+    // Solo cerrar el modal si está abierto y no hay otros modales abiertos
+    if (this.showModal && 
+        !this.showEmojiPicker && 
+        !this.showRecentTasksModal && 
+        !this.showDurationConfirmModal && 
+        !this.showFragmentDurationConfirmModal) {
+      event.preventDefault();
+      this.closeModal();
+    }
+  }
   
   onEnvironmentChange() {
     if (this.task.environment) {

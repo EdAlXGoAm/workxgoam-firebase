@@ -24,7 +24,7 @@ export interface SelectOption {
         (click)="toggleDropdown($event)">
         <div class="flex-1 truncate flex items-center gap-2">
           <img *ngIf="selectedOption?.image" 
-               [src]="selectedOption.image" 
+               [src]="selectedOption?.image" 
                class="w-6 h-6 rounded-md object-cover flex-shrink-0"
                alt="">
           <span *ngIf="selectedOption" class="selected-text">{{ selectedOption.label }}</span>
