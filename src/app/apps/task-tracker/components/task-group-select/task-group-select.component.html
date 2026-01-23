@@ -1,0 +1,113 @@
+<div
+  #containerRef
+  class="task-group-select-container"
+  [class.disabled]="disabled">
+  
+  <div
+    #inputRef
+    class="task-group-select-input"
+    [class.open]="isOpen"
+    (click)="toggleDropdown($event)">
+    <div class="task-group-select-content">
+      <div *ngIf="selectedTaskGroup" class="task-group-select-text">
+        <span class="task-group-select-name">{{ selectedTaskGroup.name }}</span>
+      </div>
+      <span *ngIf="!selectedTaskGroup" class="task-group-select-placeholder">{{ placeholder }}</span>
+    </div>
+    <div class="task-group-select-chevron" [class.rotated]="isOpen">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"></polyline>
+      </svg>
+    </div>
+  </div>
+
+  <div *ngIf="isOpen">
+    <!-- Overlay para cerrar al tocar fuera (móvil) -->
+    <div 
+      class="task-group-select-overlay"
+      (click)="closeWithoutSelection()"
+      (touchstart)="closeWithoutSelection()">
+    </div>
+    
+    <div
+      #dropdownRef
+      class="task-group-select-dropdown"
+      [style.top.px]="dropdownPosition.top"
+      [style.left.px]="dropdownPosition.left"
+      [style.width.px]="dropdownPosition.width">
+      
+      <div class="task-group-select-header">
+        <div class="task-group-select-search">
+          <input
+            #searchInputRef
+            class="task-group-select-search-input"
+            type="text"
+            [(ngModel)]="searchQuery"
+            placeholder="Buscar o crear grupo..."
+            (click)="$event.stopPropagation()">
+        </div>
+        <button
+          type="button"
+          class="task-group-select-close-btn"
+          (click)="$event.stopPropagation(); closeWithoutSelection()"
+          title="Cerrar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="task-group-select-options">
+        <div *ngIf="filteredTaskGroups.length === 0 && !searchQuery" class="task-group-select-empty">
+          {{ emptyMessage }}
+        </div>
+
+        <div
+          *ngFor="let group of filteredTaskGroups"
+          class="task-group-select-option"
+          [class.selected]="value === group.id"
+          (click)="handleSelect(group)">
+          <div class="task-group-select-option-content">
+            <div class="task-group-select-option-text">
+              <span class="task-group-select-option-name">
+                {{ group.name }}
+                <span class="task-group-select-option-count">({{ getTaskGroupUsageCount(group.id) }})</span>
+              </span>
+            </div>
+          </div>
+          
+          <div class="task-group-select-option-actions">
+            <button
+              *ngIf="getTaskGroupUsageCount(group.id) === 0"
+              type="button"
+              class="task-group-select-delete-btn"
+              (click)="handleDelete(group.id, $event)"
+              title="Eliminar grupo vacío">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+            <div *ngIf="value === group.id" class="task-group-select-check">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div
+          *ngIf="canCreateNewGroup"
+          class="task-group-select-create-option"
+          (click)="handleCreateCustom()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          Crear "{{ searchQuery }}"
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

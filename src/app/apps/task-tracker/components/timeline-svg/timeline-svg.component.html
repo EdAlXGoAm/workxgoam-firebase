@@ -64,6 +64,18 @@
           <i class="fas fa-hourglass-half text-xs"></i>
           <span>Duración: {{ formatTaskDuration(getTaskDuration(tooltipTask)) }}</span>
         </div>
+        <!-- Info de tarea compleja -->
+        <div *ngIf="taskHasComplexGroup(tooltipTask) && getComplexGroupTotalDuration(tooltipTask)" 
+             class="mt-2 pt-2 border-t border-gray-700">
+          <div class="text-xs text-amber-300 flex items-center space-x-1">
+            <i class="fas fa-layer-group text-xs"></i>
+            <span class="font-medium">{{ getTaskGroupName(tooltipTask.taskGroupId) }}</span>
+          </div>
+          <div class="text-xs text-amber-200 flex items-center space-x-1 mt-1">
+            <i class="fas fa-calculator text-xs"></i>
+            <span>Total grupo: {{ formatTaskDuration(getComplexGroupTotalDuration(tooltipTask)) }} ({{ getComplexGroupTaskCount(tooltipTask) }} tareas)</span>
+          </div>
+        </div>
         <!-- Información del tiempo hasta la próxima tarea -->
         <div class="text-xs text-blue-300 mt-2 flex items-center space-x-1">
           <i class="fas fa-clock text-xs"></i>
@@ -422,6 +434,19 @@
       <span class="text-lg mr-2">{{ contextMenuTask.emoji }}</span>
       <span class="font-semibold text-sm truncate">{{ contextMenuTask.name }}</span>
     </div>
+    <div class="context-menu-divider"></div>
+    <button class="context-menu-item" (click)="copyTitle()">
+      <i class="fas fa-copy mr-2"></i>
+      Copy Title
+    </button>
+    <button *ngIf="hasComplexGroup()" class="context-menu-item" (click)="copyComplexTitle()">
+      <i class="fas fa-clipboard mr-2"></i>
+      Copy Complex Title
+    </button>
+    <button *ngIf="hasComplexGroup()" class="context-menu-item" (click)="copyComplexTitleWithTitle()">
+      <i class="fas fa-clipboard mr-2"></i>
+      Copy Complex Title + Title
+    </button>
     <div class="context-menu-divider"></div>
     <button class="context-menu-item context-menu-item-edit" (click)="editTaskFromContextMenu()">
       <i class="fas fa-edit mr-2"></i>

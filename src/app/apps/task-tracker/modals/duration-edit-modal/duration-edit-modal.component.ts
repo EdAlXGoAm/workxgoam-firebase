@@ -1,7 +1,8 @@
-import { Component, EventEmitter, Input, Output, OnInit, OnDestroy } from '@angular/core';
+import { Component, EventEmitter, Input, Output, OnInit, OnDestroy, ElementRef, Renderer2 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Task } from '../../models/task.model';
+import { TaskGroup } from '../../models/task-group.model';
 import { TaskTimeService } from '../../services/task-time.service';
 
 export interface DurationEditResult {
@@ -42,6 +43,18 @@ export interface DurationEditResult {
               Duración actual: {{ formatDuration(currentDurationMinutes) }}
             </span>
           </div>
+        </div>
+
+        <!-- Copy buttons -->
+        <div class="copy-buttons">
+          <button class="copy-btn" (click)="copyTitle()" title="Copiar título">
+            <i class="fas fa-copy"></i>
+            <span>Copy Title</span>
+          </button>
+          <button *ngIf="hasComplexGroup()" class="copy-btn" (click)="copyComplexTitleWithTitle()" title="Copiar título complejo + título">
+            <i class="fas fa-clipboard"></i>
+            <span>Copy Complex + Title</span>
+          </button>
         </div>
 
         <!-- Fragment indicator -->
@@ -187,7 +200,7 @@ export interface DurationEditResult {
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 10000;
+      z-index: 99999;
       padding: 16px;
       animation: fadeIn 0.2s ease-out;
       overflow: hidden;
@@ -300,6 +313,38 @@ export interface DurationEditResult {
     }
 
     .task-duration i {
+      font-size: 11px;
+    }
+
+    .copy-buttons {
+      display: flex;
+      gap: 8px;
+      padding: 8px 20px;
+      background: #f3f4f6;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .copy-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      background: white;
+      font-size: 12px;
+      color: #374151;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .copy-btn:hover {
+      background: #ecfdf5;
+      border-color: #10b981;
+      color: #059669;
+    }
+
+    .copy-btn i {
       font-size: 11px;
     }
 
@@ -648,6 +693,7 @@ export class DurationEditModalComponent implements OnInit, OnDestroy {
   @Input() fragmentIndex: number | null = null;
   @Input() suggestedAdjustStart: boolean = false; // true si se arrastró desde el borde izquierdo/superior
   @Input() suggestedDurationMinutes: number | null = null;
+  @Input() taskGroups: TaskGroup[] = [];
   
   @Output() confirm = new EventEmitter<DurationEditResult>();
   @Output() cancel = new EventEmitter<void>();
@@ -670,9 +716,22 @@ export class DurationEditModalComponent implements OnInit, OnDestroy {
     { value: 240, label: '4 horas' }
   ];
 
-  constructor(private taskTimeService: TaskTimeService) {}
+  private originalParent: HTMLElement | null = null;
+  private originalNextSibling: Node | null = null;
+
+  constructor(
+    private taskTimeService: TaskTimeService,
+    private elementRef: ElementRef,
+    private renderer: Renderer2
+  ) {}
 
   ngOnInit(): void {
+    // Mover el modal al body para evitar problemas de stacking context
+    const element = this.elementRef.nativeElement;
+    this.originalParent = element.parentElement;
+    this.originalNextSibling = element.nextSibling;
+    this.renderer.appendChild(document.body, element);
+
     const scrollY = window.scrollY;
     document.body.style.overflow = 'hidden';
     document.body.style.position = 'fixed';
@@ -702,6 +761,16 @@ export class DurationEditModalComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    // Restaurar el elemento a su posición original
+    const element = this.elementRef.nativeElement;
+    if (this.originalParent) {
+      if (this.originalNextSibling) {
+        this.renderer.insertBefore(this.originalParent, element, this.originalNextSibling);
+      } else {
+        this.renderer.appendChild(this.originalParent, element);
+      }
+    }
+
     const scrollY = (document.body as any).__scrollY || 0;
     document.body.style.overflow = '';
     document.body.style.position = '';
@@ -785,5 +854,51 @@ export class DurationEditModalComponent implements OnInit, OnDestroy {
   onCancel(): void {
     this.cancel.emit();
   }
-}
 
+  /**
+   * Obtiene el nombre del grupo de tarea compleja dado su ID
+   */
+  getTaskGroupName(groupId: string | undefined): string | null {
+    if (!groupId) return null;
+    const group = this.taskGroups.find(g => g.id === groupId);
+    return group ? group.name : null;
+  }
+
+  /**
+   * Verifica si la tarea tiene un grupo complejo asignado
+   */
+  hasComplexGroup(): boolean {
+    return !!(this.task?.taskGroupId && this.getTaskGroupName(this.task.taskGroupId));
+  }
+
+  /**
+   * Copia el título de la tarea al portapapeles
+   */
+  async copyTitle(): Promise<void> {
+    if (this.task) {
+      try {
+        await navigator.clipboard.writeText(this.task.name);
+      } catch (err) {
+        console.error('Error al copiar:', err);
+      }
+    }
+  }
+
+  /**
+   * Copia el título complejo + título de la tarea al portapapeles
+   * Formato: "(ComplexTitle) Title"
+   */
+  async copyComplexTitleWithTitle(): Promise<void> {
+    if (this.task) {
+      const groupName = this.getTaskGroupName(this.task.taskGroupId);
+      if (groupName) {
+        const text = `(${groupName}) ${this.task.name}`;
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch (err) {
+          console.error('Error al copiar:', err);
+        }
+      }
+    }
+  }
+}

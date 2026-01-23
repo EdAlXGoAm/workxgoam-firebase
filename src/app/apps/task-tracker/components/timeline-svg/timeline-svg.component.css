@@ -50,12 +50,10 @@
 .preview-shadow{pointer-events:none}
 .task-hidden{opacity:.5}
 .task-hidden text{fill:#888!important}
-.task-overdue{filter:drop-shadow(0 0 3px rgba(239,68,68,.5)) drop-shadow(0 0 6px rgba(239,68,68,.3));animation:op 1.5s infinite}
-@keyframes op{0%,100%{filter:drop-shadow(0 0 3px rgba(239,68,68,.5)) drop-shadow(0 0 6px rgba(239,68,68,.3))}50%{filter:drop-shadow(0 0 4px rgba(255,255,255,.8)) drop-shadow(0 0 8px rgba(255,255,255,.4))}}
+.task-overdue{filter:drop-shadow(0 0 3px rgba(239,68,68,.5)) drop-shadow(0 0 6px rgba(239,68,68,.3))}
 .task-running{filter:drop-shadow(0 0 3px rgba(16,185,129,.5)) drop-shadow(0 0 6px rgba(16,185,129,.3));animation:rp 1.5s infinite}
 @keyframes rp{0%,100%{filter:drop-shadow(0 0 3px rgba(16,185,129,.5)) drop-shadow(0 0 6px rgba(16,185,129,.3))}50%{filter:drop-shadow(0 0 4px rgba(255,255,255,.8)) drop-shadow(0 0 8px rgba(255,255,255,.4))}}
-.task-overlapping.task-overdue{filter:drop-shadow(0 0 2px rgba(239,68,68,.2)) drop-shadow(0 0 4px rgba(239,68,68,.12));animation:opo 1.5s infinite}
-@keyframes opo{0%,100%{filter:drop-shadow(0 0 2px rgba(239,68,68,.2)) drop-shadow(0 0 4px rgba(239,68,68,.12))}50%{filter:drop-shadow(0 0 3px rgba(255,255,255,.3)) drop-shadow(0 0 6px rgba(255,255,255,.15))}}
+.task-overlapping.task-overdue{filter:drop-shadow(0 0 2px rgba(239,68,68,.2)) drop-shadow(0 0 4px rgba(239,68,68,.12))}
 .task-overlapping.task-running{filter:drop-shadow(0 0 2px rgba(16,185,129,.2)) drop-shadow(0 0 4px rgba(16,185,129,.12));animation:rpo 1.5s infinite}
 @keyframes rpo{0%,100%{filter:drop-shadow(0 0 2px rgba(16,185,129,.2)) drop-shadow(0 0 4px rgba(16,185,129,.12))}50%{filter:drop-shadow(0 0 3px rgba(255,255,255,.3)) drop-shadow(0 0 6px rgba(255,255,255,.15))}}
 .task-selector-menu{position:fixed;background:#fff;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:10001;min-width:280px;max-width:360px;overflow:hidden;animation:tsFade .2s}

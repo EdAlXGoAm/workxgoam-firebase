@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, HostListener, ElementRef, ChangeDetectorRef, ViewChild } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener, ElementRef, ChangeDetectorRef, ViewChild, AfterViewChecked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
@@ -32,6 +32,8 @@ import { TaskSumTemplateService } from './services/task-sum-template.service';
 import { TaskSumTemplate } from './models/task-sum-template.model';
 import { SumsBubbleComponent } from './components/sums-bubble/sums-bubble.component';
 import { ProjectModalComponent } from './components/project-modal/project-modal.component';
+import { TaskGroupService } from './services/task-group.service';
+import { TaskGroup } from './models/task-group.model';
 
 @Component({
   selector: 'app-task-tracker',
@@ -40,7 +42,7 @@ import { ProjectModalComponent } from './components/project-modal/project-modal.
   templateUrl: './task-tracker.component.html',
   styleUrls: ['./task-tracker.component.css']
 })
-export class TaskTrackerComponent implements OnInit, OnDestroy {
+export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked {
   @ViewChild('newTaskModal') newTaskModal?: TaskModalComponent;
   @ViewChild('editTaskModal') editTaskModal?: TaskModalComponent;
   
@@ -171,7 +173,9 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
   projectTasksForModal: Task[] = [];
   projectTaskIncluded: { [taskId: string]: boolean } = {};
   lastSelectedTaskIndex: number | null = null;
-  isCalendarExpanded: boolean = true; // Por defecto expandido
+  isCalendarExpanded: boolean = false; // Por defecto contraído
+  projectTaskGroups: TaskGroup[] = []; // Grupos de tareas para el proyecto actual
+  allTaskGroups: TaskGroup[] = []; // Todos los grupos de tareas del usuario
   
   // Variables para plantillas de suma
   taskSumTemplates: TaskSumTemplate[] = [];
@@ -180,6 +184,11 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
   editingTemplateId: string | null = null;
   startDateFilter: string = '';
   endDateFilter: string = '';
+  // Variables para filtro manual con botón
+  pendingStartDateFilter: string = '';
+  pendingEndDateFilter: string = '';
+  isFilteringTasks: boolean = false;
+  hasFilterChanges: boolean = false;
 
   // Propiedades para tareas huérfanas
   orphanedTasks: Task[] = [];
@@ -280,6 +289,7 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     private environmentService: EnvironmentService,
     private taskTypeService: TaskTypeService,
     private taskSumTemplateService: TaskSumTemplateService,
+    private taskGroupService: TaskGroupService,
     private timelineFocusService: TimelineFocusService,
     private taskTimeService: TaskTimeService,
     private elementRef: ElementRef,
@@ -323,6 +333,26 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
 
     // Configurar listener para guardar posición del scroll antes de recargar
     this.setupScrollSave();
+  }
+
+  ngAfterViewChecked() {
+    // Establecer estado indeterminado de checkboxes de grupos (con debounce para evitar ejecuciones excesivas)
+    if (this.showProjectTasksModal) {
+      setTimeout(() => {
+        this.updateGroupCheckboxesIndeterminate();
+      }, 0);
+    }
+  }
+
+  private updateGroupCheckboxesIndeterminate() {
+    // Buscar todos los checkboxes de grupos y establecer su estado indeterminado
+    const checkboxes = document.querySelectorAll<HTMLInputElement>('input[type="checkbox"][data-group-id]');
+    checkboxes.forEach(checkbox => {
+      const groupId = checkbox.getAttribute('data-group-id');
+      if (groupId) {
+        checkbox.indeterminate = this.isGroupPartiallySelected(groupId);
+      }
+    });
   }
 
   ngOnDestroy(): void {
@@ -423,12 +453,22 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
         this.loadEnvironments(),
         this.loadProjects(),
         this.loadTaskTypes(),
-        this.loadTaskSumTemplates()
+        this.loadTaskSumTemplates(),
+        this.loadAllTaskGroups()
       ]);
       await this.loadTasks();
       // Nota: initializeEnvironmentOrder se llama en ngOnInit después de cargar el orden desde localStorage
     } catch (error) {
       console.error("Error loading initial data for TaskTrackerComponent:", error);
+    }
+  }
+
+  private async loadAllTaskGroups(): Promise<void> {
+    try {
+      this.allTaskGroups = await this.taskGroupService.getTaskGroups();
+    } catch (error) {
+      console.error('Error al cargar grupos de tareas:', error);
+      this.allTaskGroups = [];
     }
   }
 
@@ -1479,8 +1519,16 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     this.projectContextMenuSourceElement = null;
   }
 
-  openProjectTasksModal(project: Project) {
+  async openProjectTasksModal(project: Project) {
     this.selectedProjectForTasksModal = project;
+    // Cargar grupos de tareas del proyecto
+    try {
+      this.projectTaskGroups = await this.taskGroupService.getTaskGroupsByProject(project.id);
+    } catch (error) {
+      console.error('Error cargando grupos de tareas:', error);
+      this.projectTaskGroups = [];
+    }
+    
     // Obtener todas las tareas del proyecto
     let projectTasks = this.tasks.filter(t => t.project === project.id);
     
@@ -1524,8 +1572,14 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     // Inicializar índice de última selección
     this.lastSelectedTaskIndex = null;
     
-    // Resetear estado del calendario a expandido por defecto
-    this.isCalendarExpanded = true;
+    // Resetear estado del calendario a contraído por defecto
+    this.isCalendarExpanded = false;
+    
+    // Sincronizar filtros pendientes con los aplicados
+    this.pendingStartDateFilter = this.startDateFilter;
+    this.pendingEndDateFilter = this.endDateFilter;
+    this.hasFilterChanges = false;
+    this.isFilteringTasks = false;
     
     this.showProjectTasksModal = true;
     document.body.style.overflow = 'hidden';
@@ -1539,12 +1593,17 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     this.projectTasksForModal = [];
     this.projectTaskIncluded = {};
     this.lastSelectedTaskIndex = null;
-    this.isCalendarExpanded = true;
+    this.isCalendarExpanded = false;
+    this.projectTaskGroups = [];
+    this.hasFilterChanges = false;
+    this.isFilteringTasks = false;
     // Limpiar filtros y estado de edición solo si no estamos guardando
     if (!this.showSaveSumTemplateModal) {
       this.editingTemplateId = null;
       this.startDateFilter = '';
       this.endDateFilter = '';
+      this.pendingStartDateFilter = '';
+      this.pendingEndDateFilter = '';
     }
   }
 
@@ -1583,13 +1642,31 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
   }
 
   onDateFilterChange() {
-    // Re-aplicar filtros cuando cambian las fechas
-    if (this.selectedProjectForTasksModal) {
+    // Marcar que hay cambios pendientes en los filtros
+    this.hasFilterChanges = 
+      this.pendingStartDateFilter !== this.startDateFilter || 
+      this.pendingEndDateFilter !== this.endDateFilter;
+  }
+
+  async applyDateFilters() {
+    if (!this.selectedProjectForTasksModal) return;
+    
+    this.isFilteringTasks = true;
+    this.hasFilterChanges = false;
+    
+    // Pequeño delay para mostrar el spinner
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    try {
       // Guardar el estado actual de los checkboxes
       const currentIncluded = { ...this.projectTaskIncluded };
       
+      // Actualizar filtros aplicados con los pendientes
+      this.startDateFilter = this.pendingStartDateFilter;
+      this.endDateFilter = this.pendingEndDateFilter;
+      
       // Reabrir el modal con los nuevos filtros
-      this.openProjectTasksModal(this.selectedProjectForTasksModal);
+      await this.openProjectTasksModal(this.selectedProjectForTasksModal);
       
       // Restaurar los checkboxes que estaban seleccionados y siguen visibles
       Object.keys(currentIncluded).forEach(taskId => {
@@ -1597,13 +1674,17 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
           this.projectTaskIncluded[taskId] = currentIncluded[taskId];
         }
       });
+    } finally {
+      this.isFilteringTasks = false;
     }
   }
 
   clearDateFilters() {
-    this.startDateFilter = '';
-    this.endDateFilter = '';
-    this.onDateFilterChange();
+    this.pendingStartDateFilter = '';
+    this.pendingEndDateFilter = '';
+    this.hasFilterChanges = 
+      this.pendingStartDateFilter !== this.startDateFilter || 
+      this.pendingEndDateFilter !== this.endDateFilter;
   }
 
   async saveTaskSumTemplate() {
@@ -1618,15 +1699,41 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
         .filter(task => this.projectTaskIncluded[task.id] !== false)
         .map(task => task.id);
 
-      // Calcular suma total
+      // Calcular suma total (agrupando tareas por taskGroupId)
       let totalHours = 0;
+      const taskGroups = new Map<string, Task[]>();
+      const individualTasks: Task[] = [];
+      
       selectedTaskIds.forEach(taskId => {
         const task = this.projectTasksForModal.find(t => t.id === taskId);
         if (task) {
+          if (task.taskGroupId) {
+            // Agrupar tareas con el mismo taskGroupId
+            if (!taskGroups.has(task.taskGroupId)) {
+              taskGroups.set(task.taskGroupId, []);
+            }
+            taskGroups.get(task.taskGroupId)!.push(task);
+          } else {
+            // Tareas individuales sin grupo
+            individualTasks.push(task);
+          }
+        }
+      });
+      
+      // Sumar duraciones de todas las tareas (agrupadas e individuales)
+      taskGroups.forEach(groupTasks => {
+        groupTasks.forEach(task => {
           const duration = this.getTaskDuration(task);
           if (duration !== null) {
             totalHours += duration;
           }
+        });
+      });
+      
+      individualTasks.forEach(task => {
+        const duration = this.getTaskDuration(task);
+        if (duration !== null) {
+          totalHours += duration;
         }
       });
 
@@ -1791,6 +1898,26 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     );
   }
 
+  /**
+   * Obtiene el conteo de tareas seleccionadas, agrupando tareas con el mismo taskGroupId como una sola
+   * @returns Número de tareas únicas (grupos + tareas individuales)
+   */
+  getGroupedTaskCount(): number {
+    const selectedTasks = this.getSelectedProjectTasks();
+    const taskGroups = new Set<string>();
+    let individualCount = 0;
+    
+    selectedTasks.forEach(task => {
+      if (task.taskGroupId) {
+        taskGroups.add(task.taskGroupId);
+      } else {
+        individualCount++;
+      }
+    });
+    
+    return taskGroups.size + individualCount;
+  }
+
   getDayTotalDuration(dateKey: string): string {
     const grouped = this.getGroupedProjectTasks();
     const dayTasks = grouped[dateKey] || [];
@@ -1840,6 +1967,113 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     });
     
     return grouped;
+  }
+
+  /**
+   * Agrupa tareas por fecha y luego por taskGroupId
+   * Retorna estructura: { [dateKey]: { groups: { [groupId]: Task[] }, individual: Task[] } }
+   */
+  getGroupedProjectTasksByGroup(): { [dateKey: string]: { groups: { [groupId: string]: Task[] }, individual: Task[] } } {
+    const grouped: { [dateKey: string]: { groups: { [groupId: string]: Task[] }, individual: Task[] } } = {};
+    
+    this.projectTasksForModal.forEach(task => {
+      let dateKey: string;
+      
+      if (task.start) {
+        const dateStr = task.start.includes('Z') ? task.start : task.start + 'Z';
+        const date = new Date(dateStr);
+        dateKey = date.toISOString().split('T')[0]; // YYYY-MM-DD
+      } else {
+        dateKey = 'sin-fecha';
+      }
+      
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = { groups: {}, individual: [] };
+      }
+      
+      if (task.taskGroupId) {
+        if (!grouped[dateKey].groups[task.taskGroupId]) {
+          grouped[dateKey].groups[task.taskGroupId] = [];
+        }
+        grouped[dateKey].groups[task.taskGroupId].push(task);
+      } else {
+        grouped[dateKey].individual.push(task);
+      }
+    });
+    
+    return grouped;
+  }
+
+  getTaskGroupName(groupId: string): string {
+    const group = this.projectTaskGroups.find(g => g.id === groupId);
+    return group ? group.name : 'Grupo desconocido';
+  }
+
+  getGroupTasks(groupId: string): Task[] {
+    return this.projectTasksForModal.filter(t => t.taskGroupId === groupId);
+  }
+
+  isGroupSelected(groupId: string): boolean {
+    const groupTasks = this.getGroupTasks(groupId);
+    if (groupTasks.length === 0) return false;
+    // Un grupo está seleccionado si todas sus tareas están seleccionadas
+    return groupTasks.every(task => this.projectTaskIncluded[task.id] !== false);
+  }
+
+  isGroupPartiallySelected(groupId: string): boolean {
+    const groupTasks = this.getGroupTasks(groupId);
+    if (groupTasks.length === 0) return false;
+    const selectedCount = groupTasks.filter(task => this.projectTaskIncluded[task.id] !== false).length;
+    return selectedCount > 0 && selectedCount < groupTasks.length;
+  }
+
+  toggleGroupSelection(groupId: string) {
+    const groupTasks = this.getGroupTasks(groupId);
+    const isCurrentlySelected = this.isGroupSelected(groupId);
+    const newState = !isCurrentlySelected;
+    
+    groupTasks.forEach(task => {
+      this.projectTaskIncluded[task.id] = newState;
+    });
+    
+    // Actualizar estado indeterminado después del cambio
+    setTimeout(() => {
+      this.updateGroupCheckboxesIndeterminate();
+    }, 0);
+  }
+
+  getGroupTotalDuration(groupId: string): string {
+    const groupTasks = this.getGroupTasks(groupId);
+    let totalHours = 0;
+    
+    groupTasks.forEach(task => {
+      const duration = this.getTaskDuration(task);
+      if (duration !== null) {
+        totalHours += duration;
+      }
+    });
+    
+    return this.formatTaskDuration(totalHours);
+  }
+
+  /**
+   * Obtiene el número de fechas únicas en las que un grupo tiene tareas
+   */
+  getGroupUniqueDates(groupId: string): number {
+    const groupTasks = this.getGroupTasks(groupId);
+    const uniqueDates = new Set<string>();
+    
+    groupTasks.forEach(task => {
+      if (task.start) {
+        const dateStr = task.start.includes('Z') ? task.start : task.start + 'Z';
+        const date = new Date(dateStr);
+        if (!isNaN(date.getTime())) {
+          uniqueDates.add(date.toISOString().split('T')[0]);
+        }
+      }
+    });
+    
+    return uniqueDates.size;
   }
 
   formatTaskDate(dateString: string | null | undefined): string {
@@ -1911,6 +2145,76 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * Obtiene la fecha más reciente (end o start) de todas las tareas de un grupo
+   * @returns dateKey (YYYY-MM-DD) de la fecha más reciente, o 'sin-fecha' si no hay fechas
+   */
+  getGroupMostRecentDateKey(groupId: string): string {
+    const groupTasks = this.getGroupTasks(groupId);
+    if (groupTasks.length === 0) return 'sin-fecha';
+    
+    let mostRecentDate: Date | null = null;
+    let mostRecentDateKey = 'sin-fecha';
+    
+    groupTasks.forEach(task => {
+      // Usar end si existe, sino start
+      const dateString = task.end || task.start;
+      if (dateString) {
+        const dateStr = dateString.includes('Z') ? dateString : dateString + 'Z';
+        const date = new Date(dateStr);
+        if (!isNaN(date.getTime())) {
+          if (!mostRecentDate || date > mostRecentDate) {
+            mostRecentDate = date;
+            mostRecentDateKey = date.toISOString().split('T')[0];
+          }
+        }
+      }
+    });
+    
+    return mostRecentDateKey;
+  }
+
+  getGroupKeysForDate(dateKey: string): string[] {
+    const dayData = this.getGroupedProjectTasksByGroup()[dateKey];
+    if (!dayData) return [];
+    
+    // Solo retornar grupos cuya fecha más reciente coincida con este dateKey
+    return Object.keys(dayData.groups).filter(groupId => {
+      const mostRecentDateKey = this.getGroupMostRecentDateKey(groupId);
+      return mostRecentDateKey === dateKey;
+    });
+  }
+
+  getGroupTasksForDate(dateKey: string, groupId: string): Task[] {
+    // Retornar TODAS las tareas del grupo (de todas las fechas), no solo las de este día
+    return this.getGroupTasks(groupId);
+  }
+
+  getIndividualTasksForDate(dateKey: string): Task[] {
+    const dayData = this.getGroupedProjectTasksByGroup()[dateKey];
+    if (!dayData) return [];
+    return dayData.individual;
+  }
+
+  getFirstTaskDateForDay(dateKey: string): string | null {
+    const dayData = this.getGroupedProjectTasksByGroup()[dateKey];
+    if (!dayData) return null;
+    
+    // Buscar en grupos
+    for (const groupId of Object.keys(dayData.groups)) {
+      if (dayData.groups[groupId].length > 0 && dayData.groups[groupId][0].start) {
+        return dayData.groups[groupId][0].start;
+      }
+    }
+    
+    // Buscar en individuales
+    if (dayData.individual.length > 0 && dayData.individual[0].start) {
+      return dayData.individual[0].start;
+    }
+    
+    return null;
+  }
+
   getTaskGlobalIndex(task: Task): number {
     return this.projectTasksForModal.findIndex(t => t.id === task.id);
   }
@@ -1922,7 +2226,10 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
     const currentState = this.projectTaskIncluded[task.id];
     const newState = !currentState;
     
-    if (isShiftPressed && this.lastSelectedTaskIndex !== null) {
+    // Si la tarea pertenece a un grupo, seleccionar/deseleccionar todo el grupo
+    if (task.taskGroupId && !isShiftPressed) {
+      this.toggleGroupSelection(task.taskGroupId);
+    } else if (isShiftPressed && this.lastSelectedTaskIndex !== null) {
       // Selección por rango
       const startIndex = Math.min(this.lastSelectedTaskIndex, index);
       const endIndex = Math.max(this.lastSelectedTaskIndex, index);
@@ -1934,9 +2241,21 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
           this.projectTaskIncluded[rangeTask.id] = newState;
         }
       }
+      
+      // Actualizar estado indeterminado después del cambio
+      setTimeout(() => {
+        this.updateGroupCheckboxesIndeterminate();
+      }, 0);
     } else {
       // Selección individual normal
       this.projectTaskIncluded[task.id] = newState;
+      
+      // Si la tarea pertenece a un grupo, actualizar estado indeterminado del grupo
+      if (task.taskGroupId) {
+        setTimeout(() => {
+          this.updateGroupCheckboxesIndeterminate();
+        }, 0);
+      }
     }
     
     // Actualizar el último índice seleccionado

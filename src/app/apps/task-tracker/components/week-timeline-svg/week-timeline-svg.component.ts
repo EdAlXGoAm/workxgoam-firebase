@@ -5,6 +5,7 @@ import { Task } from '../../models/task.model';
 import { Environment } from '../../models/environment.model';
 import { TaskType } from '../../models/task-type.model';
 import { Project } from '../../models/project.model';
+import { TaskGroup } from '../../models/task-group.model';
 import { TimelineFocusService } from '../../services/timeline-focus.service';
 import { ProjectService } from '../../services/project.service';
 import { GestureService, GestureEvent, GestureConfig } from '../../services/gesture.service';
@@ -49,6 +50,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   @Input() environments: Environment[] = [];
   @Input() taskTypes: TaskType[] = [];
   @Input() projects: Project[] = [];
+  @Input() taskGroups: TaskGroup[] = [];
   
   private loadedProjects: Project[] = [];
   
@@ -983,11 +985,24 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
           newY = Math.max(0, Math.min(this.hoursAreaHeight - originalHeight, newY));
         }
     } else if (event.type === 'resize-start') {
-        // Extender hacia arriba (inicio más temprano)
+        // Resize desde el borde superior
+        // deltaY > 0 = arrastrar hacia abajo = REDUCIR tarea
+        // deltaY < 0 = arrastrar hacia arriba = EXTENDER tarea
+        const originalEndY = originalY + originalHeight;
         newY += event.deltaY;
         newHeight -= event.deltaY;
         
-        // Detectar si se extiende antes de las 00:00
+        // REDUCCIÓN: Limitar para que el inicio no pase del final menos altura mínima
+        if (event.deltaY > 0) {
+          const minHeight = 5;
+          const maxNewY = originalEndY - minHeight;
+          if (newY > maxNewY) {
+            newY = maxNewY;
+            newHeight = minHeight;
+          }
+        }
+        
+        // EXTENSIÓN: Detectar si se extiende antes de las 00:00
         if (newY < 0) {
           // Mostrar previsualización secundaria en el día anterior
           if (dayIndex > 0) {
@@ -1008,23 +1023,31 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
               dayIndex: prevDayIndex
             };
             
-            // Ajustar preview principal para que empiece en 00:00 del día actual
-            newHeight = originalHeight - overflow;
+            // Ajustar preview principal: desde Y=0 hasta el final original de la tarea
             newY = 0;
+            newHeight = originalEndY; // Mantener el final donde estaba
           } else {
             // No hay día anterior, limitar en 00:00
             newY = 0;
-            newHeight = originalHeight + originalY;
+            newHeight = originalEndY; // La tarea va desde 00:00 hasta su final original
           }
         }
         
         // Limitar altura mínima
         newHeight = Math.max(5, newHeight);
     } else if (event.type === 'resize-end') {
-        // Extender hacia abajo (fin más tarde)
+        // Resize desde el borde inferior
+        // deltaY > 0 = arrastrar hacia abajo = EXTENDER tarea
+        // deltaY < 0 = arrastrar hacia arriba = REDUCIR tarea
         newHeight += event.deltaY;
         
-        // Detectar si se extiende después de las 23:59
+        // REDUCCIÓN: Limitar altura mínima
+        if (event.deltaY < 0) {
+          const minHeight = 5;
+          newHeight = Math.max(minHeight, newHeight);
+        }
+        
+        // EXTENSIÓN: Detectar si se extiende después de las 23:59
         const bottomY = newY + newHeight;
         if (bottomY > this.hoursAreaHeight) {
           // Mostrar previsualización secundaria en el día siguiente
@@ -1054,7 +1077,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
           }
         }
         
-        // Limitar altura mínima
+        // Limitar altura mínima (por si acaso)
         newHeight = Math.max(5, newHeight);
     }
 
@@ -1876,6 +1899,115 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
       this.changeStatus.emit({ task: this.contextMenuTask, status });
       this.closeContextMenu();
     }
+  }
+
+  /**
+   * Obtiene el nombre del grupo de tarea compleja dado su ID
+   */
+  getTaskGroupName(groupId: string | undefined): string | null {
+    if (!groupId) return null;
+    const group = this.taskGroups.find(g => g.id === groupId);
+    return group ? group.name : null;
+  }
+
+  /**
+   * Copia el título de la tarea al portapapeles
+   */
+  async copyTitle(): Promise<void> {
+    if (this.contextMenuTask) {
+      try {
+        await navigator.clipboard.writeText(this.contextMenuTask.name);
+      } catch (err) {
+        console.error('Error al copiar:', err);
+      }
+      this.closeContextMenu();
+    }
+  }
+
+  /**
+   * Copia solo el título del grupo complejo al portapapeles
+   */
+  async copyComplexTitle(): Promise<void> {
+    if (this.contextMenuTask) {
+      const groupName = this.getTaskGroupName(this.contextMenuTask.taskGroupId);
+      if (groupName) {
+        try {
+          await navigator.clipboard.writeText(groupName);
+        } catch (err) {
+          console.error('Error al copiar:', err);
+        }
+      }
+      this.closeContextMenu();
+    }
+  }
+
+  /**
+   * Copia el título complejo + título de la tarea al portapapeles
+   * Formato: "(ComplexTitle) Title"
+   */
+  async copyComplexTitleWithTitle(): Promise<void> {
+    if (this.contextMenuTask) {
+      const groupName = this.getTaskGroupName(this.contextMenuTask.taskGroupId);
+      if (groupName) {
+        const text = `(${groupName}) ${this.contextMenuTask.name}`;
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch (err) {
+          console.error('Error al copiar:', err);
+        }
+      }
+      this.closeContextMenu();
+    }
+  }
+
+  /**
+   * Verifica si la tarea tiene un grupo complejo asignado
+   */
+  hasComplexGroup(): boolean {
+    return !!(this.contextMenuTask?.taskGroupId && this.getTaskGroupName(this.contextMenuTask.taskGroupId));
+  }
+
+  /**
+   * Verifica si una tarea específica tiene un grupo complejo asignado
+   */
+  taskHasComplexGroup(task: Task): boolean {
+    return !!(task.taskGroupId && this.getTaskGroupName(task.taskGroupId));
+  }
+
+  /**
+   * Obtiene todas las tareas que pertenecen al mismo grupo complejo
+   */
+  getTasksInSameGroup(task: Task): Task[] {
+    if (!task.taskGroupId) return [];
+    return this.tasks.filter(t => t.taskGroupId === task.taskGroupId);
+  }
+
+  /**
+   * Calcula la duración total de todas las tareas de un grupo complejo (en horas)
+   */
+  getComplexGroupTotalDuration(task: Task): number | null {
+    if (!task.taskGroupId) return null;
+    
+    const groupTasks = this.getTasksInSameGroup(task);
+    if (groupTasks.length <= 1) return null; // No mostrar si solo hay una tarea
+    
+    let totalHours = 0;
+    for (const t of groupTasks) {
+      const duration = this.getTaskDuration(t);
+      if (duration) {
+        totalHours += duration;
+      }
+    }
+    
+    return totalHours > 0 ? totalHours : null;
+  }
+
+  /**
+   * Obtiene el número de tareas en el grupo complejo
+   */
+  getComplexGroupTaskCount(task: Task): number {
+    if (!task.taskGroupId) return 0;
+    return this.getTasksInSameGroup(task).length;
   }
 
   @HostListener('document:click', ['$event'])

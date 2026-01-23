@@ -9,6 +9,7 @@ export interface Task {
   environment: string;
   project: string;
   type?: string; // ID del tipo de tarea (opcional)
+  taskGroupId?: string; // ID del grupo de tarea compleja (opcional)
   priority: 'low' | 'medium' | 'high' | 'critical';
   duration: number;
   deadline: string | null;

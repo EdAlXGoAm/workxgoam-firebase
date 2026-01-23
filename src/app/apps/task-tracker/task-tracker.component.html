@@ -73,6 +73,7 @@
         [projects]="projects"
         [environments]="environments"
         [taskTypes]="taskTypes"
+        [taskGroups]="allTaskGroups"
         [showHidden]="showHidden"
         [environmentHiddenVisibility]="environmentHiddenVisibility"
         [environmentViewMode]="environmentViewMode"
@@ -107,6 +108,7 @@
         [projects]="projects"
         [environments]="environments"
         [taskTypes]="taskTypes"
+        [taskGroups]="allTaskGroups"
         [showHidden]="showHidden"
         [environmentHiddenVisibility]="environmentHiddenVisibility"
         [environmentViewMode]="environmentViewMode"
@@ -717,7 +719,7 @@
               Filtrar por Fecha de Inicio
             </h4>
             <button 
-              *ngIf="startDateFilter || endDateFilter"
+              *ngIf="pendingStartDateFilter || pendingEndDateFilter"
               (click)="clearDateFilters()" 
               class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
               Limpiar filtros
@@ -731,9 +733,10 @@
               <input 
                 type="date" 
                 id="startDateFilter"
-                [(ngModel)]="startDateFilter"
-                (change)="onDateFilterChange()"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm">
+                [(ngModel)]="pendingStartDateFilter"
+                (ngModelChange)="onDateFilterChange()"
+                [disabled]="isFilteringTasks"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed">
             </div>
             <div>
               <label for="endDateFilter" class="block text-xs font-medium text-gray-700 mb-1">
@@ -742,11 +745,30 @@
               <input 
                 type="date" 
                 id="endDateFilter"
-                [(ngModel)]="endDateFilter"
-                (change)="onDateFilterChange()"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm">
+                [(ngModel)]="pendingEndDateFilter"
+                (ngModelChange)="onDateFilterChange()"
+                [disabled]="isFilteringTasks"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed">
             </div>
           </div>
+          
+          <!-- Botón Aplicar Filtro -->
+          <div class="mt-3 flex items-center gap-3">
+            <button 
+              *ngIf="hasFilterChanges"
+              (click)="applyDateFilters()"
+              [disabled]="isFilteringTasks"
+              class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors disabled:bg-indigo-400 disabled:cursor-not-allowed flex items-center gap-2">
+              <i *ngIf="isFilteringTasks" class="fas fa-spinner fa-spin"></i>
+              <i *ngIf="!isFilteringTasks" class="fas fa-check"></i>
+              {{ isFilteringTasks ? 'Aplicando...' : 'Aplicar filtro' }}
+            </button>
+            <span *ngIf="hasFilterChanges && !isFilteringTasks" class="text-xs text-amber-600 flex items-center">
+              <i class="fas fa-exclamation-circle mr-1"></i>
+              Hay cambios sin aplicar
+            </span>
+          </div>
+          
           <div *ngIf="startDateFilter || endDateFilter" class="mt-2 text-xs text-gray-600">
             <i class="fas fa-info-circle mr-1"></i>
             Mostrando tareas con fecha de inicio 
@@ -758,7 +780,15 @@
       </div>
       
       <!-- Contenedor Principal Scrollable -->
-      <div class="flex-1 overflow-y-auto">
+      <div class="flex-1 overflow-y-auto relative">
+        <!-- Overlay de carga mientras se filtra -->
+        <div *ngIf="isFilteringTasks" class="absolute inset-0 bg-white bg-opacity-80 z-20 flex items-center justify-center">
+          <div class="flex flex-col items-center gap-3">
+            <i class="fas fa-spinner fa-spin text-4xl text-indigo-600"></i>
+            <span class="text-gray-600 font-medium">Aplicando filtros...</span>
+          </div>
+        </div>
+        
         <!-- Vista SVG Semanal -->
         <div class="border-b border-gray-200 pb-4 mb-4">
           <div class="px-6 pt-4">
@@ -780,6 +810,7 @@
                 [environments]="environments" 
                 [taskTypes]="taskTypes" 
                 [projects]="projects"
+                [taskGroups]="projectTaskGroups"
                 (editTask)="editTask($event)"
                 (deleteTask)="deleteTaskFromTimeline($event)"
                 (toggleHidden)="toggleHidden($event)"
@@ -798,13 +829,15 @@
         </div>
         <div *ngIf="projectTasksForModal.length > 0">
           <ng-container *ngFor="let dateKey of getGroupedProjectTasksKeys(); let dateIndex = index">
-            <ng-container *ngIf="getGroupedProjectTasks()[dateKey] as dayTasks">
+            <ng-container *ngIf="getGroupedProjectTasksByGroup()[dateKey]">
               <!-- Encabezado de fecha -->
               <div class="sticky top-0 bg-gray-50 border-b-2 border-indigo-200 py-3 px-4 mb-4 -mx-6 z-10">
                 <div class="flex items-center justify-between">
                   <h4 class="text-lg font-bold text-gray-800 flex items-center">
                     <i class="fas fa-calendar-day mr-2 text-indigo-600"></i>
-                    <span *ngIf="dateKey !== 'sin-fecha' && dayTasks.length > 0">{{ formatTaskDate(dayTasks[0].start) }}</span>
+                    <span *ngIf="dateKey !== 'sin-fecha' && getFirstTaskDateForDay(dateKey)">
+                      {{ formatTaskDate(getFirstTaskDateForDay(dateKey)) }}
+                    </span>
                     <span *ngIf="dateKey === 'sin-fecha'">Sin fecha</span>
                   </h4>
                   <div class="flex items-center text-sm font-semibold text-indigo-600">
@@ -816,7 +849,61 @@
               
               <!-- Tarjetas del día -->
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div *ngFor="let task of dayTasks; let taskIndex = index" 
+                <!-- Grupos de tareas (solo se muestran en la fecha más reciente) -->
+                <ng-container *ngFor="let groupId of getGroupKeysForDate(dateKey)">
+                  <div class="bg-white border-2 border-indigo-300 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                    <!-- Header del grupo -->
+                    <div class="bg-indigo-50 border-b border-indigo-200 px-4 py-3 rounded-t-lg">
+                      <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3 flex-1 min-w-0">
+                          <input type="checkbox" 
+                                 [checked]="isGroupSelected(groupId)"
+                                 [attr.data-group-id]="groupId"
+                                 (click)="toggleGroupSelection(groupId); $event.preventDefault()"
+                                 class="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer flex-shrink-0">
+                          <div class="flex-1 min-w-0">
+                            <h5 class="text-base font-semibold text-indigo-800 truncate">
+                              {{ getTaskGroupName(groupId) }}
+                            </h5>
+                            <p class="text-xs text-indigo-600 mt-1">
+                              {{ getGroupTasksForDate(dateKey, groupId).length }} {{ getGroupTasksForDate(dateKey, groupId).length === 1 ? 'tarea' : 'tareas' }}
+                              <span *ngIf="getGroupUniqueDates(groupId) > 1" class="text-indigo-400 ml-1">
+                                ({{ getGroupUniqueDates(groupId) }} días)
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+                        <div class="flex items-center text-sm font-semibold text-indigo-600 ml-2">
+                          <i class="fas fa-hourglass-half mr-1"></i>
+                          <span>{{ getGroupTotalDuration(groupId) }}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <!-- Tareas del grupo -->
+                    <div class="p-2 space-y-2">
+                      <div *ngFor="let task of getGroupTasksForDate(dateKey, groupId)" 
+                           class="bg-gray-50 border border-gray-200 rounded p-3">
+                        <div class="flex items-start space-x-2">
+                          <span class="text-xl flex-shrink-0">{{ task.emoji }}</span>
+                          <div class="flex-1 min-w-0">
+                            <h6 class="text-sm font-medium text-gray-800 truncate">{{ task.name }}</h6>
+                            <div class="flex items-center flex-wrap gap-x-3 gap-y-1 mt-1">
+                              <span *ngIf="task.start" class="text-xs text-gray-500">
+                                <i class="fas fa-calendar-alt mr-1"></i>{{ formatTaskDate(task.start) }} {{ formatTaskTime(task.start) }}
+                              </span>
+                              <span *ngIf="getTaskDuration(task) !== null" class="text-xs text-indigo-600">
+                                <i class="fas fa-hourglass-half mr-1"></i>{{ formatTaskDuration(getTaskDuration(task)) }}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </ng-container>
+                
+                <!-- Tareas individuales (sin grupo) -->
+                <div *ngFor="let task of getIndividualTasksForDate(dateKey); let taskIndex = index" 
                      class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
                 <div class="flex items-start space-x-3">
                   <!-- Checkbox -->

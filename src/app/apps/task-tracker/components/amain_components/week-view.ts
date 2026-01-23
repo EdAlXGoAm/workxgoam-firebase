@@ -6,6 +6,7 @@ import { Task } from '../../models/task.model';
 import { Project } from '../../models/project.model';
 import { Environment } from '../../models/environment.model';
 import { TaskType } from '../../models/task-type.model';
+import { TaskGroup } from '../../models/task-group.model';
 
 @Component({
   selector: 'app-week-view',
@@ -36,6 +37,7 @@ import { TaskType } from '../../models/task-type.model';
             [environments]="environments" 
             [taskTypes]="taskTypes" 
             [projects]="projects"
+            [taskGroups]="taskGroups"
             (editTask)="editTask.emit($event)" 
             (deleteTask)="deleteTask.emit($event)"
             (taskUpdated)="taskUpdated.emit($event)"
@@ -462,7 +464,7 @@ import { TaskType } from '../../models/task-type.model';
     .environment-content::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
     .environment-content::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
     .task-card { transition: all 0.2s ease; position: relative; }
-    .task-card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .task-card:hover { box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
     .task-list-item { padding: 8px 10px; border: 1px solid #e5e7eb; border-radius: 8px; background: #ffffff; cursor: pointer; transition: background 0.2s ease; max-width: 75%; user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; }
     .task-list-item:hover { background: #f9fafb; }
     .day-separator { display: flex; align-items: center; text-align: center; color: #6b7280; font-size: 12px; margin: 8px 0; }
@@ -479,12 +481,8 @@ import { TaskType } from '../../models/task-type.model';
     .progress-pending { width: 20%; background-color: #3b82f6; }
     .progress-in-progress { width: 60%; background-color: #f59e0b; }
     .progress-completed { width: 100%; background-color: #10b981; }
-    .task-overdue { border: 3px solid transparent; animation: overdue-pulse 1.5s infinite; position: relative; }
-    @keyframes overdue-pulse {
-      0%, 100% { border-color: #ef4444; box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.4), 0 0 20px rgba(239, 68, 68, 0.3), 0 0 40px rgba(239, 68, 68, 0.2); }
-      50% { border-color: #ffffff; box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.8), 0 0 25px rgba(255, 255, 255, 0.6), 0 0 45px rgba(255, 255, 255, 0.4); }
-    }
-    .task-overdue:hover { animation: overdue-pulse 1.5s infinite; transform: translateY(-2px); }
+    .task-overdue { border: 2px solid #ef4444; box-shadow: 0 0 8px rgba(239, 68, 68, 0.6), 0 0 16px rgba(239, 68, 68, 0.3); position: relative; }
+    .task-overdue:hover { }
     .task-running { border: 3px solid transparent; animation: running-pulse 1.5s infinite; position: relative; }
     @keyframes running-pulse {
       0%, 100% { border-color: #10b981; box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.4), 0 0 20px rgba(16, 185, 129, 0.3), 0 0 40px rgba(16, 185, 129, 0.2); }
@@ -503,6 +501,7 @@ export class WeekViewComponent implements OnChanges, AfterViewInit, AfterViewChe
   @Input() environments: Environment[] = [];
   private _orderedEnvironmentsCache: Environment[] = [];
   @Input() taskTypes: TaskType[] = [];
+  @Input() taskGroups: TaskGroup[] = [];
   @Input() showHidden: boolean = false;
   @Input() environmentHiddenVisibility: { [envId: string]: 'hidden' | 'show-all' | 'show-24h' | 'date-range' } = {};
   @Input() environmentViewMode: { [envId: string]: 'cards' | 'list' } = {};

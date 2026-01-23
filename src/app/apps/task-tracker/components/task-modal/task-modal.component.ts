@@ -13,11 +13,14 @@ import { AndroidDatePickerComponent } from '../android-date-picker/android-date-
 import { CustomSelectComponent, SelectOption } from '../custom-select/custom-select.component';
 import { TaskTypeService } from '../../services/task-type.service';
 import { TaskService } from '../../services/task.service';
+import { TaskGroupSelectComponent } from '../task-group-select/task-group-select.component';
+import { TaskGroupService } from '../../services/task-group.service';
+import { TaskGroup } from '../../models/task-group.model';
 
 @Component({
   selector: 'app-task-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule, MuiTimePickerComponent, PrioritySelectorComponent, AndroidDatePickerComponent, CustomSelectComponent],
+  imports: [CommonModule, FormsModule, MuiTimePickerComponent, PrioritySelectorComponent, AndroidDatePickerComponent, CustomSelectComponent, TaskGroupSelectComponent],
   templateUrl: './task-modal.component.html',
   styleUrls: ['./task-modal.component.css']
 })
@@ -51,6 +54,7 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   selectableProjects: Project[] = [];
   taskTypes: TaskType[] = [];
   selectableTaskTypes: TaskType[] = [];
+  taskGroups: TaskGroup[] = [];
   isLoading = false;
   
   // Referencias para el selector de emojis
@@ -172,6 +176,7 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     private cdr: ChangeDetectorRef,
     private taskTypeService: TaskTypeService,
     private taskService: TaskService,
+    private taskGroupService: TaskGroupService,
     private renderer: Renderer2
   ) {}
 
@@ -255,12 +260,16 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
         // Filtrar tipos seleccionables
         this.selectableTaskTypes = this.taskTypes.filter(t => t.projectId === this.task.project);
         
+        // Cargar grupos de tareas
+        await this.loadTaskGroups();
+        
         // Cargar tareas recientes solo si no estamos editando
         if (!this.isEditing) {
           await this.loadRecentTasks();
         }
       } else {
         this.selectableTaskTypes = [];
+        this.taskGroups = [];
       }
     } catch (error) {
       console.error('Error al cargar datos iniciales:', error);
@@ -683,6 +692,8 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
       await this.loadTaskTypes();
       this.selectableTaskTypes = this.taskTypes.filter(t => t.projectId === this.task.project);
       this.buildTaskTypeOptions(); // Actualizar opciones de tipo de tarea
+      // Cargar grupos de tareas cuando se selecciona un proyecto
+      await this.loadTaskGroups();
       // Cargar tareas recientes cuando se selecciona un proyecto (solo si no estamos editando)
       if (!this.isEditing) {
         this.loadRecentTasks();
@@ -691,6 +702,8 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
       this.selectableTaskTypes = [];
       this.buildTaskTypeOptions(); // Actualizar opciones de tipo de tarea
       this.task.type = undefined;
+      this.taskGroups = [];
+      this.task.taskGroupId = undefined;
       this.recentTasks = [];
       this.showRecentTasksSelector = false;
       this.selectedRecentTaskIndex = '';
@@ -698,6 +711,10 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     // Si el tipo actual no está en los tipos seleccionables, limpiarlo
     if (this.task.type && !this.selectableTaskTypes.find(t => t.id === this.task.type)) {
       this.task.type = undefined;
+    }
+    // Si el grupo actual no está en los grupos disponibles, limpiarlo
+    if (this.task.taskGroupId && !this.taskGroups.find(g => g.id === this.task.taskGroupId)) {
+      this.task.taskGroupId = undefined;
     }
   }
 
@@ -708,6 +725,31 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
       console.error('Error cargando tipos de tarea:', error);
       this.taskTypes = [];
     }
+  }
+
+  async loadTaskGroups() {
+    if (!this.task.project) {
+      this.taskGroups = [];
+      return;
+    }
+    try {
+      this.taskGroups = await this.taskGroupService.getTaskGroupsByProject(this.task.project);
+    } catch (error) {
+      console.error('Error cargando grupos de tareas:', error);
+      this.taskGroups = [];
+    }
+  }
+
+  async onTaskGroupCreated(group: TaskGroup) {
+    // Recargar grupos para incluir el nuevo
+    await this.loadTaskGroups();
+    // Seleccionar el grupo recién creado
+    this.task.taskGroupId = group.id;
+  }
+
+  async onTaskGroupDeleted(groupId: string) {
+    // Recargar grupos después de eliminar
+    await this.loadTaskGroups();
   }
 
   async refreshTaskTypes() {

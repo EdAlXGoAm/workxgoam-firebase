@@ -52,7 +52,6 @@
 }
 
 .task-card:hover {
-  transform: translateY(-2px);
   box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
 }
 .task-list-item {
@@ -257,32 +256,16 @@
   background-color: #10b981;
 }
 
-/* Tareas vencidas - efecto parpadeante */
+/* Tareas vencidas - efecto resplandor rojo estático */
 .task-overdue {
-  border: 3px solid transparent;
-  animation: overdue-pulse 1.5s infinite;
+  border: 2px solid #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.6), 
+              0 0 16px rgba(239, 68, 68, 0.3);
   position: relative;
-}
-
-@keyframes overdue-pulse {
-  0%, 100% {
-    border-color: #ef4444;
-    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.4), 
-                0 0 20px rgba(239, 68, 68, 0.3),
-                0 0 40px rgba(239, 68, 68, 0.2);
-  }
-  50% {
-    border-color: #ffffff;
-    box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.8), 
-                0 0 25px rgba(255, 255, 255, 0.6),
-                0 0 45px rgba(255, 255, 255, 0.4);
-  }
 }
 
 /* Asegurar que el efecto se vea incluso en tareas hover */
 .task-overdue:hover {
-  animation: overdue-pulse 1.5s infinite;
-  transform: translateY(-2px);
 }
 
 /* Tareas en progreso - efecto parpadeante verde-blanco */

@@ -5,6 +5,7 @@ import { Task } from '../../models/task.model';
 import { Environment } from '../../models/environment.model';
 import { TaskType } from '../../models/task-type.model';
 import { Project } from '../../models/project.model';
+import { TaskGroup } from '../../models/task-group.model';
 import { TimelineFocusService } from '../../services/timeline-focus.service';
 import { ProjectService } from '../../services/project.service';
 import { GestureService, GestureEvent, GestureConfig } from '../../services/gesture.service';
@@ -41,6 +42,7 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
   @Input() environments: Environment[] = [];
   @Input() taskTypes: TaskType[] = [];
   @Input() projects: Project[] = [];
+  @Input() taskGroups: TaskGroup[] = [];
   
   private loadedProjects: Project[] = [];
   
@@ -1358,6 +1360,115 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     } else {
       return `${wholeHours} hora${wholeHours !== 1 ? 's' : ''} y ${minutes} minutos`;
     }
+  }
+
+  /**
+   * Obtiene el nombre del grupo de tarea compleja dado su ID
+   */
+  getTaskGroupName(groupId: string | undefined): string | null {
+    if (!groupId) return null;
+    const group = this.taskGroups.find(g => g.id === groupId);
+    return group ? group.name : null;
+  }
+
+  /**
+   * Copia el título de la tarea al portapapeles
+   */
+  async copyTitle(): Promise<void> {
+    if (this.contextMenuTask) {
+      try {
+        await navigator.clipboard.writeText(this.contextMenuTask.name);
+      } catch (err) {
+        console.error('Error al copiar:', err);
+      }
+      this.closeContextMenu();
+    }
+  }
+
+  /**
+   * Copia solo el título del grupo complejo al portapapeles
+   */
+  async copyComplexTitle(): Promise<void> {
+    if (this.contextMenuTask) {
+      const groupName = this.getTaskGroupName(this.contextMenuTask.taskGroupId);
+      if (groupName) {
+        try {
+          await navigator.clipboard.writeText(groupName);
+        } catch (err) {
+          console.error('Error al copiar:', err);
+        }
+      }
+      this.closeContextMenu();
+    }
+  }
+
+  /**
+   * Copia el título complejo + título de la tarea al portapapeles
+   * Formato: "(ComplexTitle) Title"
+   */
+  async copyComplexTitleWithTitle(): Promise<void> {
+    if (this.contextMenuTask) {
+      const groupName = this.getTaskGroupName(this.contextMenuTask.taskGroupId);
+      if (groupName) {
+        const text = `(${groupName}) ${this.contextMenuTask.name}`;
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch (err) {
+          console.error('Error al copiar:', err);
+        }
+      }
+      this.closeContextMenu();
+    }
+  }
+
+  /**
+   * Verifica si la tarea tiene un grupo complejo asignado
+   */
+  hasComplexGroup(): boolean {
+    return !!(this.contextMenuTask?.taskGroupId && this.getTaskGroupName(this.contextMenuTask.taskGroupId));
+  }
+
+  /**
+   * Verifica si una tarea específica tiene un grupo complejo asignado
+   */
+  taskHasComplexGroup(task: Task): boolean {
+    return !!(task.taskGroupId && this.getTaskGroupName(task.taskGroupId));
+  }
+
+  /**
+   * Obtiene todas las tareas que pertenecen al mismo grupo complejo
+   */
+  getTasksInSameGroup(task: Task): Task[] {
+    if (!task.taskGroupId) return [];
+    return this.tasks.filter(t => t.taskGroupId === task.taskGroupId);
+  }
+
+  /**
+   * Calcula la duración total de todas las tareas de un grupo complejo (en horas)
+   */
+  getComplexGroupTotalDuration(task: Task): number | null {
+    if (!task.taskGroupId) return null;
+    
+    const groupTasks = this.getTasksInSameGroup(task);
+    if (groupTasks.length <= 1) return null; // No mostrar si solo hay una tarea
+    
+    let totalHours = 0;
+    for (const t of groupTasks) {
+      const duration = this.getTaskDuration(t);
+      if (duration) {
+        totalHours += duration;
+      }
+    }
+    
+    return totalHours > 0 ? totalHours : null;
+  }
+
+  /**
+   * Obtiene el número de tareas en el grupo complejo
+   */
+  getComplexGroupTaskCount(task: Task): number {
+    if (!task.taskGroupId) return 0;
+    return this.getTasksInSameGroup(task).length;
   }
   
   showTaskContextMenu(task: Task, x: number, y: number): void {
