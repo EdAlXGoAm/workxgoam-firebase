@@ -70,6 +70,35 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     dayIndex: 0
   };
 
+  // Preview secundaria para cuando el drag se extiende a otro día
+  previewStateSecondary = {
+    visible: false,
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+    dayIndex: 0
+  };
+
+  // Estado de selección de rango para crear nuevas tareas
+  rangeSelectionState = {
+    isSelecting: false,
+    startY: 0,
+    currentY: 0,
+    dayIndex: 0,
+    dayStartDate: new Date()
+  };
+
+  // Rectángulo visual de selección de rango
+  rangeSelectionRect = {
+    visible: false,
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+    dayIndex: 0
+  };
+
   constructor(
     private cdr: ChangeDetectorRef,
     private timelineFocusService: TimelineFocusService,
@@ -83,6 +112,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   @Output() toggleHidden = new EventEmitter<Task>();
   @Output() changeStatus = new EventEmitter<{ task: Task; status: 'pending' | 'in-progress' | 'completed' }>();
   @Output() taskUpdated = new EventEmitter<Task>();
+  @Output() createTaskWithRange = new EventEmitter<{ startTime: Date; endTime: Date }>();
 
   @ViewChild('containerRef') containerRef!: ElementRef<HTMLDivElement>;
   @ViewChild('svgScrollContainer') svgScrollContainer!: ElementRef<HTMLDivElement>;
@@ -302,6 +332,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   ngAfterViewInit() {
     this.initializeResizeObserver();
     this.initializePanHandlers();
+    this.initializeRangeSelectionHandlers();
     setTimeout(() => {
       this.updateSvgDimensions();
       this.registerTaskGestures();
@@ -465,6 +496,67 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   }
   
   private panCleanup?: () => void;
+  private rangeSelectionCleanup?: () => void;
+
+  /**
+   * Inicializar handlers para selección de rango (crear tarea)
+   */
+  private initializeRangeSelectionHandlers(): void {
+    if (!this.svgScrollContainer?.nativeElement) return;
+    
+    const scrollContainer = this.svgScrollContainer.nativeElement;
+    const svgElement = scrollContainer.querySelector('.week-timeline-svg') as SVGElement;
+    if (!svgElement) return;
+    
+    // Handler de mousedown para iniciar selección de rango
+    const handleRangeMouseDown = (e: MouseEvent) => {
+      // Solo procesar click izquierdo
+      if (e.button !== 0) return;
+      
+      // No iniciar si Ctrl está presionado (para pan)
+      if (e.ctrlKey || e.metaKey) return;
+      
+      // Verificar que sea un área vacía
+      if (!this.isClickOnEmptyArea(e.target)) return;
+      
+      const svgRect = svgElement.getBoundingClientRect();
+      const localX = e.clientX - svgRect.left;
+      const localY = e.clientY - svgRect.top;
+      
+      // Determinar el día
+      const { dayIndex, dayDate } = this.getDayFromX(localX);
+      
+      // Solo permitir selección en el área de horas (después del header de 60px)
+      if (localY < 60) return;
+      
+      // Iniciar estado de selección
+      this.rangeSelectionState = {
+        isSelecting: true,
+        startY: localY - 60, // Relativo al inicio del área de horas
+        currentY: localY - 60,
+        dayIndex: dayIndex,
+        dayStartDate: dayDate
+      };
+      
+      // Inicializar rectángulo visual
+      this.updateRangeSelectionRect(localY - 60, localY - 60, dayIndex);
+      
+      // Forzar detección de cambios para mostrar el rectángulo
+      this.cdr.detectChanges();
+      
+      // Prevenir comportamiento por defecto solo si no es pan
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    
+    // Agregar listener al SVG con captura para que se ejecute antes del pan handler
+    svgElement.addEventListener('mousedown', handleRangeMouseDown, true);
+    
+    // Limpiar en ngOnDestroy
+    this.rangeSelectionCleanup = () => {
+      svgElement.removeEventListener('mousedown', handleRangeMouseDown, true);
+    };
+  }
 
   /**
    * Registrar gestos en todos los rectángulos de tareas
@@ -541,6 +633,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     // Fase END: Ejecutar acción y limpiar
     if (event.phase === 'end') {
       this.previewState.visible = false;
+      this.previewStateSecondary.visible = false;
       this.cdr.detectChanges();
 
       switch (event.type) {
@@ -603,23 +696,124 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     
     let newY = originalY;
     let newHeight = originalHeight;
+    let newDayIndex = dayIndex;
+
+    // Resetear preview secundaria
+    this.previewStateSecondary.visible = false;
 
     if (event.type === 'drag-up' || event.type === 'drag-down') {
+        // Movimiento vertical con posible componente horizontal
         newY += event.deltaY;
+        
+        // Detectar movimiento horizontal significativo (más de 30px)
+        if (Math.abs(event.deltaX) > 30) {
+          // Calcular nuevo día basándose en deltaX
+          const dayColumnWidth = this.dayColumnWidth + this.columnGap;
+          const dayOffset = Math.round(event.deltaX / dayColumnWidth);
+          newDayIndex = Math.max(0, Math.min(6, dayIndex + dayOffset));
+          
+          // Si cambió de día, mostrar previsualización secundaria
+          if (newDayIndex !== dayIndex) {
+            const targetDayX = this.getDayColumnX(newDayIndex) + this.dayColumnPadding;
+            this.previewStateSecondary = {
+              visible: true,
+              x: targetDayX,
+              y: newY,
+              width: width,
+              height: originalHeight,
+              dayIndex: newDayIndex
+            };
+            
+            // Mantener la previsualización principal en el día original pero ajustada
+            // Limitar Y dentro de los límites del día original
+            newY = Math.max(0, Math.min(this.hoursAreaHeight - originalHeight, newY));
+          }
+        } else {
+          // Solo movimiento vertical, limitar dentro del día
+          newY = Math.max(0, Math.min(this.hoursAreaHeight - originalHeight, newY));
+        }
     } else if (event.type === 'resize-start') {
+        // Extender hacia arriba (inicio más temprano)
         newY += event.deltaY;
         newHeight -= event.deltaY;
+        
+        // Detectar si se extiende antes de las 00:00
+        if (newY < 0) {
+          // Mostrar previsualización secundaria en el día anterior
+          if (dayIndex > 0) {
+            const overflow = -newY;
+            const prevDayIndex = dayIndex - 1;
+            const prevDayX = this.getDayColumnX(prevDayIndex) + this.dayColumnPadding;
+            
+            // Calcular altura en el día anterior
+            const prevDayHeight = Math.min(overflow, this.hoursAreaHeight);
+            const prevDayY = this.hoursAreaHeight - prevDayHeight;
+            
+            this.previewStateSecondary = {
+              visible: true,
+              x: prevDayX,
+              y: prevDayY,
+              width: width,
+              height: prevDayHeight,
+              dayIndex: prevDayIndex
+            };
+            
+            // Ajustar preview principal para que empiece en 00:00 del día actual
+            newHeight = originalHeight - overflow;
+            newY = 0;
+          } else {
+            // No hay día anterior, limitar en 00:00
+            newY = 0;
+            newHeight = originalHeight + originalY;
+          }
+        }
+        
+        // Limitar altura mínima
+        newHeight = Math.max(5, newHeight);
     } else if (event.type === 'resize-end') {
+        // Extender hacia abajo (fin más tarde)
         newHeight += event.deltaY;
+        
+        // Detectar si se extiende después de las 23:59
+        const bottomY = newY + newHeight;
+        if (bottomY > this.hoursAreaHeight) {
+          // Mostrar previsualización secundaria en el día siguiente
+          if (dayIndex < 6) {
+            const overflow = bottomY - this.hoursAreaHeight;
+            const nextDayIndex = dayIndex + 1;
+            const nextDayX = this.getDayColumnX(nextDayIndex) + this.dayColumnPadding;
+            
+            // Calcular altura en el día siguiente
+            const nextDayHeight = Math.min(overflow, this.hoursAreaHeight);
+            
+            this.previewStateSecondary = {
+              visible: true,
+              x: nextDayX,
+              y: 0,
+              width: width,
+              height: nextDayHeight,
+              dayIndex: nextDayIndex
+            };
+            
+            // Ajustar preview principal para que termine en 23:59 del día actual
+            newHeight = this.hoursAreaHeight - newY;
+          } else {
+            // No hay día siguiente, limitar en 23:59
+            newHeight = this.hoursAreaHeight - newY;
+          }
+        }
+        
+        // Limitar altura mínima
+        newHeight = Math.max(5, newHeight);
     }
 
     this.previewState = {
         visible: true,
         x: x,
-        y: newY,
+        y: Math.max(0, Math.min(this.hoursAreaHeight - 5, newY)),
         width: width,
-        height: Math.max(5, newHeight),
-        dayIndex: dayIndex
+        height: Math.max(5, Math.min(this.hoursAreaHeight, newHeight)),
+        dayIndex: newDayIndex
     };
     
     this.cdr.detectChanges();
@@ -634,11 +828,28 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
 
     // Para vertical: drag-up = más temprano (backward), drag-down = más tarde (forward)
     const direction = event.type === 'drag-down' ? 'forward' : 'backward';
-    const suggestedMinutes = this.gestureService.calculateTimeShift(
+    
+    // Calcular minutos de desplazamiento vertical
+    let suggestedMinutes = this.gestureService.calculateTimeShift(
       Math.abs(event.deltaY),
       this.pixelsPerHour,
       15
     );
+    
+    // Detectar movimiento horizontal significativo (más de 30px)
+    // y agregar minutos equivalentes al cambio de día
+    if (Math.abs(event.deltaX) > 30) {
+      const dayColumnWidth = this.dayColumnWidth + this.columnGap;
+      const dayOffset = Math.round(event.deltaX / dayColumnWidth);
+      
+      // Agregar minutos equivalentes a los días de desplazamiento
+      // Cada día = 24 horas = 1440 minutos
+      const dayMinutes = Math.abs(dayOffset) * 1440;
+      
+      // Si hay movimiento horizontal, agregar los minutos de los días
+      // El movimiento vertical ya está calculado arriba
+      suggestedMinutes += dayMinutes;
+    }
 
     this.timeShiftTask = task;
     this.timeShiftFragmentIndex = fragmentIndex ?? null;
@@ -1410,9 +1621,274 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     }
   }
 
+  /**
+   * Convertir coordenada Y a hora decimal del día
+   */
+  yToHour(y: number, dayIndex: number): number {
+    // Y ya está relativo al inicio del área de horas (después del header de 60px)
+    const hour = (y / this.pixelsPerHour);
+    return Math.max(0, Math.min(24, hour));
+  }
+
+  /**
+   * Redondear hora a múltiplos de 15 minutos
+   */
+  snapToQuarterHour(hour: number): number {
+    const totalMinutes = hour * 60;
+    const snappedMinutes = Math.round(totalMinutes / 15) * 15;
+    return snappedMinutes / 60;
+  }
+
+  /**
+   * Determinar el día de la semana basándose en la coordenada X
+   */
+  getDayFromX(localX: number): { dayIndex: number; dayDate: Date } {
+    let dayIndex = 0;
+    for (let i = 0; i < 7; i++) {
+      const dayColumnX = this.getDayColumnX(i);
+      if (localX >= dayColumnX && localX < dayColumnX + this.dayColumnWidth) {
+        dayIndex = i;
+        break;
+      }
+    }
+    const clampedIndex = Math.max(0, Math.min(6, dayIndex));
+    const day = this.weekDays[clampedIndex];
+    return {
+      dayIndex: clampedIndex,
+      dayDate: day ? new Date(day.date) : new Date(this.currentWeekStart)
+    };
+  }
+
+  /**
+   * Verificar si el click está en un área vacía (sin tareas)
+   */
+  isClickOnEmptyArea(target: EventTarget | null): boolean {
+    if (!target || !(target instanceof Element)) return true;
+    
+    const element = target as Element;
+    
+    // Verificar si el target es un elemento de tarea o sus componentes
+    const isTaskElement = element.closest('.task-rect') !== null ||
+                          element.closest('.task-group') !== null ||
+                          element.closest('.task-inner') !== null ||
+                          element.closest('.task-text') !== null ||
+                          element.closest('.task-type-indicator') !== null ||
+                          element.closest('.resize-handle') !== null ||
+                          element.closest('.resize-handle-line') !== null ||
+                          element.closest('.context-menu') !== null ||
+                          element.closest('.task-selector-menu') !== null ||
+                          element.closest('.tooltip-container') !== null ||
+                          element.closest('.week-navigation') !== null ||
+                          element.closest('.color-mode-toggle') !== null ||
+                          element.closest('button') !== null ||
+                          element.closest('input') !== null ||
+                          element.closest('select') !== null ||
+                          element.closest('.preview-shadow') !== null ||
+                          element.closest('.preview-shadow-secondary') !== null ||
+                          element.closest('.range-selection-rect') !== null;
+    
+    // Permitir selección en el fondo de la columna, líneas de horas, y áreas vacías
+    const isBackgroundElement = element.tagName === 'rect' && 
+                                 (element.classList.contains('inactive-hours-shade') || 
+                                  !element.closest('.task-group'));
+    
+    return !isTaskElement || isBackgroundElement;
+  }
+
+  /**
+   * Handler para mousedown en el SVG - iniciar selección de rango
+   */
+  onSvgMouseDown(event: MouseEvent): void {
+    // Solo procesar click izquierdo
+    if (event.button !== 0) return;
+    
+    // No iniciar si Ctrl está presionado (para pan)
+    if (event.ctrlKey || event.metaKey) return;
+    
+    // Verificar que sea un área vacía
+    if (!this.isClickOnEmptyArea(event.target)) return;
+    
+    // Obtener coordenadas relativas al SVG
+    const svgElement = this.svgScrollContainer?.nativeElement?.querySelector('.week-timeline-svg') || 
+                       this.containerRef?.nativeElement?.querySelector('.week-timeline-svg');
+    if (!svgElement) return;
+    
+    const svgRect = svgElement.getBoundingClientRect();
+    const localX = event.clientX - svgRect.left;
+    const localY = event.clientY - svgRect.top;
+    
+    // Determinar el día
+    const { dayIndex, dayDate } = this.getDayFromX(localX);
+    
+    // Solo permitir selección en el área de horas (después del header de 60px)
+    if (localY < 60) return;
+    
+    // Iniciar estado de selección
+    this.rangeSelectionState = {
+      isSelecting: true,
+      startY: localY - 60, // Relativo al inicio del área de horas
+      currentY: localY - 60,
+      dayIndex: dayIndex,
+      dayStartDate: dayDate
+    };
+    
+    // Inicializar rectángulo visual
+    this.updateRangeSelectionRect(localY - 60, localY - 60, dayIndex);
+    
+    // Forzar detección de cambios para mostrar el rectángulo
+    this.cdr.detectChanges();
+    
+    // Prevenir comportamiento por defecto
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  /**
+   * Handler para mousemove global durante selección
+   */
+  @HostListener('document:mousemove', ['$event'])
+  onDocumentMouseMove(event: MouseEvent): void {
+    if (!this.rangeSelectionState.isSelecting) return;
+    
+    const svgElement = this.svgScrollContainer?.nativeElement?.querySelector('.week-timeline-svg') || 
+                       this.containerRef?.nativeElement?.querySelector('.week-timeline-svg');
+    if (!svgElement) {
+      // Si no hay SVG, cancelar selección
+      this.resetRangeSelection();
+      return;
+    }
+    
+    const svgRect = svgElement.getBoundingClientRect();
+    const localY = event.clientY - svgRect.top;
+    const localX = event.clientX - svgRect.left;
+    
+    // Verificar que el mouse esté dentro del SVG
+    if (localX < 0 || localX > this.svgWidth || localY < 0 || localY > this.svgHeight) {
+      // Mouse fuera del SVG, cancelar selección
+      this.resetRangeSelection();
+      return;
+    }
+    
+    // Verificar que sigamos en el mismo día
+    const { dayIndex } = this.getDayFromX(localX);
+    if (dayIndex !== this.rangeSelectionState.dayIndex) {
+      // Si cambiamos de día, cancelar la selección
+      this.resetRangeSelection();
+      return;
+    }
+    
+    // Limitar Y al área de horas (después del header de 60px)
+    const yRelative = Math.max(0, Math.min(this.hoursAreaHeight, localY - 60));
+    
+    this.rangeSelectionState.currentY = yRelative;
+    this.updateRangeSelectionRect(
+      this.rangeSelectionState.startY, 
+      yRelative, 
+      this.rangeSelectionState.dayIndex
+    );
+    
+    this.cdr.detectChanges();
+  }
+
+  /**
+   * Handler para mouseup global - finalizar selección
+   */
+  @HostListener('document:mouseup', ['$event'])
+  onDocumentMouseUp(event: MouseEvent): void {
+    if (!this.rangeSelectionState.isSelecting) return;
+    
+    const startY = this.rangeSelectionState.startY;
+    const endY = this.rangeSelectionState.currentY;
+    const dayIndex = this.rangeSelectionState.dayIndex;
+    const dayDate = this.rangeSelectionState.dayStartDate;
+    
+    // Calcular horas (startY y endY ya están relativos al área de horas)
+    let startHour = this.yToHour(startY, dayIndex);
+    let endHour = this.yToHour(endY, dayIndex);
+    
+    // Asegurar que startHour < endHour
+    if (startHour > endHour) {
+      [startHour, endHour] = [endHour, startHour];
+    }
+    
+    // Redondear a 15 minutos
+    startHour = this.snapToQuarterHour(startHour);
+    endHour = this.snapToQuarterHour(endHour);
+    
+    // Asegurar duración mínima de 15 minutos (0.25 horas)
+    if (endHour - startHour < 0.25) {
+      endHour = startHour + 0.25;
+    }
+    
+    // Limitar a 24 horas
+    endHour = Math.min(24, endHour);
+    
+    // Crear objetos Date con las horas calculadas
+    const startTime = new Date(dayDate);
+    startTime.setHours(Math.floor(startHour), Math.round((startHour % 1) * 60), 0, 0);
+    
+    const endTime = new Date(dayDate);
+    endTime.setHours(Math.floor(endHour), Math.round((endHour % 1) * 60), 0, 0);
+    
+    // Emitir evento solo si hubo una selección significativa (más de un umbral mínimo)
+    const deltaY = Math.abs(endY - startY);
+    if (deltaY > 10) {
+      this.createTaskWithRange.emit({ startTime, endTime });
+    }
+    
+    // Limpiar estado
+    this.resetRangeSelection();
+  }
+
+  /**
+   * Actualizar el rectángulo visual de selección
+   */
+  private updateRangeSelectionRect(startY: number, endY: number, dayIndex: number): void {
+    const minY = Math.max(0, Math.min(startY, endY));
+    const maxY = Math.min(this.hoursAreaHeight, Math.max(startY, endY));
+    const height = maxY - minY;
+    
+    this.rangeSelectionRect = {
+      visible: true,
+      x: this.dayColumnPadding,
+      y: minY,
+      width: this.dayColumnWidth - (this.dayColumnPadding * 2),
+      height: Math.max(5, height),
+      dayIndex: dayIndex
+    };
+  }
+
+  /**
+   * Limpiar estado de selección de rango
+   */
+  private resetRangeSelection(): void {
+    this.rangeSelectionState = {
+      isSelecting: false,
+      startY: 0,
+      currentY: 0,
+      dayIndex: 0,
+      dayStartDate: new Date()
+    };
+    this.rangeSelectionRect = {
+      visible: false,
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      dayIndex: 0
+    };
+    this.cdr.detectChanges();
+  }
+
   ngOnDestroy(): void {
     if (this.tooltipTimeout) {
       clearTimeout(this.tooltipTimeout);
+    }
+    if (this.panCleanup) {
+      this.panCleanup();
+    }
+    if (this.rangeSelectionCleanup) {
+      this.rangeSelectionCleanup();
     }
     if (this.focusSubscription) {
       this.focusSubscription.unsubscribe();

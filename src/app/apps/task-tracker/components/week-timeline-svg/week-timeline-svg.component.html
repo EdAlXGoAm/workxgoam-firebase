@@ -90,7 +90,8 @@
   <div #svgScrollContainer class="svg-scroll-container">
     <div class="svg-container">
       <svg [attr.width]="svgWidth" [attr.height]="svgHeight" [attr.viewBox]="'0 0 ' + svgWidth + ' ' + svgHeight" 
-           class="week-timeline-svg" [style.min-width.px]="svgWidth">
+           class="week-timeline-svg" [style.min-width.px]="svgWidth"
+           (mousedown)="onSvgMouseDown($event)">
       
       <!-- Encabezado con nombres de días -->
       <g transform="translate(0, 0)">
@@ -126,6 +127,15 @@
               rx="4" ry="4" 
               stroke="#e5e7eb" 
               stroke-width="1"/>
+        
+        <!-- Sombreado para horas inactivas (0:00 - 8:00) -->
+        <rect x="0" y="0" 
+              [attr.width]="dayColumnWidth" 
+              [attr.height]="8 * pixelsPerHour" 
+              fill="#e5e7eb" 
+              fill-opacity="0.7"
+              rx="4" ry="4"
+              class="inactive-hours-shade"/>
         
         <!-- Líneas de horas y etiquetas -->
         <g *ngFor="let hour of hours">
@@ -261,6 +271,34 @@
               stroke-dasharray="4 4"
               rx="4" ry="4"
               class="preview-shadow"
+              pointer-events="none" />
+        
+        <!-- Previsualización secundaria para movimiento entre días -->
+        <rect *ngIf="previewStateSecondary.visible && previewStateSecondary.dayIndex === dayIndex"
+              [attr.x]="previewStateSecondary.x"
+              [attr.y]="previewStateSecondary.y"
+              [attr.width]="previewStateSecondary.width"
+              [attr.height]="previewStateSecondary.height"
+              fill="rgba(99, 102, 241, 0.15)"
+              stroke="#6366f1"
+              stroke-width="2"
+              stroke-dasharray="4 4"
+              rx="4" ry="4"
+              class="preview-shadow-secondary"
+              pointer-events="none" />
+        
+        <!-- Rectángulo de selección de rango para crear tarea -->
+        <rect *ngIf="rangeSelectionRect.visible && rangeSelectionRect.dayIndex === dayIndex"
+              [attr.x]="rangeSelectionRect.x"
+              [attr.y]="rangeSelectionRect.y"
+              [attr.width]="rangeSelectionRect.width"
+              [attr.height]="rangeSelectionRect.height"
+              fill="rgba(99, 102, 241, 0.2)"
+              stroke="#6366f1"
+              stroke-width="2"
+              stroke-dasharray="4 4"
+              rx="4" ry="4"
+              class="range-selection-rect"
               pointer-events="none" />
       </g>
       </svg>

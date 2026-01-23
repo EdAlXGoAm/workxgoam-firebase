@@ -129,7 +129,8 @@
         (addTaskToProject)="openNewTaskModalForProject($event.environmentId, $event.projectId)"
         (createProject)="createProjectForEnvironment($event)"
         (saveOrderToDatabase)="saveOrderToDatabase()"
-        (loadOrderFromDatabase)="loadOrderFromDatabase()">
+        (loadOrderFromDatabase)="loadOrderFromDatabase()"
+        (createTaskWithRange)="openNewTaskModalWithRange($event)">
       </app-week-view>
     </div>
   </main>

@@ -38,7 +38,8 @@ import { TaskType } from '../../models/task-type.model';
             [projects]="projects"
             (editTask)="editTask.emit($event)" 
             (deleteTask)="deleteTask.emit($event)"
-            (taskUpdated)="taskUpdated.emit($event)">
+            (taskUpdated)="taskUpdated.emit($event)"
+            (createTaskWithRange)="createTaskWithRange.emit($event)">
           </app-week-timeline-svg>
         </div>
 
@@ -493,6 +494,7 @@ export class WeekViewComponent implements OnChanges, AfterViewInit, AfterViewChe
   @Output() moveEnvironmentDown = new EventEmitter<string>();
   @Output() saveOrderToDatabase = new EventEmitter<void>();
   @Output() loadOrderFromDatabase = new EventEmitter<void>();
+  @Output() createTaskWithRange = new EventEmitter<{ startTime: Date; endTime: Date }>();
 
   collapsedEmptyEnvironments: boolean = true;
   collapsedEnvironments: { [envId: string]: boolean } = {};
