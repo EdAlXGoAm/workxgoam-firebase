@@ -87,11 +87,33 @@
   </div>
 
   <!-- Contenedor con scroll independiente para el SVG -->
-  <div #svgScrollContainer class="svg-scroll-container">
-    <div class="svg-container">
-      <svg [attr.width]="svgWidth" [attr.height]="svgHeight" [attr.viewBox]="'0 0 ' + svgWidth + ' ' + svgHeight" 
-           class="week-timeline-svg" [style.min-width.px]="svgWidth"
-           (mousedown)="onSvgMouseDown($event)">
+  <div class="timeline-wrapper">
+    <!-- Indicador de horas fijo en el lado izquierdo -->
+    <div #hoursIndicator class="hours-indicator">
+      <svg [attr.width]="60" [attr.height]="svgHeight" class="hours-indicator-svg" 
+           [style.height.px]="svgHeight" [attr.viewBox]="'0 0 60 ' + svgHeight">
+        <!-- Fondo del indicador -->
+        <rect x="0" y="0" width="60" height="60" fill="#f9fafb" rx="6" ry="6"/>
+        <line x1="0" y1="60" x2="60" y2="60" stroke="#888" stroke-width="2" />
+        
+        <!-- Etiquetas de horas (solo horas completas: 0-23) -->
+        <g *ngFor="let hour of fullHours">
+          <text x="4" 
+                [attr.y]="(hour * pixelsPerHour) - 1 + 60" 
+                [attr.font-size]="hourFontSize" 
+                fill="#666" 
+                text-anchor="start">
+            {{ formatHour(hour) }}
+          </text>
+        </g>
+      </svg>
+    </div>
+    
+    <div #svgScrollContainer class="svg-scroll-container">
+      <div class="svg-container">
+        <svg [attr.width]="svgWidth" [attr.height]="svgHeight" [attr.viewBox]="'0 0 ' + svgWidth + ' ' + svgHeight" 
+             class="week-timeline-svg" [style.min-width.px]="svgWidth"
+             (mousedown)="onSvgMouseDown($event)">
       
       <!-- Encabezado con nombres de días -->
       <g transform="translate(0, 0)">
@@ -137,7 +159,7 @@
               rx="4" ry="4"
               class="inactive-hours-shade"/>
         
-        <!-- Líneas de horas y etiquetas -->
+        <!-- Líneas de horas (sin etiquetas, ahora están en el indicador lateral) -->
         <g *ngFor="let hour of hours">
           <line x1="0" y1="0" 
                 [attr.x2]="dayColumnWidth" 
@@ -145,16 +167,6 @@
                 [attr.stroke]="'#e5e7eb'" 
                 [attr.stroke-width]="hour % 2 === 0 ? '2' : '1'"
                 [attr.transform]="'translate(0, ' + getHourY(hour) + ')'"/>
-          
-          <text *ngIf="dayIndex === 0"
-                x="4" 
-                [attr.y]="getHourY(hour) - 1" 
-                [attr.font-size]="hourFontSize" 
-                fill="#666" 
-                text-anchor="start"
-                [attr.transform]="'translate(0, ' + getHourY(hour) + ')'">
-            {{ formatHour(hour) }}
-          </text>
         </g>
         
         <!-- Tareas para este día -->
@@ -303,6 +315,7 @@
       </g>
       </svg>
     </div>
+  </div>
   </div>
 
   <!-- Menú contextual -->

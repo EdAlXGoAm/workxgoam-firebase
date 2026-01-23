@@ -116,6 +116,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
 
   @ViewChild('containerRef') containerRef!: ElementRef<HTMLDivElement>;
   @ViewChild('svgScrollContainer') svgScrollContainer!: ElementRef<HTMLDivElement>;
+  @ViewChild('hoursIndicator') hoursIndicator!: ElementRef<HTMLDivElement>;
   @ViewChildren('taskRect') taskRects!: QueryList<ElementRef<SVGRectElement>>;
   @ViewChildren('resizeHandleStart') resizeHandlesStart!: QueryList<ElementRef<SVGRectElement>>;
   @ViewChildren('resizeHandleEnd') resizeHandlesEnd!: QueryList<ElementRef<SVGRectElement>>;
@@ -181,6 +182,11 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   taskFontSize = 11;
   
   hours: number[] = Array.from({length: 48}, (_, i) => i);
+  
+  // Array de horas completas para el indicador lateral (0-23)
+  get fullHours(): number[] {
+    return Array.from({length: 24}, (_, i) => i);
+  }
   weekDays: WeekDay[] = [];
   
   private resizeObserver?: ResizeObserver;
@@ -333,6 +339,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     this.initializeResizeObserver();
     this.initializePanHandlers();
     this.initializeRangeSelectionHandlers();
+    this.initializeHoursIndicatorSync();
     setTimeout(() => {
       this.updateSvgDimensions();
       this.registerTaskGestures();
@@ -497,6 +504,62 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   
   private panCleanup?: () => void;
   private rangeSelectionCleanup?: () => void;
+  private hoursIndicatorSyncCleanup?: () => void;
+
+  /**
+   * Sincronizar el scroll vertical del indicador de horas con el contenedor SVG
+   */
+  private initializeHoursIndicatorSync(): void {
+    if (!this.svgScrollContainer?.nativeElement || !this.hoursIndicator?.nativeElement) return;
+    
+    const scrollContainer = this.svgScrollContainer.nativeElement;
+    const hoursIndicator = this.hoursIndicator.nativeElement;
+    
+    // Sincronizar altura del indicador con el contenedor
+    const updateHeight = () => {
+      hoursIndicator.style.height = scrollContainer.offsetHeight + 'px';
+    };
+    updateHeight();
+    
+    // Sincronizar scroll del contenedor al indicador
+    let isScrollingContainer = false;
+    const handleContainerScroll = () => {
+      if (!isScrollingContainer) {
+        isScrollingContainer = true;
+        hoursIndicator.scrollTop = scrollContainer.scrollTop;
+        requestAnimationFrame(() => {
+          isScrollingContainer = false;
+        });
+      }
+    };
+    
+    // Sincronizar scroll del indicador al contenedor
+    let isScrollingIndicator = false;
+    const handleIndicatorScroll = () => {
+      if (!isScrollingIndicator) {
+        isScrollingIndicator = true;
+        scrollContainer.scrollTop = hoursIndicator.scrollTop;
+        requestAnimationFrame(() => {
+          isScrollingIndicator = false;
+        });
+      }
+    };
+    
+    scrollContainer.addEventListener('scroll', handleContainerScroll);
+    hoursIndicator.addEventListener('scroll', handleIndicatorScroll);
+    
+    // Observar cambios de tamaño
+    const resizeObserver = new ResizeObserver(() => {
+      updateHeight();
+    });
+    resizeObserver.observe(scrollContainer);
+    
+    this.hoursIndicatorSyncCleanup = () => {
+      scrollContainer.removeEventListener('scroll', handleContainerScroll);
+      hoursIndicator.removeEventListener('scroll', handleIndicatorScroll);
+      resizeObserver.disconnect();
+    };
+  }
 
   /**
    * Inicializar handlers para selección de rango (crear tarea)
@@ -1889,6 +1952,9 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     }
     if (this.rangeSelectionCleanup) {
       this.rangeSelectionCleanup();
+    }
+    if (this.hoursIndicatorSyncCleanup) {
+      this.hoursIndicatorSyncCleanup();
     }
     if (this.focusSubscription) {
       this.focusSubscription.unsubscribe();
