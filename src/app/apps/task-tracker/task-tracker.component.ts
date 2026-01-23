@@ -287,6 +287,9 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
   ) {}
 
   async ngOnInit() {
+    // Cargar la vista guardada desde localStorage
+    this.currentView = this.loadSavedView();
+    
     // Iniciar carga del orden
     this.isLoadingEnvironmentOrder = true;
     
@@ -516,6 +519,33 @@ export class TaskTrackerComponent implements OnInit, OnDestroy {
 
   switchView(view: 'board' | 'week') {
     this.currentView = view;
+    this.saveCurrentView(view);
+  }
+  
+  /**
+   * Cargar la vista guardada desde localStorage
+   */
+  private loadSavedView(): 'board' | 'week' {
+    try {
+      const savedView = localStorage.getItem('task-tracker-current-view');
+      if (savedView === 'board' || savedView === 'week') {
+        return savedView;
+      }
+    } catch (error) {
+      console.error('Error al cargar vista guardada:', error);
+    }
+    return 'board'; // Valor por defecto
+  }
+  
+  /**
+   * Guardar la vista actual en localStorage
+   */
+  private saveCurrentView(view: 'board' | 'week'): void {
+    try {
+      localStorage.setItem('task-tracker-current-view', view);
+    } catch (error) {
+      console.error('Error al guardar vista:', error);
+    }
   }
 
   openNewTaskModal() {

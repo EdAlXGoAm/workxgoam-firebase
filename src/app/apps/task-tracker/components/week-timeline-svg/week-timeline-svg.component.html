@@ -1,4 +1,4 @@
-<div #containerRef class="week-timeline-container w-full overflow-x-auto relative">
+<div #containerRef class="week-timeline-container w-full overflow-auto relative">
   <!-- Toggle de modo de coloreado (solo visible cuando hay ambiente enfocado) -->
   <div *ngIf="focusedEnvironmentId" class="color-mode-toggle mb-3 flex items-center justify-center gap-2 bg-white rounded-lg p-2 shadow-sm border">
     <button 
@@ -86,10 +86,11 @@
     <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-12 border-r-12 border-b-12 border-l-transparent border-r-transparent border-b-gray-900"></div>
   </div>
 
-  <!-- Contenedor centrado para el SVG -->
-  <div class="svg-container">
-    <svg [attr.width]="svgWidth" [attr.height]="svgHeight" [attr.viewBox]="'0 0 ' + svgWidth + ' ' + svgHeight" 
-         class="week-timeline-svg" [style.min-width.px]="svgWidth">
+  <!-- Contenedor con scroll independiente para el SVG -->
+  <div #svgScrollContainer class="svg-scroll-container">
+    <div class="svg-container">
+      <svg [attr.width]="svgWidth" [attr.height]="svgHeight" [attr.viewBox]="'0 0 ' + svgWidth + ' ' + svgHeight" 
+           class="week-timeline-svg" [style.min-width.px]="svgWidth">
       
       <!-- Encabezado con nombres de días -->
       <g transform="translate(0, 0)">
@@ -262,7 +263,8 @@
               class="preview-shadow"
               pointer-events="none" />
       </g>
-    </svg>
+      </svg>
+    </div>
   </div>
 
   <!-- Menú contextual -->

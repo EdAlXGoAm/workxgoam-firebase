@@ -85,6 +85,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   @Output() taskUpdated = new EventEmitter<Task>();
 
   @ViewChild('containerRef') containerRef!: ElementRef<HTMLDivElement>;
+  @ViewChild('svgScrollContainer') svgScrollContainer!: ElementRef<HTMLDivElement>;
   @ViewChildren('taskRect') taskRects!: QueryList<ElementRef<SVGRectElement>>;
   @ViewChildren('resizeHandleStart') resizeHandlesStart!: QueryList<ElementRef<SVGRectElement>>;
   @ViewChildren('resizeHandleEnd') resizeHandlesEnd!: QueryList<ElementRef<SVGRectElement>>;
@@ -135,6 +136,13 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   dayColumnWidth = 180;
   dayColumnPadding = 4;
   columnGap = 2;
+  
+  // Propiedades para pan libre (horizontal y vertical) con Ctrl+drag
+  private isPanning = false;
+  private panStartX = 0;
+  private panStartY = 0;
+  private panStartScrollLeft = 0;
+  private panStartScrollTop = 0;
   
   // Fuentes
   dayNameFontSize = 14;
@@ -293,6 +301,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
 
   ngAfterViewInit() {
     this.initializeResizeObserver();
+    this.initializePanHandlers();
     setTimeout(() => {
       this.updateSvgDimensions();
       this.registerTaskGestures();
@@ -302,6 +311,160 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
       this.registerTaskGestures();
     });
   }
+  
+  /**
+   * Inicializar handlers para pan horizontal y vertical con Ctrl+drag
+   */
+  private initializePanHandlers(): void {
+    if (!this.svgScrollContainer?.nativeElement) return;
+    
+    const scrollContainer = this.svgScrollContainer.nativeElement;
+    const svgElement = scrollContainer.querySelector('.week-timeline-svg') as SVGElement;
+    
+    // Función para verificar si el click es sobre una tarea
+    const isClickOnTask = (e: MouseEvent): boolean => {
+      const target = e.target as HTMLElement;
+      return target?.closest('.task-rect, .task-inner, .resize-handle') !== null;
+    };
+    
+    // Mousedown: iniciar pan si Ctrl está presionado y no es sobre una tarea
+    const handleMouseDown = (e: MouseEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !isClickOnTask(e)) {
+        // Prevenir el comportamiento por defecto y los gestos de tareas
+        e.preventDefault();
+        e.stopPropagation();
+        
+        this.isPanning = true;
+        this.panStartX = e.clientX;
+        this.panStartY = e.clientY;
+        this.panStartScrollLeft = scrollContainer.scrollLeft;
+        this.panStartScrollTop = scrollContainer.scrollTop;
+        
+        // Cambiar cursor a "grabbing"
+        scrollContainer.style.cursor = 'grabbing';
+        scrollContainer.style.userSelect = 'none';
+        document.body.style.cursor = 'grabbing';
+        document.body.style.userSelect = 'none';
+        
+        // También aplicar al SVG si existe
+        if (svgElement) {
+          svgElement.style.cursor = 'grabbing';
+        }
+        
+        // Agregar listener global para capturar movimientos rápidos
+        document.addEventListener('mousemove', handleDocumentMouseMove, { passive: false });
+        document.addEventListener('mouseup', handleDocumentMouseUp, { passive: false });
+      }
+    };
+    
+    // Mousemove local: solo para cambiar cursor cuando Ctrl está presionado
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!this.isPanning && (e.ctrlKey || e.metaKey) && !isClickOnTask(e)) {
+        // Cambiar cursor a "grab" cuando Ctrl está presionado y no está sobre una tarea
+        scrollContainer.style.cursor = 'grab';
+        if (svgElement) {
+          svgElement.style.cursor = 'grab';
+        }
+      }
+    };
+    
+    // Mousemove global: actualizar scroll durante el pan (captura movimientos rápidos)
+    const handleDocumentMouseMove = (e: MouseEvent) => {
+      if (this.isPanning) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const deltaX = e.clientX - this.panStartX;
+        const deltaY = e.clientY - this.panStartY;
+        
+        // Desplazamiento horizontal y vertical
+        scrollContainer.scrollLeft = this.panStartScrollLeft - deltaX;
+        scrollContainer.scrollTop = this.panStartScrollTop - deltaY;
+      }
+    };
+    
+    // Mouseup local: solo para casos normales
+    const handleMouseUp = (e: MouseEvent) => {
+      if (this.isPanning) {
+        e.preventDefault();
+        e.stopPropagation();
+        finishPanning();
+      }
+    };
+    
+    // Mouseup global: finalizar pan (captura cuando se suelta fuera del contenedor)
+    const handleDocumentMouseUp = (e: MouseEvent) => {
+      if (this.isPanning) {
+        e.preventDefault();
+        e.stopPropagation();
+        finishPanning();
+      }
+    };
+    
+    // Función para finalizar el pan y limpiar
+    const finishPanning = () => {
+      this.isPanning = false;
+      scrollContainer.style.cursor = '';
+      scrollContainer.style.userSelect = '';
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      if (svgElement) {
+        svgElement.style.cursor = '';
+      }
+      
+      // Remover listeners globales
+      document.removeEventListener('mousemove', handleDocumentMouseMove);
+      document.removeEventListener('mouseup', handleDocumentMouseUp);
+    };
+    
+    // Mouseleave: finalizar pan si el mouse sale del contenedor
+    const handleMouseLeave = (e: MouseEvent) => {
+      // No finalizar aquí, dejar que handleDocumentMouseUp lo maneje
+      // Esto permite continuar el pan incluso si el mouse sale del contenedor
+    };
+    
+    // Agregar listeners locales al contenedor de scroll
+    scrollContainer.addEventListener('mousedown', handleMouseDown, true);
+    scrollContainer.addEventListener('mousemove', handleMouseMove, true);
+    scrollContainer.addEventListener('mouseup', handleMouseUp, true);
+    scrollContainer.addEventListener('mouseleave', handleMouseLeave, true);
+    
+    // Detectar cuando se presiona/suelta Ctrl para cambiar el cursor
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !this.isPanning && scrollContainer) {
+        scrollContainer.style.cursor = 'grab';
+        if (svgElement) {
+          svgElement.style.cursor = 'grab';
+        }
+      }
+    };
+    
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (!e.ctrlKey && !e.metaKey && !this.isPanning && scrollContainer) {
+        scrollContainer.style.cursor = '';
+        if (svgElement) {
+          svgElement.style.cursor = '';
+        }
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
+    
+    // Limpiar listeners en ngOnDestroy
+    this.panCleanup = () => {
+      scrollContainer.removeEventListener('mousedown', handleMouseDown, true);
+      scrollContainer.removeEventListener('mousemove', handleMouseMove, true);
+      scrollContainer.removeEventListener('mouseup', handleMouseUp, true);
+      scrollContainer.removeEventListener('mouseleave', handleMouseLeave, true);
+      document.removeEventListener('mousemove', handleDocumentMouseMove);
+      document.removeEventListener('mouseup', handleDocumentMouseUp);
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keyup', handleKeyUp);
+    };
+  }
+  
+  private panCleanup?: () => void;
 
   /**
    * Registrar gestos en todos los rectángulos de tareas
@@ -594,7 +757,12 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   }
 
   private initializeResizeObserver() {
-    if (typeof ResizeObserver !== 'undefined' && this.containerRef?.nativeElement) {
+    if (typeof ResizeObserver !== 'undefined' && this.svgScrollContainer?.nativeElement) {
+      this.resizeObserver = new ResizeObserver(() => {
+        this.updateSvgDimensions();
+      });
+      this.resizeObserver.observe(this.svgScrollContainer.nativeElement);
+    } else if (typeof ResizeObserver !== 'undefined' && this.containerRef?.nativeElement) {
       this.resizeObserver = new ResizeObserver(() => {
         this.updateSvgDimensions();
       });
@@ -611,7 +779,10 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     const screenWidth = window.innerWidth;
     let containerWidth = screenWidth;
 
-    if (this.containerRef?.nativeElement) {
+    if (this.svgScrollContainer?.nativeElement) {
+      const rect = this.svgScrollContainer.nativeElement.getBoundingClientRect();
+      containerWidth = rect.width;
+    } else if (this.containerRef?.nativeElement) {
       const rect = this.containerRef.nativeElement.getBoundingClientRect();
       containerWidth = rect.width;
     }
@@ -1035,7 +1206,8 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     const overlapping: RenderableItem[] = [];
     
     // Obtener el rect del SVG para convertir coordenadas
-    const svgElement = this.containerRef?.nativeElement?.querySelector('.week-timeline-svg');
+    const svgElement = this.svgScrollContainer?.nativeElement?.querySelector('.week-timeline-svg') || 
+                       this.containerRef?.nativeElement?.querySelector('.week-timeline-svg');
     if (!svgElement) return [];
     
     const svgRect = svgElement.getBoundingClientRect();
@@ -1250,6 +1422,9 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     }
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
+    }
+    if (this.panCleanup) {
+      this.panCleanup();
     }
     this.gestureCleanups.forEach(cleanup => cleanup());
     this.gestureCleanups = [];

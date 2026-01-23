@@ -366,7 +366,7 @@ import { TaskType } from '../../models/task-type.model';
         flex-shrink: 0;
         height: fit-content;
         max-height: 100%;
-        overflow-y: auto;
+        overflow: visible;
       }
       
       .environments-section {
