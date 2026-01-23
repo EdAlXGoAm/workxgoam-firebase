@@ -1,5 +1,17 @@
 <div *ngIf="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" style="overflow: hidden;">
-  <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] md:max-h-[95vh] overflow-hidden flex flex-col" (click)="$event.stopPropagation()">
+  <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] md:max-h-[95vh] overflow-hidden flex flex-col relative" (click)="$event.stopPropagation()">
+    <!-- Burbuja flotante para tareas recientes - posicionada cerca del botón de cerrar -->
+    <div *ngIf="showRecentTasksSelector && recentTasks.length > 0 && !isEditing" 
+         class="absolute z-[60] recent-tasks-bubble"
+         (click)="toggleRecentTasksModal()">
+      <div class="w-12 h-12 bg-indigo-600 text-white rounded-full shadow-lg flex items-center justify-center cursor-pointer hover:bg-indigo-700 transition-all hover:scale-110 relative">
+        <i class="fas fa-history text-lg"></i>
+        <span *ngIf="recentTasks.length > 0" class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-xs font-bold flex items-center justify-center border-2 border-white">
+          {{ recentTasks.length > 9 ? '9+' : recentTasks.length }}
+        </span>
+      </div>
+    </div>
+    
     <div class="p-4 md:p-6 border-b border-gray-200 flex-shrink-0">
       <div class="flex justify-between items-center">
         <h3 class="text-xl font-bold">{{ isEditing ? 'Editar Tarea' : 'Nueva Tarea' }}</h3>
@@ -21,43 +33,6 @@
     <!-- Contenido del formulario -->
     <div *ngIf="!isLoading" class="flex-1 overflow-y-auto">
       <div class="p-4 md:p-6">
-        
-        <!-- Selector de tareas recientes -->
-        <div *ngIf="showRecentTasksSelector && recentTasks.length > 0 && !isEditing" class="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
-          <label class="block text-sm font-medium text-indigo-700 mb-2">
-            <i class="fas fa-history mr-2"></i>Tareas recientes de este proyecto
-          </label>
-          
-          <!-- Selector nativo para desktop (≥768px) -->
-          <select 
-            [(ngModel)]="selectedRecentTaskIndex"
-            (change)="onRecentTaskSelectNative(selectedRecentTaskIndex)"
-            name="recentTaskSelector"
-            class="hidden md:block w-full px-3 py-2 border border-indigo-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-            <option value="">Selecciona una tarea para autocompletar...</option>
-            <option *ngFor="let task of recentTasks; let i = index" [value]="i">
-              {{task.emoji || '📝'}} {{task.name}} 
-              <span class="text-gray-500 text-xs">
-                ({{formatReminderDateTime(task.updatedAt || task.createdAt)}})
-              </span>
-            </option>
-          </select>
-          
-          <!-- Selector personalizado para móvil (<768px) -->
-          <div class="block md:hidden">
-            <app-custom-select
-              [options]="recentTasksOptions"
-              (optionSelected)="onRecentTaskSelect($event)"
-              placeholder="Selecciona una tarea para autocompletar..."
-              maxHeightClass="max-h-72">
-            </app-custom-select>
-          </div>
-          
-          <p class="text-xs text-indigo-600 mt-2">
-            <i class="fas fa-info-circle mr-1"></i>
-            Selecciona una tarea para copiar automáticamente: nombre, tipo, emoji, descripción, prioridad y duración
-          </p>
-        </div>
         
         <form [id]="formId" (ngSubmit)="saveTask()" class="space-y-4">
           
@@ -686,6 +661,82 @@
               class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors">
         Sí, ajustar fecha de fin
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal secundario para tareas recientes -->
+<div *ngIf="showRecentTasksModal && showRecentTasksSelector && recentTasks.length > 0 && !isEditing" 
+     class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60] p-4"
+     (click)="closeRecentTasksModal()"
+     style="overflow: hidden;">
+  <div class="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col"
+       (click)="$event.stopPropagation()"
+       style="overflow-y: auto;">
+    <!-- Header del modal -->
+    <div class="p-4 md:p-6 border-b border-gray-200 flex-shrink-0 bg-indigo-50">
+      <div class="flex justify-between items-center">
+        <h3 class="text-lg font-bold text-indigo-900 flex items-center">
+          <i class="fas fa-history mr-2"></i>
+          Tareas Recientes
+        </h3>
+        <button (click)="closeRecentTasksModal()" class="text-gray-500 hover:text-gray-700 transition-colors">
+          <i class="fas fa-times text-xl"></i>
+        </button>
+      </div>
+      <p class="text-xs text-indigo-700 mt-2">
+        <i class="fas fa-info-circle mr-1"></i>
+        Selecciona una tarea para copiar automáticamente: nombre, tipo, emoji, descripción, prioridad y duración
+      </p>
+    </div>
+    
+    <!-- Contenido scrollable -->
+    <div class="flex-1 overflow-y-auto p-4 md:p-6">
+      <!-- Selector nativo para desktop (≥768px) -->
+      <select 
+        *ngIf="recentTasks.length > 0"
+        [(ngModel)]="selectedRecentTaskIndex"
+        (change)="onRecentTaskSelectNative(selectedRecentTaskIndex)"
+        name="recentTaskSelectorModal"
+        class="hidden md:block w-full px-3 py-2 border border-indigo-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-4">
+        <option value="">Selecciona una tarea para autocompletar...</option>
+        <option *ngFor="let task of recentTasks; let i = index" [value]="i">
+          {{task.emoji || '📝'}} {{task.name}} 
+          <span class="text-gray-500 text-xs">
+            ({{formatReminderDateTime(task.updatedAt || task.createdAt)}})
+          </span>
+        </option>
+      </select>
+      
+      <!-- Selector personalizado para móvil (<768px) -->
+      <div *ngIf="recentTasks.length > 0" class="block md:hidden mb-4">
+        <app-custom-select
+          [options]="recentTasksOptions"
+          (optionSelected)="onRecentTaskSelect($event)"
+          placeholder="Selecciona una tarea para autocompletar..."
+          maxHeightClass="max-h-72">
+        </app-custom-select>
+      </div>
+      
+      <!-- Lista de tareas recientes (alternativa visual) -->
+      <div class="space-y-2">
+        <div *ngFor="let task of recentTasks; let i = index" 
+             (click)="applyRecentTaskData(i)"
+             class="p-3 border border-gray-200 rounded-lg hover:bg-indigo-50 hover:border-indigo-300 cursor-pointer transition-colors">
+          <div class="flex items-start gap-3">
+            <span class="text-2xl flex-shrink-0">{{ task.emoji || '📝' }}</span>
+            <div class="flex-1 min-w-0">
+              <h4 class="font-medium text-gray-900 truncate">{{ task.name }}</h4>
+              <p class="text-xs text-gray-500 mt-1">
+                {{ formatReminderDateTime(task.updatedAt || task.createdAt) }}
+              </p>
+              <div *ngIf="task.description" class="text-xs text-gray-600 mt-1 line-clamp-2">
+                {{ task.description }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>

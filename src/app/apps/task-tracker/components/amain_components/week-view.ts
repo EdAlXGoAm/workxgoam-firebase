@@ -362,7 +362,7 @@ import { TaskType } from '../../models/task-type.model';
       .timeline-section {
         position: sticky;
         top: 0;
-        width: 1200px;
+        width: 900px;
         flex-shrink: 0;
         height: fit-content;
         max-height: 100%;

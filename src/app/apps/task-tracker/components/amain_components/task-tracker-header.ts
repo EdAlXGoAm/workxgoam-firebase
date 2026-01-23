@@ -1,5 +1,6 @@
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-task-tracker-header',
@@ -12,10 +13,24 @@ import { CommonModule } from '@angular/common';
     <!-- Contenedor para el contenido del header -->
       <div class="w-full px-4 py-4 flex justify-between items-center">
 
-        <!-- Contenedor para el logo y el título -->
+        <!-- Contenedor para el botón de regreso, logo y título -->
         <div class="flex items-center space-x-3">
-          <i class="fas fa-tasks text-2xl"></i>
-          <h1 class="text-2xl font-bold select-none">TaskFlow</h1>
+          <!-- Botón de regreso a /apps -->
+          <button 
+            (click)="goToApps()" 
+            class="p-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center"
+            title="Volver a aplicaciones">
+            <i class="fas fa-arrow-left text-xl"></i>
+          </button>
+          
+          <!-- Separador visual -->
+          <div class="h-8 w-px bg-indigo-400 opacity-50"></div>
+          
+          <!-- Logo y título -->
+          <div class="flex items-center space-x-3">
+            <i class="fas fa-tasks text-2xl"></i>
+            <h1 class="text-2xl font-bold select-none">TaskFlow</h1>
+          </div>
         </div>
 
         <!-- Botón de nueva tarea -->
@@ -33,4 +48,10 @@ export class TaskTrackerHeaderComponent {
   @Input() userName: string = '';
   @Input() userPhotoUrl: string = '';
   @Output() createTask = new EventEmitter<void>();
+
+  constructor(private router: Router) {}
+
+  goToApps() {
+    this.router.navigate(['/apps']);
+  }
 }

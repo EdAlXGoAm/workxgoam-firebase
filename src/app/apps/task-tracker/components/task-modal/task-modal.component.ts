@@ -63,6 +63,7 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   // Tareas recientes del proyecto
   recentTasks: Task[] = [];
   showRecentTasksSelector = false;
+  showRecentTasksModal = false;
   selectedRecentTaskIndex: string = '';
   recentTasksOptions: SelectOption[] = [];
   
@@ -234,6 +235,7 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
       // Limpiar tareas recientes al cerrar
       this.recentTasks = [];
       this.showRecentTasksSelector = false;
+      this.showRecentTasksModal = false;
       this.selectedRecentTaskIndex = '';
       this.isLoading = false;
       // Cerrar el selector de emojis si está abierto
@@ -347,7 +349,16 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   closeModal() {
     this.enableBodyScroll();
     this.closeEmojiPicker();
+    this.closeRecentTasksModal();
     this.closeModalEvent.emit();
+  }
+  
+  toggleRecentTasksModal() {
+    this.showRecentTasksModal = !this.showRecentTasksModal;
+  }
+  
+  closeRecentTasksModal() {
+    this.showRecentTasksModal = false;
   }
   
   saveTask() {
@@ -791,6 +802,7 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     }
     
     this.applyRecentTaskData(index);
+    // El modal se cierra dentro de applyRecentTaskData
   }
   
   // Método para manejar la selección desde el selector personalizado (móvil)
@@ -801,10 +813,11 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     }
     
     this.applyRecentTaskData(index);
+    // El modal se cierra dentro de applyRecentTaskData
   }
   
   // Método común para aplicar los datos de la tarea reciente seleccionada
-  private applyRecentTaskData(index: number) {
+  applyRecentTaskData(index: number) {
     const selectedTask = this.recentTasks[index];
     if (!selectedTask) {
       return;
@@ -872,6 +885,9 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     
     // Resetear el selector para permitir seleccionar otra tarea
     this.selectedRecentTaskIndex = '';
+    
+    // Cerrar el modal de tareas recientes después de aplicar
+    this.closeRecentTasksModal();
     
     // Forzar actualización de la vista
     this.cdr.detectChanges();
