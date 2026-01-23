@@ -761,16 +761,8 @@ export class DurationEditModalComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    // Restaurar el elemento a su posición original
-    const element = this.elementRef.nativeElement;
-    if (this.originalParent) {
-      if (this.originalNextSibling) {
-        this.renderer.insertBefore(this.originalParent, element, this.originalNextSibling);
-      } else {
-        this.renderer.appendChild(this.originalParent, element);
-      }
-    }
-
+    // Limpiar los estilos del body y restaurar el scroll
+    // NO devolvemos el elemento a su posición original ya que Angular lo destruirá
     const scrollY = (document.body as any).__scrollY || 0;
     document.body.style.overflow = '';
     document.body.style.position = '';

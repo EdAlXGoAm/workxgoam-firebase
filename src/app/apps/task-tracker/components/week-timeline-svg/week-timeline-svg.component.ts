@@ -174,6 +174,19 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   dayColumnPadding = 4;
   columnGap = 2;
   
+  // ==========================================
+  // 🎯 VARIABLES DE CALIBRACIÓN DEL HEADER DE DÍAS
+  // Estas variables escalan proporcionalmente con el zoom
+  // ==========================================
+  
+  // Offset izquierdo del header de días (como padding inicial)
+  // Valor base que se multiplicará por zoomScale
+  headerDayLeftOffset = 60; // Ajusta este valor para mover el header hacia la derecha
+  
+  // Ancho de cada día en el header
+  // Valor base que se multiplicará por zoomScale
+  headerDayWidth = 200; // Ajusta este valor para cambiar el ancho de cada día en el header
+  
   // Propiedades para pan libre (horizontal y vertical) con Ctrl+drag
   private isPanning = false;
   private panStartX = 0;
@@ -209,6 +222,54 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   // Píxeles por hora (vertical)
   get pixelsPerHour(): number {
     return 37.5; // 900px / 24 horas
+  }
+
+  // ==========================================
+  // 🎯 GETTERS ESCALADOS PARA EL HEADER DE DÍAS
+  // ==========================================
+  
+  /**
+   * Offset izquierdo del header escalado con el zoom
+   * Úsalo para ajustar el padding/margen izquierdo del header
+   */
+  get scaledHeaderDayLeftOffset(): number {
+    return this.headerDayLeftOffset * this.zoomScale;
+  }
+  
+  /**
+   * Ancho de cada día en el header escalado con el zoom
+   * Úsalo para ajustar el ancho de cada columna de día en el header
+   */
+  get scaledHeaderDayWidth(): number {
+    return this.dayColumnWidth * this.zoomScale;
+  }
+  
+  /**
+   * Calcula la posición X de cada día en el header del indicador fijo
+   * Usa el ancho de columna calculado para que sea responsivo
+   * @param dayIndex Índice visual del día (0-4 o 0-6)
+   */
+  getHeaderDayX(dayIndex: number): number {
+    return this.headerDayLeftOffset + (dayIndex * (this.dayColumnWidth + this.columnGap));
+  }
+  
+  /**
+   * Calcula el ancho total del SVG del header de días
+   * Basado en las dimensiones calculadas y el número de días visibles
+   */
+  get headerSvgWidth(): number {
+    const daysCount = this.visibleDaysCount;
+    // Usar dayColumnWidth en lugar de headerDayWidth para que sea responsivo
+    return this.headerDayLeftOffset + (daysCount * this.dayColumnWidth) + ((daysCount - 1) * this.columnGap);
+  }
+  
+  /**
+   * Ratio entre el ancho del header y el ancho del SVG principal
+   * Se usa para sincronizar el scroll horizontal correctamente
+   */
+  get headerToSvgWidthRatio(): number {
+    if (this.svgWidth === 0) return 1;
+    return this.headerSvgWidth / this.svgWidth;
   }
 
   // Sistema de zoom (incrementos de 5%)
@@ -251,9 +312,8 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
       }
       if (this.daysIndicator?.nativeElement && this.svgScrollContainer?.nativeElement) {
         const daysIndicator = this.daysIndicator.nativeElement;
-        const scrollContainer = this.svgScrollContainer.nativeElement;
-        // Ajustar ancho del indicador para que coincida con el contenedor
-        daysIndicator.style.width = scrollContainer.offsetWidth + 'px';
+        // El ancho debe ser el SVG SIN escalar, ya que CSS transform se encarga del zoom visual
+        daysIndicator.style.width = this.headerSvgWidth + 'px';
       }
     }, 0);
     this.cdr.detectChanges();
@@ -345,15 +405,8 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
 
   toggleWeekends(): void {
     this.showWeekends = !this.showWeekends;
+    // updateSvgDimensions ya se encarga de actualizar el ancho del indicador de días
     this.updateSvgDimensions();
-    // Actualizar ancho del indicador de días
-    setTimeout(() => {
-      if (this.daysIndicator?.nativeElement && this.svgScrollContainer?.nativeElement) {
-        const daysIndicator = this.daysIndicator.nativeElement;
-        const scrollContainer = this.svgScrollContainer.nativeElement;
-        daysIndicator.style.width = scrollContainer.offsetWidth + 'px';
-      }
-    }, 0);
     this.cdr.detectChanges();
   }
 
@@ -644,33 +697,36 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     const scrollContainer = this.svgScrollContainer.nativeElement;
     const daysIndicator = this.daysIndicator.nativeElement;
     
-    // Sincronizar ancho del indicador con el contenedor (ajustado por zoom)
+    // Sincronizar ancho del indicador con el contenedor
+    // El ancho debe ser el SVG SIN escalar, ya que CSS transform se encarga del zoom visual
     const updateWidth = () => {
-      // El ancho debe ser el mismo que el contenedor, pero el SVG dentro se escala
-      daysIndicator.style.width = scrollContainer.offsetWidth + 'px';
+      daysIndicator.style.width = this.headerSvgWidth + 'px';
     };
     updateWidth();
     
-    // Sincronizar scroll del contenedor al indicador (ajustado por zoom)
+    // Sincronizar scroll del contenedor al indicador
+    // Ajusta por el ratio de anchos entre header y SVG principal
     let isScrollingContainer = false;
     const handleContainerScroll = () => {
       if (!isScrollingContainer) {
         isScrollingContainer = true;
-        // El scroll del contenedor escalado necesita ajustarse por el zoom
-        daysIndicator.scrollLeft = scrollContainer.scrollLeft / this.zoomScale;
+        // Calcular el scroll proporcional basado en el ratio de anchos
+        const ratio = this.headerToSvgWidthRatio;
+        daysIndicator.scrollLeft = (scrollContainer.scrollLeft / this.zoomScale) * ratio;
         requestAnimationFrame(() => {
           isScrollingContainer = false;
         });
       }
     };
     
-    // Sincronizar scroll del indicador al contenedor (ajustado por zoom)
+    // Sincronizar scroll del indicador al contenedor
     let isScrollingIndicator = false;
     const handleIndicatorScroll = () => {
       if (!isScrollingIndicator) {
         isScrollingIndicator = true;
-        // El scroll del indicador necesita escalarse para el contenedor
-        scrollContainer.scrollLeft = daysIndicator.scrollLeft * this.zoomScale;
+        // Calcular el scroll proporcional inverso
+        const ratio = this.headerToSvgWidthRatio;
+        scrollContainer.scrollLeft = (daysIndicator.scrollLeft * this.zoomScale) / ratio;
         requestAnimationFrame(() => {
           isScrollingIndicator = false;
         });
@@ -1262,49 +1318,68 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     }
 
     const screenWidth = window.innerWidth;
+    
+    // Usar el ancho de la ventana como base para evitar el crecimiento infinito
+    // del contenedor cuando tiene min-width: fit-content
     let containerWidth = screenWidth;
 
-    if (this.svgScrollContainer?.nativeElement) {
-      const rect = this.svgScrollContainer.nativeElement.getBoundingClientRect();
-      containerWidth = rect.width;
-    } else if (this.containerRef?.nativeElement) {
-      const rect = this.containerRef.nativeElement.getBoundingClientRect();
-      containerWidth = rect.width;
+    if (this.containerRef?.nativeElement) {
+      // Intentar obtener el ancho del padre que debería ser el que limita el espacio
+      const parent = this.containerRef.nativeElement.parentElement;
+      if (parent) {
+        containerWidth = parent.clientWidth || screenWidth;
+      } else {
+        containerWidth = this.containerRef.nativeElement.clientWidth || screenWidth;
+      }
     }
+
+    // Asegurar que el ancho de columna del cuerpo coincida con el del header (calibración)
+    this.dayColumnWidth = this.headerDayWidth;
 
     const availableWidth = Math.max(containerWidth - this.containerPadding, this.minSvgWidth);
     const daysCount = this.visibleDaysCount;
     const gapsCount = daysCount - 1;
-    const minRequiredWidth = daysCount * (this.dayColumnWidth + this.columnGap) - this.columnGap;
     
     if (screenWidth <= 640) {
-      this.dayColumnWidth = Math.max(120, (availableWidth - gapsCount * this.columnGap) / daysCount);
+      // En móvil, si el ancho calibrado es muy grande, lo ajustamos para que quepan los días
+      // pero mantenemos un mínimo de 120px para legibilidad
+      const fitWidth = (availableWidth - gapsCount * this.columnGap) / daysCount;
+      this.dayColumnWidth = Math.max(120, Math.min(this.headerDayWidth, fitWidth));
+      
       this.dayNameFontSize = 11;
       this.dayNumberFontSize = 10;
       this.hourFontSize = 8;
       this.taskFontSize = 9;
     } else if (screenWidth <= 1024) {
-      this.dayColumnWidth = Math.max(140, (availableWidth - gapsCount * this.columnGap) / daysCount);
+      // En tablets, ajuste similar
+      const fitWidth = (availableWidth - gapsCount * this.columnGap) / daysCount;
+      this.dayColumnWidth = Math.max(140, Math.min(this.headerDayWidth, fitWidth));
+      
       this.dayNameFontSize = 12;
       this.dayNumberFontSize = 11;
       this.hourFontSize = 9;
       this.taskFontSize = 10;
     } else {
-      this.dayColumnWidth = Math.max(180, Math.min(200, (availableWidth - gapsCount * this.columnGap) / daysCount));
+      // En escritorio, usamos el valor calibrado si es posible, o lo ajustamos al espacio disponible
+      // si el espacio es muy grande, pero siempre respetando la intención del usuario
       this.dayNameFontSize = 14;
       this.dayNumberFontSize = 12;
       this.hourFontSize = 10;
       this.taskFontSize = 11;
     }
 
+    // El ancho de columna ya está calculado en this.dayColumnWidth
+    // No sobreescribimos this.headerDayWidth para preservar la calibración original del usuario
+
+    const minRequiredWidth = daysCount * (this.dayColumnWidth + this.columnGap) - this.columnGap;
     this.svgWidth = Math.max(minRequiredWidth, daysCount * (this.dayColumnWidth + this.columnGap) - this.columnGap);
     
     // Actualizar ancho del indicador de días después de calcular las dimensiones
     setTimeout(() => {
       if (this.daysIndicator?.nativeElement && this.svgScrollContainer?.nativeElement) {
         const daysIndicator = this.daysIndicator.nativeElement;
-        const scrollContainer = this.svgScrollContainer.nativeElement;
-        daysIndicator.style.width = scrollContainer.offsetWidth + 'px';
+        // El ancho del indicador de días debe ser el ancho total calculado del header
+        daysIndicator.style.width = this.headerSvgWidth + 'px';
       }
     }, 0);
   }

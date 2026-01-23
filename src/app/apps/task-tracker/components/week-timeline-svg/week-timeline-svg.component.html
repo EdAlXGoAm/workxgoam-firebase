@@ -149,26 +149,36 @@
   <!-- Contenedor con scroll independiente para el SVG -->
   <div class="timeline-wrapper">
     <!-- Indicador de días fijo en la parte superior -->
+    <!-- 🎯 CALIBRACIÓN: Usa headerDayLeftOffset y headerDayWidth en el .ts para ajustar -->
     <div #daysIndicator class="days-indicator" [style.transform]="'scale(' + zoomScale + ')'" [style.transform-origin]="'top left'">
-      <svg [attr.width]="svgWidth" [attr.height]="60" class="days-indicator-svg" 
-           [style.width.px]="svgWidth" [attr.viewBox]="'0 0 ' + svgWidth + ' 60'">
+      <svg [attr.width]="headerSvgWidth" height="60" class="days-indicator-svg" 
+           [style.width.px]="headerSvgWidth" style="height: 60px; min-height: 60px;">
         <!-- Fondo del indicador -->
-        <rect x="0" y="0" [attr.width]="svgWidth" height="60" fill="#f9fafb" rx="6" ry="6"/>
-        <line x1="0" y1="60" [attr.x2]="svgWidth" y2="60" stroke="#888" stroke-width="2" />
+        <rect x="0" y="0" [attr.width]="headerSvgWidth" height="60" fill="#f9fafb" rx="6" ry="6"/>
+        <line x1="0" y1="60" [attr.x2]="headerSvgWidth" y2="60" stroke="#888" stroke-width="2" />
         
-        <!-- Nombres de los días -->
+        <!-- 🎯 Línea de calibración: marca donde comienza headerDayLeftOffset -->
+        <line [attr.x1]="headerDayLeftOffset" y1="0" 
+              [attr.x2]="headerDayLeftOffset" y2="60" 
+              stroke="#ef4444" stroke-width="2" stroke-dasharray="4 2" />
+        
+        <!-- Nombres de los días - Usa getHeaderDayX() y dayColumnWidth para calibración -->
         <g *ngFor="let day of visibleWeekDays; let i = index">
-          <rect [attr.x]="getDayColumnX(i)" y="0" [attr.width]="dayColumnWidth" height="60" 
+          <rect [attr.x]="getHeaderDayX(i)" y="0" [attr.width]="dayColumnWidth" height="60" 
                 [attr.fill]="isTodayColumn(i) ? '#e0e7ff' : '#f9fafb'" 
                 rx="4" ry="4"/>
-          <text [attr.x]="getDayColumnX(i) + dayColumnWidth / 2" y="20" 
+          <!-- Línea separadora gris entre días -->
+          <line [attr.x1]="getHeaderDayX(i) + dayColumnWidth" y1="5" 
+                [attr.x2]="getHeaderDayX(i) + dayColumnWidth" y2="55" 
+                stroke="#d1d5db" stroke-width="1" />
+          <text [attr.x]="getHeaderDayX(i) + dayColumnWidth / 2" y="20" 
                 [attr.font-size]="dayNameFontSize" 
                 fill="#333" 
                 font-weight="bold" 
                 text-anchor="middle">
             {{ day.dayName }}
           </text>
-          <text [attr.x]="getDayColumnX(i) + dayColumnWidth / 2" y="40" 
+          <text [attr.x]="getHeaderDayX(i) + dayColumnWidth / 2" y="40" 
                 [attr.font-size]="dayNumberFontSize" 
                 fill="#666" 
                 text-anchor="middle">

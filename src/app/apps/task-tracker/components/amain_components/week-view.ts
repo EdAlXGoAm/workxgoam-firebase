@@ -13,7 +13,7 @@ import { TaskGroup } from '../../models/task-group.model';
   standalone: true,
   imports: [CommonModule, FormsModule, WeekTimelineSvgComponent],
   template: `
-    <div class="w-full bg-white rounded-lg shadow-md p-3 md:p-4 lg:p-6 week-view-container">
+    <div class="w-full bg-white rounded-lg shadow-md p-3 md:p-4 lg:p-6 week-view-container" [class.wide-layout]="isWideLayout">
       <div class="flex flex-wrap justify-between items-center gap-2 mb-3 md:mb-4">
         <h2 class="text-lg md:text-xl font-bold">Vista Semanal</h2>
         <div *ngIf="emptyEnvironmentsCount > 0" class="flex items-center gap-1.5 md:gap-2">
@@ -383,44 +383,45 @@ import { TaskGroup } from '../../models/task-group.model';
       }
     }
     
-    @media (min-width: 1920px) {
-      .week-view-container {
-        padding: 1.5rem;
-      }
-      
-      .week-layout-wrapper {
-        flex-direction: row;
-        align-items: flex-start;
-        min-height: 600px;
-        gap: 1.5rem;
-      }
-      
-      .timeline-section {
-        position: sticky;
-        top: 0;
-        width: 900px;
-        flex-shrink: 0;
-        height: fit-content;
-        max-height: 100%;
-        overflow: visible;
-      }
-      
-      .environments-section {
-        flex: 1;
-        height: 100%;
-        overflow-y: auto;
-        overflow-x: hidden;
-        padding-right: 0.5rem;
-      }
-      
-      .environments-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 1rem;
-      }
+    /* Layout de 2 columnas controlado por la variable WIDE_LAYOUT_BREAKPOINT */
+    .wide-layout.week-view-container {
+      padding: 1.5rem;
     }
     
-    @media (min-width: 1920px) and (min-height: 900px) {
-      .environments-grid {
+    .wide-layout .week-layout-wrapper {
+      flex-direction: row;
+      align-items: flex-start;
+      min-height: 600px;
+      gap: 1.5rem;
+      overflow: hidden;
+    }
+    
+    .wide-layout .timeline-section {
+      position: sticky;
+      top: 0;
+      width: 900px;
+      flex-shrink: 0;
+      height: fit-content;
+      max-height: 100%;
+      overflow: visible;
+    }
+    
+    .wide-layout .environments-section {
+      flex: 1;
+      height: 100%;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-right: 0.5rem;
+    }
+    
+    .wide-layout .environments-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+    
+    /* 3 columnas cuando hay suficiente altura (900px+) */
+    @media (min-height: 900px) {
+      .wide-layout .environments-grid {
         grid-template-columns: repeat(3, 1fr);
       }
     }
@@ -435,10 +436,8 @@ import { TaskGroup } from '../../models/task-group.model';
       overflow: hidden;
     }
     
-    @media (min-width: 1920px) {
-      .board-column {
-        max-height: none;
-      }
+    .wide-layout .board-column {
+      max-height: none;
     }
     .board-column-empty {
       min-height: auto;
@@ -496,6 +495,15 @@ import { TaskGroup } from '../../models/task-group.model';
 export class WeekViewComponent implements OnChanges, AfterViewInit, AfterViewChecked, OnDestroy {
   @ViewChild('weekLayoutWrapper', { static: false }) weekLayoutWrapper!: ElementRef<HTMLDivElement>;
   
+  // ==========================================
+  // 🎯 VARIABLE DE CALIBRACIÓN - BREAKPOINT DE 2 COLUMNAS
+  // Ajusta este valor para cambiar cuándo el layout cambia a 2 columnas
+  // ==========================================
+  readonly WIDE_LAYOUT_BREAKPOINT = 1800; // px - Antes era 1920
+  
+  // Flag para saber si estamos en layout ancho (2 columnas)
+  isWideLayout = false;
+  
   @Input() tasks: Task[] = [];
   @Input() projects: Project[] = [];
   @Input() environments: Environment[] = [];
@@ -538,6 +546,32 @@ export class WeekViewComponent implements OnChanges, AfterViewInit, AfterViewChe
 
   constructor(private cdr: ChangeDetectorRef, private ngZone: NgZone) {}
 
+  // Método para verificar si estamos en layout ancho
+  private checkWideLayout(): void {
+    this.isWideLayout = window.innerWidth >= this.WIDE_LAYOUT_BREAKPOINT;
+  }
+
+  // Handler para resize (guardado como arrow function para mantener el contexto)
+  private onWindowResize = (): void => {
+    const wasWideLayout = this.isWideLayout;
+    this.checkWideLayout();
+    
+    // Si cambió el estado del layout, recalcular altura
+    if (wasWideLayout !== this.isWideLayout) {
+      this.heightCalculated = false;
+      if (this.isWideLayout) {
+        this.calculateAndSetHeight();
+      } else {
+        // Limpiar estilos cuando no es wide layout
+        if (this.weekLayoutWrapper?.nativeElement) {
+          this.weekLayoutWrapper.nativeElement.style.height = '';
+          this.weekLayoutWrapper.nativeElement.style.maxHeight = '';
+        }
+      }
+      this.cdr.detectChanges();
+    }
+  };
+
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['environments'] || changes['environmentCustomOrder'] || changes['tasks']) {
       this.updateOrderedEnvironmentsCache();
@@ -547,7 +581,10 @@ export class WeekViewComponent implements OnChanges, AfterViewInit, AfterViewChe
   }
 
   ngAfterViewInit(): void {
-    if (window.innerWidth >= 1920) {
+    this.checkWideLayout();
+    window.addEventListener('resize', this.onWindowResize);
+    
+    if (this.isWideLayout) {
       this.setupResizeObserver();
       // Esperar a que el elemento esté disponible y renderizado
       setTimeout(() => {
@@ -560,7 +597,7 @@ export class WeekViewComponent implements OnChanges, AfterViewInit, AfterViewChe
 
   ngAfterViewChecked(): void {
     // Solo calcular una vez cuando el elemento esté disponible y no se haya calculado aún
-    if (window.innerWidth >= 1920 && 
+    if (this.isWideLayout && 
         this.weekLayoutWrapper?.nativeElement && 
         !this.heightCalculated && 
         !this.isCalculating) {
@@ -574,7 +611,7 @@ export class WeekViewComponent implements OnChanges, AfterViewInit, AfterViewChe
   }
 
   private calculateAndSetHeight(): void {
-    if (!this.weekLayoutWrapper?.nativeElement || window.innerWidth < 1920 || this.isCalculating) {
+    if (!this.weekLayoutWrapper?.nativeElement || !this.isWideLayout || this.isCalculating) {
       return;
     }
 
@@ -679,6 +716,8 @@ export class WeekViewComponent implements OnChanges, AfterViewInit, AfterViewChe
     if (this.resizeListener) {
       window.removeEventListener('resize', this.resizeListener);
     }
+    // Remover listener de wide layout
+    window.removeEventListener('resize', this.onWindowResize);
   }
 
   get orderedEnvironments(): Environment[] {
