@@ -134,6 +134,10 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   // 🔄 FILTRO DE FINES DE SEMANA
   showWeekends: boolean = true;
   
+  // 🔑 CLAVES PARA CACHÉ EN LOCALSTORAGE
+  private readonly CACHE_KEY_ZOOM = 'week-timeline-zoom';
+  private readonly CACHE_KEY_SHOW_WEEKENDS = 'week-timeline-show-weekends';
+  
   // 💡 SISTEMA DE TOOLTIP
   showTooltip: boolean = false;
   tooltipTask: Task | null = null;
@@ -281,7 +285,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   }
 
   // Sistema de zoom (incrementos de 5%)
-  zoomScale: number = 1.0;
+  zoomScale: number = 1.0; // Se inicializa desde caché en ngOnInit
   readonly zoomStep = 0.05; // 5%
   readonly minZoom = 0.5; // 50%
   readonly maxZoom = 2.0; // 200%
@@ -290,6 +294,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     const newScale = this.zoomScale - this.zoomStep;
     if (newScale >= this.minZoom) {
       this.zoomScale = Math.round(newScale * 100) / 100; // Redondear a 2 decimales
+      this.saveCachedZoom();
       this.applyZoom();
     }
   }
@@ -298,12 +303,14 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     const newScale = this.zoomScale + this.zoomStep;
     if (newScale <= this.maxZoom) {
       this.zoomScale = Math.round(newScale * 100) / 100; // Redondear a 2 decimales
+      this.saveCachedZoom();
       this.applyZoom();
     }
   }
 
   resetZoom(): void {
     this.zoomScale = 1.0;
+    this.saveCachedZoom();
     this.applyZoom();
   }
 
@@ -413,6 +420,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
 
   toggleWeekends(): void {
     this.showWeekends = !this.showWeekends;
+    this.saveCachedShowWeekends();
     // updateSvgDimensions ya se encarga de actualizar el ancho del indicador de días
     this.updateSvgDimensions();
     this.cdr.detectChanges();
@@ -479,6 +487,10 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   }
 
   async ngOnInit() {
+    // Cargar valores desde caché (localStorage)
+    this.zoomScale = this.loadCachedZoom();
+    this.showWeekends = this.loadCachedShowWeekends();
+    
     try {
       this.loadedProjects = await this.projectService.getProjects();
     } catch (error) {
@@ -2510,6 +2522,65 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
       dayIndex: 0
     };
     this.cdr.detectChanges();
+  }
+
+  // ==========================================
+  // 💾 MÉTODOS DE CACHÉ (localStorage)
+  // ==========================================
+  
+  /**
+   * Cargar el valor de zoom desde localStorage
+   */
+  private loadCachedZoom(): number {
+    try {
+      const cached = localStorage.getItem(this.CACHE_KEY_ZOOM);
+      if (cached) {
+        const value = parseFloat(cached);
+        if (!isNaN(value) && value >= this.minZoom && value <= this.maxZoom) {
+          return value;
+        }
+      }
+    } catch (error) {
+      console.warn('Error al cargar zoom desde caché:', error);
+    }
+    return 1.0; // Valor por defecto
+  }
+  
+  /**
+   * Guardar el valor de zoom en localStorage
+   */
+  private saveCachedZoom(): void {
+    try {
+      localStorage.setItem(this.CACHE_KEY_ZOOM, this.zoomScale.toString());
+    } catch (error) {
+      console.warn('Error al guardar zoom en caché:', error);
+    }
+  }
+  
+  /**
+   * Cargar el valor de showWeekends desde localStorage
+   */
+  private loadCachedShowWeekends(): boolean {
+    try {
+      const cached = localStorage.getItem(this.CACHE_KEY_SHOW_WEEKENDS);
+      if (cached !== null) {
+        return cached === 'true';
+      }
+    } catch (error) {
+      console.warn('Error al cargar showWeekends desde caché:', error);
+    }
+    return true; // Valor por defecto (mostrar fines de semana)
+  }
+  
+  /**
+   * Guardar el valor de showWeekends en localStorage
+   */
+  private saveCachedShowWeekends(): void {
+    try {
+      localStorage.setItem(this.CACHE_KEY_SHOW_WEEKENDS, this.showWeekends.toString());
+    } catch (error) {
+      console.warn('Error al guardar showWeekends en caché:', error);
+    }
   }
 
   ngOnDestroy(): void {

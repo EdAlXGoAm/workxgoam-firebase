@@ -163,6 +163,31 @@ export class CustomSelectComponent implements ControlValueAccessor, OnDestroy, O
     this.optionSelected.emit(option);
   }
   
+  /**
+   * Abre el dropdown programáticamente.
+   * Útil para abrir el selector desde el componente padre.
+   */
+  open(): void {
+    if (this.disabled || this.isOpen) {
+      return;
+    }
+    
+    // Cerrar todos los otros dropdowns abiertos ANTES de abrir este
+    this.closeOtherDropdowns();
+    
+    // Calcular posición ANTES de abrir
+    this.calculateDropdownPositionSync();
+    
+    this.isOpen = true;
+  }
+  
+  /**
+   * Cierra el dropdown programáticamente.
+   */
+  close(): void {
+    this.isOpen = false;
+  }
+  
   // Recalcular posición al hacer scroll
   @HostListener('window:scroll', ['$event'])
   onWindowScroll(): void {

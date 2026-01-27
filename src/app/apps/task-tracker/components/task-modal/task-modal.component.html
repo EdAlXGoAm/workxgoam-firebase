@@ -64,6 +64,7 @@
                 <!-- Selector personalizado para todas las resoluciones -->
                 <div class="flex-1">
                   <app-custom-select
+                    #projectSelect
                     [options]="projectOptions"
                     [(ngModel)]="task.project"
                     (optionSelected)="onProjectSelectCustom($event)"

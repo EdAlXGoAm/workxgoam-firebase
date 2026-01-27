@@ -60,6 +60,9 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   
   // Referencias para el selector de emojis
   @ViewChild('emojiButton', { static: false }) emojiButton!: ElementRef;
+  
+  // Referencia al selector de proyecto para abrirlo programáticamente
+  @ViewChild('projectSelect', { static: false }) projectSelect!: CustomSelectComponent;
   private emojiPickerElement: HTMLElement | null = null;
   private emojiPickerClickListener?: () => void;
   private emojiGridElement: HTMLElement | null = null;
@@ -681,11 +684,24 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
       this.selectableProjects = [];
     }
     this.buildProjectOptions(); // Actualizar opciones de proyecto
+    
+    const hadProject = !!this.task.project;
     if (!this.selectableProjects.find(p => p.id === this.task.project)) {
       this.task.project = '';
       this.task.type = undefined;
     }
     this.onProjectChange();
+    
+    // Si se seleccionó un environment, hay proyectos disponibles y no hay proyecto seleccionado,
+    // abrir automáticamente el selector de proyecto
+    if (this.task.environment && this.selectableProjects.length > 0 && !this.task.project) {
+      // Usar setTimeout para esperar a que Angular actualice la vista y el selector esté habilitado
+      setTimeout(() => {
+        if (this.projectSelect && !this.task.project) {
+          this.projectSelect.open();
+        }
+      }, 100);
+    }
   }
 
   async onProjectChange() {
