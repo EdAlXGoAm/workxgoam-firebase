@@ -759,8 +759,8 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
       }
     };
     
-    scrollContainer.addEventListener('scroll', handleContainerScroll);
-    daysIndicator.addEventListener('scroll', handleIndicatorScroll);
+    scrollContainer.addEventListener('scroll', handleContainerScroll, { passive: true });
+    daysIndicator.addEventListener('scroll', handleIndicatorScroll, { passive: true });
     
     // Observar cambios de tamaño
     const resizeObserver = new ResizeObserver(() => {
@@ -777,12 +777,16 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
 
   /**
    * Sincronizar el scroll vertical del indicador de horas con el contenedor SVG
+   * Usa CSS transform en lugar de scrollTop para mejor rendimiento (evita reflows)
    */
   private initializeHoursIndicatorSync(): void {
     if (!this.svgScrollContainer?.nativeElement || !this.hoursIndicator?.nativeElement) return;
     
     const scrollContainer = this.svgScrollContainer.nativeElement;
     const hoursIndicator = this.hoursIndicator.nativeElement;
+    const hoursSvg = hoursIndicator.querySelector('.hours-indicator-svg') as SVGElement;
+    
+    if (!hoursSvg) return;
     
     // Sincronizar altura del indicador con el contenedor
     const updateHeight = () => {
@@ -791,32 +795,15 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     };
     updateHeight();
     
-    // Sincronizar scroll del contenedor al indicador
-    let isScrollingContainer = false;
+    // Sincronizar scroll del contenedor al indicador usando transform (más eficiente)
     const handleContainerScroll = () => {
-      if (!isScrollingContainer) {
-        isScrollingContainer = true;
-        hoursIndicator.scrollTop = scrollContainer.scrollTop;
-        requestAnimationFrame(() => {
-          isScrollingContainer = false;
-        });
-      }
+      // Usar transform en lugar de scrollTop para evitar reflows
+      const scrollTop = scrollContainer.scrollTop;
+      hoursSvg.style.transform = `translateY(-${scrollTop}px)`;
     };
     
-    // Sincronizar scroll del indicador al contenedor
-    let isScrollingIndicator = false;
-    const handleIndicatorScroll = () => {
-      if (!isScrollingIndicator) {
-        isScrollingIndicator = true;
-        scrollContainer.scrollTop = hoursIndicator.scrollTop;
-        requestAnimationFrame(() => {
-          isScrollingIndicator = false;
-        });
-      }
-    };
-    
-    scrollContainer.addEventListener('scroll', handleContainerScroll);
-    hoursIndicator.addEventListener('scroll', handleIndicatorScroll);
+    // Usar passive: true para mejor rendimiento del scroll
+    scrollContainer.addEventListener('scroll', handleContainerScroll, { passive: true });
     
     // Observar cambios de tamaño
     const resizeObserver = new ResizeObserver(() => {
@@ -826,7 +813,6 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     
     this.hoursIndicatorSyncCleanup = () => {
       scrollContainer.removeEventListener('scroll', handleContainerScroll);
-      hoursIndicator.removeEventListener('scroll', handleIndicatorScroll);
       resizeObserver.disconnect();
     };
   }

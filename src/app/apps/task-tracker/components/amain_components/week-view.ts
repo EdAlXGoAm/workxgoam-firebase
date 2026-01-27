@@ -237,7 +237,7 @@ import { TaskGroup } from '../../models/task-group.model';
                         <h4 class="font-medium flex items-center gap-2">
                           <span>{{task.name}}</span>
                         </h4>
-                        <p class="text-sm text-gray-600 mt-1">{{task.description}}</p>
+                        <p class="text-sm text-gray-600 mt-1 task-description-clamp">{{task.description}}</p>
                         <div class="mt-2 text-xs text-gray-500">
                           <div>Inicio: {{formatDate(task.start)}}</div>
                           <div>Fin: {{formatDate(task.end)}}</div>
@@ -310,7 +310,7 @@ import { TaskGroup } from '../../models/task-group.model';
                       </span>
                     </div>
                     <h4 class="font-medium">{{task.name}}</h4>
-                    <p class="text-sm text-gray-600 mt-1">{{task.description}}</p>
+                    <p class="text-sm text-gray-600 mt-1 task-description-clamp">{{task.description}}</p>
                     <div class="mt-2 text-xs text-gray-500">
                       <div>Inicio: {{formatDate(task.start)}}</div>
                       <div>Fin: {{formatDate(task.end)}}</div>
@@ -522,6 +522,16 @@ import { TaskGroup } from '../../models/task-group.model';
     .task-running:hover { animation: running-pulse 1.5s infinite; transform: translateY(-2px); }
     button[disabled] { opacity: 0.4; cursor: not-allowed; }
     button[disabled]:hover { opacity: 0.4; }
+    /* Descripción de tarea con saltos de línea y límite de 3 líneas */
+    .task-description-clamp {
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.4;
+    }
   `]
 })
 export class WeekViewComponent implements OnChanges, AfterViewInit, AfterViewChecked, OnDestroy {

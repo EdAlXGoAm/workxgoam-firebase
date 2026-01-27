@@ -940,9 +940,7 @@
                       <span class="font-medium">Sin fecha de inicio</span>
                     </div>
                     
-                    <p *ngIf="task.description" class="text-sm text-gray-600 mb-3 line-clamp-2">
-                      {{ task.description }}
-                    </p>
+                    <p *ngIf="task.description" class="text-sm text-gray-600 mb-3 task-description-clamp">{{ task.description }}</p>
                     
                     <div class="flex items-center justify-between text-sm text-gray-500">
                       <div class="flex items-center space-x-4">
