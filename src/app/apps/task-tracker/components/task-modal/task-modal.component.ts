@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
-import { Task } from '../../models/task.model';
+import { Task, TaskAction } from '../../models/task.model';
 import { Project } from '../../models/project.model';
 import { Environment } from '../../models/environment.model';
 import { TaskType } from '../../models/task-type.model';
@@ -2061,5 +2061,148 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     
     // Forzar actualización de la vista
     this.cdr.detectChanges();
+  }
+  
+  // ============================================
+  // MÉTODOS PARA ACCIONES REALIZADAS
+  // ============================================
+  
+  /**
+   * Obtiene la hora de inicio para una nueva acción
+   * Si no hay acciones, usa la hora de inicio de la tarea
+   * Si hay acciones, usa la hora de fin de la última acción
+   */
+  getNextActionStartTime(): string {
+    if (!this.task.actionsPerformed || this.task.actionsPerformed.length === 0) {
+      return this.startTime || '00:00';
+    }
+    const lastAction = this.task.actionsPerformed[this.task.actionsPerformed.length - 1];
+    return lastAction.endTime;
+  }
+  
+  /**
+   * Calcula la hora de fin sumando minutos a una hora dada
+   */
+  private addMinutesToTime(time: string, minutes: number): string {
+    const [hours, mins] = time.split(':').map(Number);
+    const totalMinutes = hours * 60 + mins + minutes;
+    const newHours = Math.floor(totalMinutes / 60) % 24;
+    const newMinutes = totalMinutes % 60;
+    return `${String(newHours).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`;
+  }
+  
+  /**
+   * Convierte una hora HH:MM a minutos desde medianoche
+   */
+  private timeToMinutes(time: string): number {
+    const [hours, mins] = time.split(':').map(Number);
+    return hours * 60 + mins;
+  }
+  
+  /**
+   * Calcula los minutos restantes disponibles para acciones
+   */
+  getRemainingMinutesForActions(): number {
+    if (!this.startTime || !this.endTime) {
+      return 0;
+    }
+    
+    const taskStartMinutes = this.timeToMinutes(this.startTime);
+    const taskEndMinutes = this.timeToMinutes(this.endTime);
+    
+    // Calcular duración total de la tarea en minutos
+    let totalTaskMinutes = taskEndMinutes - taskStartMinutes;
+    // Si la tarea cruza medianoche
+    if (totalTaskMinutes < 0) {
+      totalTaskMinutes += 24 * 60;
+    }
+    
+    // Calcular minutos ya usados por acciones
+    let usedMinutes = 0;
+    if (this.task.actionsPerformed && this.task.actionsPerformed.length > 0) {
+      const lastAction = this.task.actionsPerformed[this.task.actionsPerformed.length - 1];
+      const lastEndMinutes = this.timeToMinutes(lastAction.endTime);
+      usedMinutes = lastEndMinutes - taskStartMinutes;
+      if (usedMinutes < 0) {
+        usedMinutes += 24 * 60;
+      }
+    }
+    
+    return totalTaskMinutes - usedMinutes;
+  }
+  
+  /**
+   * Verifica si se puede agregar una acción de X minutos
+   */
+  canAddAction(minutes: number): boolean {
+    if (!this.startTime || !this.endTime) {
+      return false;
+    }
+    return this.getRemainingMinutesForActions() >= minutes;
+  }
+  
+  /**
+   * Agrega una nueva acción con la duración especificada
+   */
+  addAction(minutes: number) {
+    if (!this.canAddAction(minutes)) {
+      return;
+    }
+    
+    if (!this.task.actionsPerformed) {
+      this.task.actionsPerformed = [];
+    }
+    
+    const startTime = this.getNextActionStartTime();
+    const endTime = this.addMinutesToTime(startTime, minutes);
+    
+    this.task.actionsPerformed.push({
+      startTime: startTime,
+      endTime: endTime,
+      description: ''
+    });
+    
+    // Forzar actualización de la vista
+    this.cdr.detectChanges();
+  }
+  
+  /**
+   * Elimina la última acción
+   */
+  removeLastAction() {
+    if (this.task.actionsPerformed && this.task.actionsPerformed.length > 0) {
+      this.task.actionsPerformed.pop();
+      this.cdr.detectChanges();
+    }
+  }
+  
+  /**
+   * Actualiza la descripción de una acción
+   */
+  updateActionDescription(index: number, description: string) {
+    if (this.task.actionsPerformed && this.task.actionsPerformed[index]) {
+      this.task.actionsPerformed[index].description = description;
+    }
+  }
+  
+  /**
+   * Formatea el rango de tiempo de una acción para mostrar
+   */
+  formatActionTimeRange(action: TaskAction): string {
+    return `${action.startTime} - ${action.endTime}`;
+  }
+  
+  /**
+   * Obtiene el texto del tooltip para los botones deshabilitados
+   */
+  getActionButtonTooltip(minutes: number): string {
+    const remaining = this.getRemainingMinutesForActions();
+    if (remaining < minutes) {
+      if (remaining <= 0) {
+        return 'No hay tiempo restante disponible';
+      }
+      return `Solo quedan ${remaining} minutos disponibles`;
+    }
+    return `Agregar acción de ${minutes} minutos`;
   }
 } 

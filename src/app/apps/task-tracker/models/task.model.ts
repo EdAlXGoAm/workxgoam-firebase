@@ -1,3 +1,9 @@
+export interface TaskAction {
+  startTime: string; // Formato HH:MM
+  endTime: string;   // Formato HH:MM
+  description: string;
+}
+
 export interface Task {
   id: string;
   userId: string;
@@ -18,6 +24,7 @@ export interface Task {
     start: string;
     end: string;
   }[];
+  actionsPerformed?: TaskAction[]; // Acciones realizadas durante la tarea
   createdAt: string;
   updatedAt: string;
   completed: boolean;

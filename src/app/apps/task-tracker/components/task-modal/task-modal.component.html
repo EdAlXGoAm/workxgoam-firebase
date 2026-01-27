@@ -164,21 +164,110 @@
             </div>
           </div>
           
-          <div class="grid grid-cols-2 md:grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
             <textarea [(ngModel)]="task.description" name="description" rows="3" class="w-full px-3 py-2 border rounded-lg"></textarea>
           </div>
           
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Prioridad</label>
-              <app-priority-selector
-                [(ngModel)]="task.priority"
-                name="priority">
-              </app-priority-selector>
-            </div>
-            
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Prioridad</label>
+            <app-priority-selector
+              [(ngModel)]="task.priority"
+              name="priority">
+            </app-priority-selector>
           </div>
+        </div>
+        
+        <!-- Sección de Acciones Realizadas -->
+        <div class="bg-purple-50 rounded-lg border border-purple-200 p-4">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center">
+              <div class="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center mr-3">
+                <i class="fas fa-list-check text-white"></i>
+              </div>
+              <div>
+                <label class="text-sm font-medium text-gray-700">Acciones Realizadas</label>
+                <p class="text-xs text-gray-500">Registra lo que hiciste durante esta tarea</p>
+              </div>
+            </div>
+            <!-- Indicador de tiempo restante -->
+            <div *ngIf="startTime && endTime" class="text-xs text-purple-700 bg-purple-100 px-2 py-1 rounded-full">
+              <i class="fas fa-clock mr-1"></i>
+              {{ getRemainingMinutesForActions() }} min restantes
+            </div>
+          </div>
+          
+          <!-- Botones para agregar acciones -->
+          <div class="flex gap-2 mb-3">
+            <button type="button" 
+                    (click)="addAction(5)"
+                    [disabled]="!canAddAction(5)"
+                    [title]="getActionButtonTooltip(5)"
+                    class="flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center justify-center"
+                    [class]="canAddAction(5) 
+                      ? 'bg-purple-600 text-white hover:bg-purple-700' 
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'">
+              <i class="fas fa-plus mr-1"></i> 5 min
+            </button>
+            <button type="button" 
+                    (click)="addAction(10)"
+                    [disabled]="!canAddAction(10)"
+                    [title]="getActionButtonTooltip(10)"
+                    class="flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center justify-center"
+                    [class]="canAddAction(10) 
+                      ? 'bg-purple-600 text-white hover:bg-purple-700' 
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'">
+              <i class="fas fa-plus mr-1"></i> 10 min
+            </button>
+            <button type="button" 
+                    (click)="addAction(15)"
+                    [disabled]="!canAddAction(15)"
+                    [title]="getActionButtonTooltip(15)"
+                    class="flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center justify-center"
+                    [class]="canAddAction(15) 
+                      ? 'bg-purple-600 text-white hover:bg-purple-700' 
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'">
+              <i class="fas fa-plus mr-1"></i> 15 min
+            </button>
+          </div>
+          
+          <!-- Lista de acciones -->
+          <div *ngIf="task.actionsPerformed && task.actionsPerformed.length > 0" class="space-y-1 max-h-40 overflow-y-auto actions-list">
+            <div *ngFor="let action of task.actionsPerformed; let i = index; let isLast = last" 
+                 class="bg-white rounded border border-purple-200 px-2 py-1 relative action-item"
+                 [class.action-item-last]="isLast">
+              <div class="flex items-center gap-2">
+                <!-- Badge de tiempo -->
+                <div class="flex-shrink-0 bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded text-xs font-mono font-medium min-w-[90px] text-center">
+                  {{ formatActionTimeRange(action) }}
+                </div>
+                <!-- Input de descripción -->
+                <input type="text"
+                       [(ngModel)]="action.description"
+                       [name]="'actionDesc' + i"
+                       placeholder="¿Qué hiciste?"
+                       class="flex-1 px-2 py-1 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500">
+                <!-- Botón eliminar (solo en el último) -->
+                <button *ngIf="isLast"
+                        type="button"
+                        (click)="removeLastAction()"
+                        class="flex-shrink-0 w-6 h-6 flex items-center justify-center text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                        title="Eliminar última acción">
+                  <i class="fas fa-trash-alt text-xs"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Estado vacío -->
+          <div *ngIf="!task.actionsPerformed || task.actionsPerformed.length === 0" 
+               class="text-center text-gray-500 py-4 bg-white rounded-lg border border-dashed border-purple-200">
+            <i class="fas fa-clipboard-list text-2xl text-purple-300 mb-2"></i>
+            <p class="text-sm">No hay acciones registradas</p>
+            <p class="text-xs text-gray-400">Usa los botones de arriba para agregar</p>
+          </div>
+        </div>
           <!-- Sección de fechas y horas con agrupación visual -->
           <div class="grid grid-cols-2 md:grid-cols-2 gap-4">
             <!-- Fecha y hora de inicio -->
