@@ -529,10 +529,31 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     setTimeout(() => {
       this.updateSvgDimensions();
       this.registerTaskGestures();
+      this.scrollToInitialPosition();
     }, 100);
 
     this.taskRects.changes.subscribe(() => {
       this.registerTaskGestures();
+    });
+  }
+  
+  /**
+   * Hacer scroll a una posición inicial útil (8:00 AM por defecto)
+   * para mostrar las horas más relevantes del día laboral
+   */
+  private scrollToInitialPosition(): void {
+    if (!this.svgScrollContainer?.nativeElement) return;
+    
+    const scrollContainer = this.svgScrollContainer.nativeElement;
+    
+    // Hora inicial para el scroll (8:00 AM = hora 8)
+    const initialHour = 8;
+    const scrollTop = initialHour * this.pixelsPerHour;
+    
+    // Aplicar scroll suave
+    scrollContainer.scrollTo({
+      top: scrollTop,
+      behavior: 'auto' // 'auto' para scroll instantáneo, 'smooth' para animado
     });
   }
   
