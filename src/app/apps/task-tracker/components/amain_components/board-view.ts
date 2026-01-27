@@ -367,14 +367,16 @@ import { TaskGroup } from '../../models/task-group.model';
     }
     
     /* Desktop mediano: 3 columnas */
-    @media (min-width: 1280px) and (max-width: 1919px) {
+    /* Desktop mediano: 3 columnas (hasta WIDE_LAYOUT_BREAKPOINT - 1 = 1649px) */
+    @media (min-width: 1280px) and (max-width: 1649px) {
       .environments-grid {
         grid-template-columns: repeat(3, 1fr);
         gap: 1rem;
       }
     }
     
-    @media (min-width: 1920px) {
+    /* Layout ancho: a partir de WIDE_LAYOUT_BREAKPOINT (1650px) */
+    @media (min-width: 1650px) {
       .board-view-container {
         padding: 1.5rem;
       }
@@ -410,7 +412,7 @@ import { TaskGroup } from '../../models/task-group.model';
       }
     }
     
-    @media (min-width: 1920px) and (min-height: 900px) {
+    @media (min-width: 1650px) and (min-height: 900px) {
       .environments-grid {
         grid-template-columns: repeat(3, 1fr);
       }
@@ -426,7 +428,7 @@ import { TaskGroup } from '../../models/task-group.model';
       overflow: hidden;
     }
     
-    @media (min-width: 1920px) {
+    @media (min-width: 1650px) {
       .board-column {
         max-height: none;
       }
@@ -530,6 +532,9 @@ export class BoardViewComponent implements OnChanges, AfterViewInit, AfterViewCh
   @Output() loadOrderFromDatabase = new EventEmitter<void>();
   @Output() createTaskWithRange = new EventEmitter<{ startTime: Date; endTime: Date }>();
 
+  // Breakpoint para activar layout de pantalla ancha (debe coincidir con week-view.ts)
+  readonly WIDE_LAYOUT_BREAKPOINT = 1650; // px
+  
   collapsedEmptyEnvironments: boolean = true;
   collapsedEnvironments: { [envId: string]: boolean } = {};
   collapsedProjects: { [projectId: string]: boolean } = {};
@@ -549,7 +554,7 @@ export class BoardViewComponent implements OnChanges, AfterViewInit, AfterViewCh
   }
 
   ngAfterViewInit(): void {
-    if (window.innerWidth >= 1920) {
+    if (window.innerWidth >= this.WIDE_LAYOUT_BREAKPOINT) {
       this.setupResizeObserver();
       // Esperar a que el elemento esté disponible y renderizado
       setTimeout(() => {
@@ -562,7 +567,7 @@ export class BoardViewComponent implements OnChanges, AfterViewInit, AfterViewCh
 
   ngAfterViewChecked(): void {
     // Solo calcular una vez cuando el elemento esté disponible y no se haya calculado aún
-    if (window.innerWidth >= 1920 && 
+    if (window.innerWidth >= this.WIDE_LAYOUT_BREAKPOINT && 
         this.boardLayoutWrapper?.nativeElement && 
         !this.heightCalculated && 
         !this.isCalculating) {
@@ -576,7 +581,7 @@ export class BoardViewComponent implements OnChanges, AfterViewInit, AfterViewCh
   }
 
   private calculateAndSetHeight(): void {
-    if (!this.boardLayoutWrapper?.nativeElement || window.innerWidth < 1920 || this.isCalculating) {
+    if (!this.boardLayoutWrapper?.nativeElement || window.innerWidth < this.WIDE_LAYOUT_BREAKPOINT || this.isCalculating) {
       return;
     }
 
@@ -657,7 +662,7 @@ export class BoardViewComponent implements OnChanges, AfterViewInit, AfterViewCh
       const currentHeight = window.innerHeight;
       
       // Solo recalcular si el cambio es significativo (más de 50px) y estamos en modo desktop
-      if (currentWidth >= 1920 && 
+      if (currentWidth >= this.WIDE_LAYOUT_BREAKPOINT && 
           (Math.abs(currentWidth - lastWindowWidth) > 50 || Math.abs(currentHeight - lastWindowHeight) > 50)) {
         if (!this.isCalculating) {
           this.isCalculating = true;

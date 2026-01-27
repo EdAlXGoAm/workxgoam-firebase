@@ -375,15 +375,15 @@ import { TaskGroup } from '../../models/task-group.model';
       }
     }
     
-    /* Desktop mediano: 3 columnas */
-    @media (min-width: 1280px) and (max-width: 1919px) {
+    /* Desktop mediano: 3 columnas (hasta WIDE_LAYOUT_BREAKPOINT - 1 = 1649px) */
+    @media (min-width: 1280px) and (max-width: 1649px) {
       .environments-grid {
         grid-template-columns: repeat(3, 1fr);
         gap: 1rem;
       }
     }
     
-    /* Layout de 2 columnas controlado por la variable WIDE_LAYOUT_BREAKPOINT */
+    /* Layout de 2 columnas controlado por la variable WIDE_LAYOUT_BREAKPOINT (1650px) */
     .wide-layout.week-view-container {
       padding: 1.5rem;
     }
@@ -399,7 +399,7 @@ import { TaskGroup } from '../../models/task-group.model';
     .wide-layout .timeline-section {
       position: sticky;
       top: 0;
-      width: 900px;
+      width: 600px;
       flex-shrink: 0;
       height: auto;
       max-height: calc(100vh - 150px);
@@ -730,7 +730,7 @@ export class WeekViewComponent implements OnChanges, AfterViewInit, AfterViewChe
       const currentHeight = window.innerHeight;
       
       // Solo recalcular si el cambio es significativo (más de 50px) y estamos en modo desktop
-      if (currentWidth >= 1920 && 
+      if (currentWidth >= this.WIDE_LAYOUT_BREAKPOINT && 
           (Math.abs(currentWidth - lastWindowWidth) > 50 || Math.abs(currentHeight - lastWindowHeight) > 50)) {
         if (!this.isCalculating) {
           this.isCalculating = true;

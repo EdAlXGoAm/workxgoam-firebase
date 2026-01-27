@@ -156,7 +156,8 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
   sectionHeight = 100;
   svgHeight = this.sectionHeight * 3;
 
-  private widthScale: number = 0.7;
+  // Escala de ancho - 1.0 = usar todo el ancho disponible del contenedor
+  private widthScale: number = 1.0;
 
   // Tamaños de fuente responsivos
   titleFontSize = 12;
@@ -630,45 +631,48 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
 
     const availableWidth = Math.max(containerWidth - this.containerPadding, this.minSvgWidth);
 
+    // El SVG usa todo el ancho disponible del contenedor
+    // Solo ajustamos tamaños de fuente según el tamaño de pantalla
     if (screenWidth <= 375) {
-      this.svgWidth = Math.floor(Math.max(availableWidth, this.minSvgWidth) * this.widthScale);
+      this.svgWidth = Math.floor(availableWidth * 0.98);
       this.titleFontSize = 10;
       this.hourFontSize = 8;
       this.taskFontSize = 10;
     } else if (screenWidth <= 480) {
-      this.svgWidth = Math.floor(Math.max(availableWidth * 1.2, 400) * this.widthScale);
+      this.svgWidth = Math.floor(availableWidth * 0.98);
       this.titleFontSize = 11;
       this.hourFontSize = 9;
       this.taskFontSize = 11;
     } else if (screenWidth <= 640) {
-      this.svgWidth = Math.floor(Math.max(availableWidth * 1.4, 500) * this.widthScale);
+      this.svgWidth = Math.floor(availableWidth * 0.98);
       this.titleFontSize = 12;
       this.hourFontSize = 10;
       this.taskFontSize = 12;
     } else if (screenWidth <= 768) {
-      this.svgWidth = Math.floor(Math.max(availableWidth * 0.9, 600) * this.widthScale);
+      this.svgWidth = Math.floor(availableWidth * 0.98);
       this.titleFontSize = 12;
       this.hourFontSize = 10;
       this.taskFontSize = 12;
     } else if (screenWidth <= 1024) {
-      this.svgWidth = Math.floor(Math.max(availableWidth * 0.95, 800) * this.widthScale);
+      this.svgWidth = Math.floor(availableWidth * 0.98);
       this.titleFontSize = 13;
       this.hourFontSize = 11;
       this.taskFontSize = 13;
     } else if (screenWidth <= 1280) {
-      this.svgWidth = Math.floor(Math.max(availableWidth * 0.98, 1000) * this.widthScale);
+      this.svgWidth = Math.floor(availableWidth * 0.98);
       this.titleFontSize = 14;
       this.hourFontSize = 12;
       this.taskFontSize = 14;
     } else {
-      this.svgWidth = Math.floor(Math.min(availableWidth * 0.98, 1400) * this.widthScale);
+      // En pantallas grandes, usar el ancho completo del contenedor disponible
+      this.svgWidth = Math.floor(availableWidth * 0.98);
       this.titleFontSize = 14;
       this.hourFontSize = 12;
       this.taskFontSize = 14;
     }
 
-    const scaledMinWidth = Math.floor(this.minSvgWidth * this.widthScale);
-    this.svgWidth = Math.max(this.svgWidth, scaledMinWidth);
+    // Asegurar que el ancho no sea menor al mínimo
+    this.svgWidth = Math.max(this.svgWidth, this.minSvgWidth);
   }
 
   getTaskText(task: Task, sectionStartHour: number): string {
