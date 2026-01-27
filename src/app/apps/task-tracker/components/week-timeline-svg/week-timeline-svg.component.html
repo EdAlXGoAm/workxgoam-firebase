@@ -421,68 +421,6 @@
     </div>
   </div>
 
-  <!-- Menú contextual -->
-  <div *ngIf="showContextMenu && contextMenuTask" 
-       class="context-menu"
-       [style.left.px]="contextMenuX"
-       [style.top.px]="contextMenuY"
-       (click)="$event.stopPropagation()">
-    <div class="context-menu-header">
-      <span class="text-lg mr-2">{{ contextMenuTask.emoji }}</span>
-      <span class="font-semibold text-sm truncate">{{ contextMenuTask.name }}</span>
-    </div>
-    <div class="context-menu-divider"></div>
-    <button class="context-menu-item" (click)="copyTitle()">
-      <i class="fas fa-copy mr-2"></i>
-      Copy Title
-    </button>
-    <button *ngIf="hasComplexGroup()" class="context-menu-item" (click)="copyComplexTitle()">
-      <i class="fas fa-clipboard mr-2"></i>
-      Copy Complex Title
-    </button>
-    <button *ngIf="hasComplexGroup()" class="context-menu-item" (click)="copyComplexTitleWithTitle()">
-      <i class="fas fa-clipboard mr-2"></i>
-      Copy Complex Title + Title
-    </button>
-    <div class="context-menu-divider"></div>
-    <button class="context-menu-item context-menu-item-edit" (click)="editTaskFromContextMenu()">
-      <i class="fas fa-edit mr-2"></i>
-      Editar tarea
-    </button>
-    <div class="context-menu-divider"></div>
-    <button *ngIf="contextMenuTask.hidden" class="context-menu-item" (click)="toggleHiddenFromContextMenu()">
-      <i class="fas fa-eye mr-2"></i>
-      Mostrar
-    </button>
-    <button *ngIf="!contextMenuTask.hidden" class="context-menu-item" (click)="toggleHiddenFromContextMenu()">
-      <i class="fas fa-eye-slash mr-2"></i>
-      Ocultar
-    </button>
-    <div *ngIf="isTaskOverdue(contextMenuTask) || isTaskRunning(contextMenuTask)" class="context-menu-divider"></div>
-    <button *ngIf="(isTaskOverdue(contextMenuTask) || isTaskRunning(contextMenuTask)) && contextMenuTask.status !== 'completed'" 
-            class="context-menu-item context-menu-item-completed" 
-            (click)="changeStatusFromContextMenu('completed')">
-      <i class="fas fa-check mr-2"></i>
-      Marcar completada
-    </button>
-    <button *ngIf="(isTaskOverdue(contextMenuTask) || isTaskRunning(contextMenuTask)) && contextMenuTask.status !== 'in-progress'" 
-            class="context-menu-item context-menu-item-progress" 
-            (click)="changeStatusFromContextMenu('in-progress')">
-      <i class="fas fa-spinner mr-2"></i>
-      Marcar en progreso
-    </button>
-    <button *ngIf="(isTaskOverdue(contextMenuTask) || isTaskRunning(contextMenuTask)) && contextMenuTask.status !== 'pending'" 
-            class="context-menu-item context-menu-item-pending" 
-            (click)="changeStatusFromContextMenu('pending')">
-      <i class="fas fa-play mr-2"></i>
-      Marcar pendiente
-    </button>
-    <div class="context-menu-divider"></div>
-    <button class="context-menu-item delete" (click)="deleteTaskFromContextMenu()">
-      <i class="fas fa-trash-alt mr-2"></i>
-      Eliminar tarea
-    </button>
-  </div>
 
   <!-- Menú de selección de tareas superpuestas -->
   <div *ngIf="showTaskSelector && taskSelectorItems.length > 1" 

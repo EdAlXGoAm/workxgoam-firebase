@@ -499,7 +499,7 @@ export class WeekViewComponent implements OnChanges, AfterViewInit, AfterViewChe
   // 🎯 VARIABLE DE CALIBRACIÓN - BREAKPOINT DE 2 COLUMNAS
   // Ajusta este valor para cambiar cuándo el layout cambia a 2 columnas
   // ==========================================
-  readonly WIDE_LAYOUT_BREAKPOINT = 1800; // px - Antes era 1920
+  readonly WIDE_LAYOUT_BREAKPOINT = 1650; // px - Antes era 1920
   
   // Flag para saber si estamos en layout ancho (2 columnas)
   isWideLayout = false;

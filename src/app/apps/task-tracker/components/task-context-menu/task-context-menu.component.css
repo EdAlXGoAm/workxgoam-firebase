@@ -1,0 +1,104 @@
+.context-menu-content {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 200px;
+  max-width: 280px;
+  overflow: hidden;
+  animation: contextFadeIn 0.15s;
+}
+
+@keyframes contextFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.context-menu-header {
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+}
+
+.context-menu-header .truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.context-menu-divider {
+  height: 1px;
+  background: #e5e7eb;
+}
+
+.context-menu-item {
+  width: 100%;
+  padding: 12px 16px;
+  text-align: left;
+  border: none;
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  color: #374151;
+  transition: background 0.15s;
+}
+
+.context-menu-item:hover {
+  background: #f3f4f6;
+}
+
+.context-menu-item.delete {
+  color: #ef4444;
+}
+
+.context-menu-item.delete:hover {
+  background: #fef2f2;
+}
+
+.context-menu-item-completed {
+  color: #10b981;
+}
+
+.context-menu-item-completed:hover {
+  background: #ecfdf5;
+}
+
+.context-menu-item-progress {
+  color: #f59e0b;
+}
+
+.context-menu-item-progress:hover {
+  background: #fffbeb;
+}
+
+.context-menu-item-pending {
+  color: #3b82f6;
+}
+
+.context-menu-item-pending:hover {
+  background: #eff6ff;
+}
+
+.context-menu-item-edit {
+  color: #8b5cf6;
+}
+
+.context-menu-item-edit:hover {
+  background: #f5f3ff;
+}
+
+.context-menu-item i {
+  width: 20px;
+  text-align: center;
+}

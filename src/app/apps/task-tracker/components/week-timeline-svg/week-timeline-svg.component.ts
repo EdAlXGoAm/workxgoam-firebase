@@ -14,6 +14,9 @@ import { AndroidDatePickerComponent } from '../android-date-picker/android-date-
 import { TimeShiftModalComponent, TimeShiftResult } from '../../modals/time-shift-modal/time-shift-modal.component';
 import { DurationEditModalComponent, DurationEditResult } from '../../modals/duration-edit-modal/duration-edit-modal.component';
 import { Subscription } from 'rxjs';
+import { Overlay, OverlayRef, OverlayConfig } from '@angular/cdk/overlay';
+import { ComponentPortal } from '@angular/cdk/portal';
+import { TaskContextMenuComponent, TaskContextMenuEvent } from '../task-context-menu/task-context-menu.component';
 
 // Interfaz para elementos renderizables (tareas o fragmentos)
 interface RenderableItem {
@@ -106,7 +109,8 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     private timelineFocusService: TimelineFocusService,
     private projectService: ProjectService,
     private gestureService: GestureService,
-    private taskTimeService: TaskTimeService
+    private taskTimeService: TaskTimeService,
+    private overlay: Overlay
   ) {}
 
   @Output() editTask = new EventEmitter<Task>();
@@ -140,6 +144,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   contextMenuTask: Task | null = null;
   contextMenuX: number = 0;
   contextMenuY: number = 0;
+  private overlayRef: OverlayRef | null = null;
 
   // 🎯 SISTEMA DE SELECCIÓN DE TAREAS SUPERPUESTAS
   showTaskSelector: boolean = false;
@@ -1295,6 +1300,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   @HostListener('window:resize', ['$event'])
   onResize(event: any) {
     this.updateSvgDimensions();
+    // Ya no necesitamos reposicionar manualmente, CDK Overlay lo maneja automáticamente
   }
 
   private initializeResizeObserver() {
@@ -1770,11 +1776,94 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   showTaskContextMenu(task: Task, x: number, y: number): void {
     this.hideTooltip();
     this.closeTaskSelector();
+    this.closeContextMenu(); // Cerrar menú anterior si existe
     
     this.contextMenuTask = task;
-    this.contextMenuX = x;
-    this.contextMenuY = y;
+    
+    // Configuración del overlay
+    const config = new OverlayConfig({
+      hasBackdrop: true,
+      backdropClass: 'cdk-overlay-transparent-backdrop',
+      positionStrategy: this.overlay.position()
+        .flexibleConnectedTo({ x, y })
+        .withPositions([
+          {
+            originX: 'start',
+            originY: 'bottom',
+            overlayX: 'start',
+            overlayY: 'top'
+          },
+          {
+            originX: 'start',
+            originY: 'top',
+            overlayX: 'start',
+            overlayY: 'bottom'
+          },
+          {
+            originX: 'end',
+            originY: 'bottom',
+            overlayX: 'end',
+            overlayY: 'top'
+          },
+          {
+            originX: 'end',
+            originY: 'top',
+            overlayX: 'end',
+            overlayY: 'bottom'
+          }
+        ]),
+      scrollStrategy: this.overlay.scrollStrategies.reposition()
+    });
+    
+    this.overlayRef = this.overlay.create(config);
+    
+    // Crear portal y adjuntar
+    const portal = new ComponentPortal(TaskContextMenuComponent);
+    const componentRef = this.overlayRef.attach(portal);
+    
+    // Pasar datos al componente
+    componentRef.instance.task = task;
+    componentRef.instance.taskGroups = this.taskGroups;
+    componentRef.instance.isOverdue = this.isTaskOverdue(task);
+    componentRef.instance.isRunning = this.isTaskRunning(task);
+    
+    // Escuchar eventos
+    componentRef.instance.menuAction.subscribe((event: TaskContextMenuEvent) => {
+      this.handleContextMenuAction(event);
+    });
+    
+    componentRef.instance.close.subscribe(() => {
+      this.closeContextMenu();
+    });
+    
+    // Cerrar al hacer clic en el backdrop
+    this.overlayRef.backdropClick().subscribe(() => {
+      this.closeContextMenu();
+    });
+    
     this.showContextMenu = true;
+  }
+
+  /**
+   * Manejar acciones del menú contextual
+   */
+  private handleContextMenuAction(event: TaskContextMenuEvent): void {
+    switch (event.action) {
+      case 'edit':
+        this.editTask.emit(event.task);
+        break;
+      case 'delete':
+        this.deleteTask.emit(event.task);
+        break;
+      case 'toggleHidden':
+        this.toggleHidden.emit(event.task);
+        break;
+      case 'changeStatus':
+        if (event.status) {
+          this.changeStatus.emit({ task: event.task, status: event.status });
+        }
+        break;
+    }
   }
 
   /**
@@ -1943,6 +2032,10 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   }
 
   closeContextMenu(): void {
+    if (this.overlayRef) {
+      this.overlayRef.dispose();
+      this.overlayRef = null;
+    }
     this.showContextMenu = false;
     this.contextMenuTask = null;
   }
@@ -2363,6 +2456,10 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   ngOnDestroy(): void {
     if (this.tooltipTimeout) {
       clearTimeout(this.tooltipTimeout);
+    }
+    if (this.overlayRef) {
+      this.overlayRef.dispose();
+      this.overlayRef = null;
     }
     if (this.panCleanup) {
       this.panCleanup();

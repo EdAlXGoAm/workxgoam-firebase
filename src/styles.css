@@ -53,3 +53,8 @@ input, textarea, select {
 .max-w-7xl, .container, main, section, div {
   overflow-x: hidden;
 }
+
+/* Estilos para el backdrop transparente del menú contextual */
+.cdk-overlay-transparent-backdrop {
+  background: transparent;
+}
