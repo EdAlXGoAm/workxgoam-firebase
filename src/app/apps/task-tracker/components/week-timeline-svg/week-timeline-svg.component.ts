@@ -842,8 +842,9 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
       if (!this.isClickOnEmptyArea(e.target)) return;
       
       const svgRect = svgElement.getBoundingClientRect();
-      const localX = e.clientX - svgRect.left;
-      const localY = e.clientY - svgRect.top;
+      // Ajustar por zoom para convertir a espacio SVG sin escalar
+      const localX = (e.clientX - svgRect.left) / this.zoomScale;
+      const localY = (e.clientY - svgRect.top) / this.zoomScale;
       
       // Determinar el día
       const { dayIndex, dayDate } = this.getDayFromX(localX);
@@ -1025,13 +1026,15 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
 
     if (event.type === 'drag-up' || event.type === 'drag-down') {
         // Movimiento vertical con posible componente horizontal
-        newY += event.deltaY;
+        // Ajustar deltaY por zoom para convertir a espacio SVG sin escalar
+        newY += event.deltaY / this.zoomScale;
         
         // Detectar movimiento horizontal significativo (más de 30px)
-        if (Math.abs(event.deltaX) > 30) {
-          // Calcular nuevo día basándose en deltaX
+        // Ajustar deltaX por zoom para convertir a espacio SVG sin escalar
+        if (Math.abs(event.deltaX / this.zoomScale) > 30) {
+          // Calcular nuevo día basándose en deltaX (ya ajustado por zoom)
           const dayColumnWidth = this.dayColumnWidth + this.columnGap;
-          const dayOffset = Math.round(event.deltaX / dayColumnWidth);
+          const dayOffset = Math.round((event.deltaX / this.zoomScale) / dayColumnWidth);
           const maxVisualIndex = this.visibleDaysCount - 1;
           newDayIndex = Math.max(0, Math.min(maxVisualIndex, dayIndex + dayOffset));
           
@@ -1059,12 +1062,14 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
         // Resize desde el borde superior
         // deltaY > 0 = arrastrar hacia abajo = REDUCIR tarea
         // deltaY < 0 = arrastrar hacia arriba = EXTENDER tarea
+        // Ajustar deltaY por zoom para convertir a espacio SVG sin escalar
         const originalEndY = originalY + originalHeight;
-        newY += event.deltaY;
-        newHeight -= event.deltaY;
+        const adjustedDeltaY = event.deltaY / this.zoomScale;
+        newY += adjustedDeltaY;
+        newHeight -= adjustedDeltaY;
         
         // REDUCCIÓN: Limitar para que el inicio no pase del final menos altura mínima
-        if (event.deltaY > 0) {
+        if (adjustedDeltaY > 0) {
           const minHeight = 5;
           const maxNewY = originalEndY - minHeight;
           if (newY > maxNewY) {
@@ -1110,10 +1115,12 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
         // Resize desde el borde inferior
         // deltaY > 0 = arrastrar hacia abajo = EXTENDER tarea
         // deltaY < 0 = arrastrar hacia arriba = REDUCIR tarea
-        newHeight += event.deltaY;
+        // Ajustar deltaY por zoom para convertir a espacio SVG sin escalar
+        const adjustedDeltaY = event.deltaY / this.zoomScale;
+        newHeight += adjustedDeltaY;
         
         // REDUCCIÓN: Limitar altura mínima
-        if (event.deltaY < 0) {
+        if (adjustedDeltaY < 0) {
           const minHeight = 5;
           newHeight = Math.max(minHeight, newHeight);
         }
@@ -1175,17 +1182,19 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     const direction = event.type === 'drag-down' ? 'forward' : 'backward';
     
     // Calcular minutos de desplazamiento vertical
+    // Ajustar deltaY por zoom para convertir a espacio SVG sin escalar
     let suggestedMinutes = this.gestureService.calculateTimeShift(
-      Math.abs(event.deltaY),
+      Math.abs(event.deltaY) / this.zoomScale,
       this.pixelsPerHour,
       15
     );
     
     // Detectar movimiento horizontal significativo (más de 30px)
     // y agregar minutos equivalentes al cambio de día
-    if (Math.abs(event.deltaX) > 30) {
+    // Ajustar deltaX por zoom para convertir a espacio SVG sin escalar
+    if (Math.abs(event.deltaX / this.zoomScale) > 30) {
       const dayColumnWidth = this.dayColumnWidth + this.columnGap;
-      const dayOffset = Math.round(event.deltaX / dayColumnWidth);
+      const dayOffset = Math.round((event.deltaX / this.zoomScale) / dayColumnWidth);
       
       // Agregar minutos equivalentes a los días de desplazamiento
       // Cada día = 24 horas = 1440 minutos
@@ -1222,9 +1231,10 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
         currentDuration = this.taskTimeService.getTaskDurationMinutes(task);
     }
 
-    let pixels = event.deltaY;
+    // Ajustar deltaY por zoom para convertir a espacio SVG sin escalar
+    let pixels = event.deltaY / this.zoomScale;
     if (event.type === 'resize-start') {
-        pixels = -event.deltaY;
+        pixels = -pixels;
     }
 
     const pixelsPerHour = this.hoursAreaHeight / 24;
@@ -1891,8 +1901,9 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     const svgRect = svgElement.getBoundingClientRect();
     
     // Convertir coordenadas de pantalla a coordenadas del SVG
-    const localX = clientX - svgRect.left;
-    const localY = clientY - svgRect.top;
+    // Ajustar por zoom para convertir a espacio SVG sin escalar
+    const localX = (clientX - svgRect.left) / this.zoomScale;
+    const localY = (clientY - svgRect.top) / this.zoomScale;
     
     // Revisar todos los días visibles para encontrar tareas superpuestas
     for (let di = 0; di < this.visibleDaysCount; di++) {
@@ -2333,8 +2344,9 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     if (!svgElement) return;
     
     const svgRect = svgElement.getBoundingClientRect();
-    const localX = event.clientX - svgRect.left;
-    const localY = event.clientY - svgRect.top;
+    // Ajustar por zoom para convertir a espacio SVG sin escalar
+    const localX = (event.clientX - svgRect.left) / this.zoomScale;
+    const localY = (event.clientY - svgRect.top) / this.zoomScale;
     
     // Determinar el día
     const { dayIndex, dayDate } = this.getDayFromX(localX);
@@ -2378,10 +2390,11 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     }
     
     const svgRect = svgElement.getBoundingClientRect();
-    const localY = event.clientY - svgRect.top;
-    const localX = event.clientX - svgRect.left;
+    // Ajustar por zoom para convertir a espacio SVG sin escalar
+    const localY = (event.clientY - svgRect.top) / this.zoomScale;
+    const localX = (event.clientX - svgRect.left) / this.zoomScale;
     
-    // Verificar que el mouse esté dentro del SVG
+    // Verificar que el mouse esté dentro del SVG (ambos en espacio SVG sin escalar)
     if (localX < 0 || localX > this.svgWidth || localY < 0 || localY > this.svgHeight) {
       // Mouse fuera del SVG, cancelar selección
       this.resetRangeSelection();
