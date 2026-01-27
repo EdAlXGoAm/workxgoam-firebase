@@ -185,62 +185,80 @@ import { TaskGroup } from '../../models/task-group.model';
                   <ng-container *ngFor="let task of getTasksByProject(project.id); let i = index">
                     <ng-container *ngIf="getEnvironmentViewMode(env.id) === 'list'; else cardItem">
                       <div *ngIf="shouldShowDaySeparator(project.id, i)" class="day-separator"><span>{{ formatListDay(task.start) }}</span></div>
-                      <div class="task-list-item" 
-                           [class.status-completed]="task.status === 'completed'"
-                           [class.status-in-progress]="task.status === 'in-progress'"
-                           [class.status-pending]="task.status === 'pending'"
-                           [class.task-overdue]="isTaskOverdue(task)"
-                           [class.task-running]="isTaskRunning(task)"
-                           (click)="taskContextMenu.emit({ mouseEvent: $event, task })"
-                           (contextmenu)="taskQuickContextMenu.emit({ mouseEvent: $event, task })"
-                           [attr.title]="getTaskTooltip(task)">
-                        <div class="flex items-center gap-2">
-                          <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-xs"></i>
-                          <span class="text-base">{{ task.emoji || '📋' }}</span>
-                          <div *ngIf="getTaskTypeColor(task)" 
-                               class="w-3 h-3 rounded-full border-2 border-white shadow-sm flex-shrink-0" 
-                               [style.background-color]="getTaskTypeColor(task)"></div>
-                          <span class="truncate flex-1">{{task.name}}</span>
-                          <span class="text-xs text-gray-500 ml-2 whitespace-nowrap">{{ formatTime12(task.start) }}</span>
+                      <div class="task-card-wrapper">
+                        <div class="task-bar-running" *ngIf="isTaskRunning(task)"></div>
+                        <div class="task-bar-status"
+                             [class.bar-pending]="task.status === 'pending'"
+                             [class.bar-in-progress]="task.status === 'in-progress'"
+                             [class.bar-completed]="task.status === 'completed'"></div>
+                        <div class="task-list-item" 
+                             [class.status-completed]="task.status === 'completed'"
+                             [class.task-overdue]="isTaskOverdue(task)"
+                             (click)="taskContextMenu.emit({ mouseEvent: $event, task })"
+                             (contextmenu)="taskQuickContextMenu.emit({ mouseEvent: $event, task })"
+                             [attr.title]="getTaskTooltip(task)">
+                          <div *ngIf="isTaskUpdating(task)" class="task-loading-overlay">
+                            <div class="task-loading-spinner">
+                              <i class="fas fa-spinner fa-spin"></i>
+                            </div>
+                          </div>
+                          <div class="flex items-center gap-2">
+                            <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-xs"></i>
+                            <span class="text-base">{{ task.emoji || '📋' }}</span>
+                            <div *ngIf="getTaskTypeColor(task)" 
+                                 class="w-3 h-3 rounded-full border-2 border-white shadow-sm flex-shrink-0" 
+                                 [style.background-color]="getTaskTypeColor(task)"></div>
+                            <span class="truncate flex-1">{{task.name}}</span>
+                            <span class="text-xs text-gray-500 ml-2 whitespace-nowrap">{{ formatTime12(task.start) }}</span>
+                          </div>
                         </div>
                       </div>
                     </ng-container>
                     <ng-template #cardItem>
-                      <div class="task-card bg-white p-3 rounded-lg shadow-sm border border-gray-200 relative"
-                           [class.status-completed]="task.status === 'completed'"
-                           [class.status-in-progress]="task.status === 'in-progress'"
-                           [class.status-pending]="task.status === 'pending'"
-                           [class.task-overdue]="isTaskOverdue(task)"
-                           [class.task-running]="isTaskRunning(task)">
-                        <div class="progress-bar-container">
-                          <div class="progress-bar" 
-                               [class.progress-pending]="task.status === 'pending'"
-                               [class.progress-in-progress]="task.status === 'in-progress'"
-                               [class.progress-completed]="task.status === 'completed'">
+                      <div class="task-card-wrapper">
+                        <div class="task-bar-running" *ngIf="isTaskRunning(task)"></div>
+                        <div class="task-bar-status"
+                             [class.bar-pending]="task.status === 'pending'"
+                             [class.bar-in-progress]="task.status === 'in-progress'"
+                             [class.bar-completed]="task.status === 'completed'"></div>
+                        <div class="task-card-content bg-white p-3 rounded-lg shadow-sm border border-gray-200 relative"
+                             [class.status-completed]="task.status === 'completed'"
+                             [class.task-overdue]="isTaskOverdue(task)">
+                          <div *ngIf="isTaskUpdating(task)" class="task-loading-overlay">
+                            <div class="task-loading-spinner">
+                              <i class="fas fa-spinner fa-spin"></i>
+                            </div>
                           </div>
-                        </div>
-                        <button (click)="taskContextMenu.emit({ mouseEvent: $event, task })" (contextmenu)="taskQuickContextMenu.emit({ mouseEvent: $event, task })" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
-                          <i class="fas fa-ellipsis-v"></i>
-                        </button>
-                        <div class="flex items-center justify-between mb-2">
-                          <div class="flex items-center gap-1">
-                            <span class="text-lg">{{ task.emoji || '📋' }}</span>
-                            <div *ngIf="getTaskTypeColor(task)" 
-                                 class="w-3 h-3 rounded-full border-2 border-white shadow-sm flex-shrink-0" 
-                                 [style.background-color]="getTaskTypeColor(task)"></div>
-                            <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-sm" title="Tarea oculta"></i>
+                          <div class="progress-bar-container">
+                            <div class="progress-bar" 
+                                 [class.progress-pending]="task.status === 'pending'"
+                                 [class.progress-in-progress]="task.status === 'in-progress'"
+                                 [class.progress-completed]="task.status === 'completed'">
+                            </div>
                           </div>
-                          <span class="text-xs px-2 py-1 rounded" [class]="'priority-' + task.priority">
-                            {{task.priority}}
-                          </span>
-                        </div>
-                        <h4 class="font-medium flex items-center gap-2">
-                          <span>{{task.name}}</span>
-                        </h4>
-                        <p class="text-sm text-gray-600 mt-1 task-description-clamp">{{task.description}}</p>
-                        <div class="mt-2 text-xs text-gray-500">
-                          <div>Inicio: {{formatDate(task.start)}}</div>
-                          <div>Fin: {{formatDate(task.end)}}</div>
+                          <button (click)="taskContextMenu.emit({ mouseEvent: $event, task })" (contextmenu)="taskQuickContextMenu.emit({ mouseEvent: $event, task })" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-ellipsis-v"></i>
+                          </button>
+                          <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-1">
+                              <span class="text-lg">{{ task.emoji || '📋' }}</span>
+                              <div *ngIf="getTaskTypeColor(task)" 
+                                   class="w-3 h-3 rounded-full border-2 border-white shadow-sm flex-shrink-0" 
+                                   [style.background-color]="getTaskTypeColor(task)"></div>
+                              <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-sm" title="Tarea oculta"></i>
+                            </div>
+                            <span class="text-xs px-2 py-1 rounded" [class]="'priority-' + task.priority">
+                              {{task.priority}}
+                            </span>
+                          </div>
+                          <h4 class="font-medium flex items-center gap-2">
+                            <span>{{task.name}}</span>
+                          </h4>
+                          <p class="text-sm text-gray-600 mt-1 task-description-clamp">{{task.description}}</p>
+                          <div class="mt-2 text-xs text-gray-500">
+                            <div>Inicio: {{formatDate(task.start)}}</div>
+                            <div>Fin: {{formatDate(task.end)}}</div>
+                          </div>
                         </div>
                       </div>
                     </ng-template>
@@ -283,37 +301,43 @@ import { TaskGroup } from '../../models/task-group.model';
                   </h4>
                 </div>
                 <div class="space-y-2 ml-2">
-                  <div *ngFor="let task of getTasksWithoutProjectInEnvironment(env.id)"
-                       class="task-card bg-white p-3 rounded-lg shadow-sm border border-yellow-200 relative"
-                       [class.task-overdue]="isTaskOverdue(task)"
-                       [class.task-running]="isTaskRunning(task)">
-                    <div class="progress-bar-container">
-                      <div class="progress-bar" 
-                           [class.progress-pending]="task.status === 'pending'"
-                           [class.progress-in-progress]="task.status === 'in-progress'"
-                           [class.progress-completed]="task.status === 'completed'">
+                  <div *ngFor="let task of getTasksWithoutProjectInEnvironment(env.id)" class="task-card-wrapper">
+                    <div class="task-bar-running" *ngIf="isTaskRunning(task)"></div>
+                    <div class="task-bar-status"
+                         [class.bar-pending]="task.status === 'pending'"
+                         [class.bar-in-progress]="task.status === 'in-progress'"
+                         [class.bar-completed]="task.status === 'completed'"></div>
+                    <div class="task-card-content bg-white p-3 rounded-lg shadow-sm border border-yellow-200 relative"
+                         [class.status-completed]="task.status === 'completed'"
+                         [class.task-overdue]="isTaskOverdue(task)">
+                      <div class="progress-bar-container">
+                        <div class="progress-bar" 
+                             [class.progress-pending]="task.status === 'pending'"
+                             [class.progress-in-progress]="task.status === 'in-progress'"
+                             [class.progress-completed]="task.status === 'completed'">
+                        </div>
                       </div>
-                    </div>
-                    <button (click)="taskContextMenu.emit({ mouseEvent: $event, task })" (contextmenu)="taskQuickContextMenu.emit({ mouseEvent: $event, task })" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
-                      <i class="fas fa-ellipsis-v"></i>
-                    </button>
-                    <div class="flex items-center justify-between mb-2">
-                      <div class="flex items-center gap-1">
-                        <span class="text-lg">{{task.emoji}}</span>
-                        <div *ngIf="getTaskTypeColor(task)" 
-                             class="w-3 h-3 rounded-full border-2 border-white shadow-sm flex-shrink-0" 
-                             [style.background-color]="getTaskTypeColor(task)"></div>
-                        <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-sm" title="Tarea oculta"></i>
+                      <button (click)="taskContextMenu.emit({ mouseEvent: $event, task })" (contextmenu)="taskQuickContextMenu.emit({ mouseEvent: $event, task })" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-ellipsis-v"></i>
+                      </button>
+                      <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-1">
+                          <span class="text-lg">{{task.emoji}}</span>
+                          <div *ngIf="getTaskTypeColor(task)" 
+                               class="w-3 h-3 rounded-full border-2 border-white shadow-sm flex-shrink-0" 
+                               [style.background-color]="getTaskTypeColor(task)"></div>
+                          <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-sm" title="Tarea oculta"></i>
+                        </div>
+                        <span class="text-xs px-2 py-1 rounded" [class]="'priority-' + task.priority">
+                          {{task.priority}}
+                        </span>
                       </div>
-                      <span class="text-xs px-2 py-1 rounded" [class]="'priority-' + task.priority">
-                        {{task.priority}}
-                      </span>
-                    </div>
-                    <h4 class="font-medium">{{task.name}}</h4>
-                    <p class="text-sm text-gray-600 mt-1 task-description-clamp">{{task.description}}</p>
-                    <div class="mt-2 text-xs text-gray-500">
-                      <div>Inicio: {{formatDate(task.start)}}</div>
-                      <div>Fin: {{formatDate(task.end)}}</div>
+                      <h4 class="font-medium">{{task.name}}</h4>
+                      <p class="text-sm text-gray-600 mt-1 task-description-clamp">{{task.description}}</p>
+                      <div class="mt-2 text-xs text-gray-500">
+                        <div>Inicio: {{formatDate(task.start)}}</div>
+                        <div>Fin: {{formatDate(task.end)}}</div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -494,17 +518,21 @@ import { TaskGroup } from '../../models/task-group.model';
     .environment-content::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 3px; }
     .environment-content::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
     .environment-content::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
-    .task-card { transition: all 0.2s ease; position: relative; }
-    .task-card:hover { box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-    .task-list-item { padding: 8px 10px; border: 1px solid #e5e7eb; border-radius: 8px; background: #ffffff; cursor: pointer; transition: background 0.2s ease; max-width: 75%; user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; }
+    .task-card-wrapper { display: flex; flex-direction: row; }
+    .task-bar-running { width: 4px; background-color: #10b981; border-radius: 8px 0 0 8px; flex-shrink: 0; }
+    .task-bar-status { width: 4px; flex-shrink: 0; }
+    .bar-pending { background-color: #3b82f6; }
+    .bar-in-progress { background-color: #facc15; }
+    .bar-completed { background-color: #22c55e; }
+    .task-card-content { transition: all 0.2s ease; position: relative; flex: 1; }
+    .task-card-content:hover { box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .task-list-item { padding: 8px 10px; border: 1px solid #e5e7eb; border-radius: 0 8px 8px 0; background: #ffffff; cursor: pointer; transition: background 0.2s ease; max-width: 75%; user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; flex: 1; }
     .task-list-item:hover { background: #f9fafb; }
     .day-separator { display: flex; align-items: center; text-align: center; color: #6b7280; font-size: 12px; margin: 8px 0; }
     .day-separator::before, .day-separator::after { content: ''; flex: 1; border-bottom: 1px solid #e5e7eb; }
     .day-separator:not(:empty)::before { margin-right: .5em; }
     .day-separator:not(:empty)::after { margin-left: .5em; }
-    .status-completed { opacity: 0.6; text-decoration: line-through; border-left: 4px solid #22c55e; }
-    .status-in-progress { border-left: 4px solid #facc15; }
-    .status-pending { border-left: 4px solid #3b82f6; }
+    .status-completed { opacity: 0.6; text-decoration: line-through; }
     .project-section { border-left: 3px solid #e5e7eb; padding-left: 8px; margin-left: 4px; }
     .project-section:hover { border-left-color: #6366f1; }
     .progress-bar-container { position: absolute; top: 0; left: 0; right: 0; width: 100%; height: 6px; background-color: #e5e7eb; border-radius: 8px 8px 0 0; overflow: hidden; }
@@ -514,8 +542,6 @@ import { TaskGroup } from '../../models/task-group.model';
     .progress-completed { width: 100%; background-color: #10b981; }
     .task-overdue { border: 2px solid #ef4444; box-shadow: 0 0 8px rgba(239, 68, 68, 0.6), 0 0 16px rgba(239, 68, 68, 0.3); position: relative; }
     .task-overdue:hover { }
-    .task-running { box-shadow: inset 0 0 0 3px #10b981; position: relative; }
-    .task-running:hover { transform: translateY(-2px); }
     button[disabled] { opacity: 0.4; cursor: not-allowed; }
     button[disabled]:hover { opacity: 0.4; }
     /* Descripción de tarea con saltos de línea y límite de 3 líneas */
@@ -527,6 +553,23 @@ import { TaskGroup } from '../../models/task-group.model';
       white-space: pre-wrap;
       word-break: break-word;
       line-height: 1.4;
+    }
+    .task-loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(255, 255, 255, 0.8);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+    .task-loading-spinner {
+      font-size: 24px;
+      color: #3b82f6;
     }
   `]
 })
@@ -558,6 +601,7 @@ export class WeekViewComponent implements OnChanges, AfterViewInit, AfterViewChe
   @Input() isLoadingOrderFromDatabase: boolean = false;
   @Input() orderSyncMessage: string = '';
   @Input() orderSyncMessageType: 'success' | 'error' | 'info' = 'info';
+  @Input() tasksUpdatingStatus: { [taskId: string]: boolean } = {};
 
   @Output() editTask = new EventEmitter<Task>();
   @Output() deleteTask = new EventEmitter<Task>();
@@ -583,6 +627,10 @@ export class WeekViewComponent implements OnChanges, AfterViewInit, AfterViewChe
   private resizeListener?: () => void;
 
   constructor(private cdr: ChangeDetectorRef, private ngZone: NgZone) {}
+  
+  isTaskUpdating(task: Task): boolean {
+    return !!this.tasksUpdatingStatus[task.id];
+  }
 
   // Método para verificar si estamos en layout ancho
   private checkWideLayout(): void {

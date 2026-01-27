@@ -248,6 +248,18 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
   showStatusChangeModal = false;
   pendingStatusChange: { task: Task; status: 'pending' | 'in-progress' | 'completed' } | null = null;
   statusChangeWillHide = false; // Para mostrar diferente mensaje según si va a ocultar o mostrar
+  
+  // Set para rastrear tareas que están siendo actualizadas
+  tasksUpdatingStatus = new Set<string>();
+  
+  // Getter para convertir el Set a un objeto simple para pasar a los componentes hijos
+  get tasksUpdatingStatusMap(): { [taskId: string]: boolean } {
+    const map: { [taskId: string]: boolean } = {};
+    this.tasksUpdatingStatus.forEach(taskId => {
+      map[taskId] = true;
+    });
+    return map;
+  }
 
   // Propiedades para recordatorios con fecha/hora separadas
   newTaskReminderDates: string[] = [];
@@ -2399,6 +2411,7 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
       this.statusChangeWillHide = false;
     } else {
       // Para otros cambios, aplicar directamente sin modal
+      this.closeContextMenu();
       await this.applyStatusChange(task, status, false);
       return;
     }
@@ -2409,6 +2422,9 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
   }
 
   async applyStatusChange(task: Task, status: 'pending' | 'in-progress' | 'completed', changeVisibility: boolean = false) {
+    // Agregar la tarea al set de actualización
+    this.tasksUpdatingStatus.add(task.id);
+    
     try {
       const updates: Partial<Task> = { status };
       
@@ -2433,6 +2449,9 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
       await this.loadTasks();
     } catch (error) {
       console.error('Error al cambiar estado:', error);
+    } finally {
+      // Remover la tarea del set de actualización
+      this.tasksUpdatingStatus.delete(task.id);
     }
   }
 
