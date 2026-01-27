@@ -390,7 +390,7 @@ import { TaskGroup } from '../../models/task-group.model';
     
     .wide-layout .week-layout-wrapper {
       flex-direction: row;
-      align-items: flex-start;
+      align-items: stretch;
       min-height: 600px;
       gap: 1.5rem;
       overflow: hidden;
@@ -401,9 +401,41 @@ import { TaskGroup } from '../../models/task-group.model';
       top: 0;
       width: 900px;
       flex-shrink: 0;
-      height: fit-content;
-      max-height: 100%;
-      overflow: visible;
+      height: auto;
+      max-height: calc(100vh - 150px);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .wide-layout .timeline-section h3 {
+      flex-shrink: 0;
+    }
+    
+    .wide-layout .timeline-section app-week-timeline-svg {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    
+    .wide-layout .timeline-section ::ng-deep .timeline-component-wrapper {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    
+    .wide-layout .timeline-section ::ng-deep .timeline-controls-section {
+      flex-shrink: 0;
+    }
+    
+    .wide-layout .timeline-section ::ng-deep .week-timeline-container {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
     }
     
     .wide-layout .environments-section {
