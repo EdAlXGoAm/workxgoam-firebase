@@ -115,15 +115,21 @@
   <div #containerRef class="week-timeline-container w-full overflow-auto relative">
     <!-- Tooltip para mostrar información completa de la tarea -->
   <div *ngIf="showTooltip && tooltipTask" 
-       class="tooltip-container absolute top-[150px] left-1/2 transform -translate-x-1/2 z-50 bg-gray-900 text-white px-6 py-5 rounded-xl shadow-2xl max-w-2xl min-w-[400px]">
+       class="tooltip-container absolute top-[150px] left-1/2 transform -translate-x-1/2 z-50 bg-gray-900 text-white px-6 py-5 rounded-xl shadow-2xl max-w-2xl min-w-[400px]"
+       (mousedown)="onTooltipMouseDown($event)"
+       (mouseup)="onTooltipMouseUp($event)">
     <div class="flex items-start space-x-4">
       <span class="text-3xl flex-shrink-0">{{ tooltipTask.emoji }}</span>
       <div *ngIf="getTaskTypeColor(tooltipTask)" 
            class="w-5 h-5 rounded-full border-2 border-white shadow-sm flex-shrink-0 mt-1" 
            [style.background-color]="getTaskTypeColor(tooltipTask)"></div>
       <div class="flex-1">
-        <div class="font-bold text-lg mb-2">{{ getTaskDisplayName(tooltipTask) }}</div>
-        <div *ngIf="tooltipTask.description" class="text-sm text-gray-200 mt-2 mb-3 leading-relaxed">{{ tooltipTask.description }}</div>
+        <div class="font-bold text-lg mb-1">{{ getTaskDisplayName(tooltipTask) }}</div>
+        <div *ngIf="taskHasComplexGroup(tooltipTask)" class="text-sm text-amber-300 mb-2 flex items-center space-x-2">
+          <i class="fas fa-layer-group text-xs"></i>
+          <span class="font-medium">{{ getTaskGroupName(tooltipTask.taskGroupId) }}</span>
+        </div>
+        <div *ngIf="tooltipTask.description" class="text-sm text-gray-200 mt-2 mb-3 leading-relaxed task-description-clamp">{{ tooltipTask.description }}</div>
         <div class="flex flex-wrap gap-4 mt-3">
           <div class="text-sm text-gray-300 flex items-center space-x-2">
             <i class="fas fa-clock text-xs"></i>

@@ -117,6 +117,9 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
   showTooltip: boolean = false;
   tooltipTask: Task | null = null;
   tooltipTimeout: any = null;
+  // Variables para detectar selección de texto en tooltip
+  private tooltipMouseDownPos: { x: number; y: number } | null = null;
+  private isTooltipTextSelection: boolean = false;
 
   // 📱 SISTEMA DE MENÚ CONTEXTUAL
   showContextMenu: boolean = false;
@@ -1686,11 +1689,49 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
       this.closeContextMenu();
     }
     if (this.showTooltip) {
-      this.hideTooltip();
+      // No cerrar el tooltip si hubo selección de texto
+      if (this.isTooltipTextSelection) {
+        this.isTooltipTextSelection = false;
+        return;
+      }
+      // Verificar si el click fue dentro del tooltip
+      const tooltipElement = (event.target as HTMLElement).closest('.tooltip-container');
+      if (!tooltipElement) {
+        this.hideTooltip();
+      }
     }
     if (this.showTaskSelector) {
       this.closeTaskSelector();
     }
+  }
+
+  // Métodos para manejar selección de texto en tooltip
+  onTooltipMouseDown(event: MouseEvent): void {
+    event.stopPropagation();
+    this.tooltipMouseDownPos = { x: event.clientX, y: event.clientY };
+    this.isTooltipTextSelection = false;
+    // Reiniciar el timeout del tooltip mientras se interactúa
+    if (this.tooltipTimeout) {
+      clearTimeout(this.tooltipTimeout);
+      this.tooltipTimeout = null;
+    }
+  }
+
+  onTooltipMouseUp(event: MouseEvent): void {
+    event.stopPropagation();
+    if (this.tooltipMouseDownPos) {
+      const dx = Math.abs(event.clientX - this.tooltipMouseDownPos.x);
+      const dy = Math.abs(event.clientY - this.tooltipMouseDownPos.y);
+      // Si el mouse se movió más de 5px, considerar como selección de texto
+      if (dx > 5 || dy > 5) {
+        this.isTooltipTextSelection = true;
+      }
+    }
+    this.tooltipMouseDownPos = null;
+    // Reiniciar el timeout del tooltip
+    this.tooltipTimeout = setTimeout(() => {
+      this.hideTooltip();
+    }, 4000);
   }
 
   // ========================

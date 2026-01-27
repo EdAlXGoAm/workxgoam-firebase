@@ -32,7 +32,7 @@
 .week-timeline-container::-webkit-scrollbar-track,.task-selector-list::-webkit-scrollbar-track{background:#f1f1f1;border-radius:3px}
 .week-timeline-container::-webkit-scrollbar-thumb,.task-selector-list::-webkit-scrollbar-thumb{background:#c1c1c1;border-radius:3px}
 .week-timeline-container::-webkit-scrollbar-thumb:hover,.task-selector-list::-webkit-scrollbar-thumb:hover{background:#a8a8a8}
-.tooltip-container{animation:fi .3s;pointer-events:none;z-index:1000;border:2px solid rgba(255,255,255,.1)}
+.tooltip-container{animation:fi .3s;pointer-events:auto;z-index:1000;border:2px solid rgba(255,255,255,.1);user-select:text;-webkit-user-select:text;-moz-user-select:text;-ms-user-select:text}
 @keyframes fi{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%)}}
 .cursor-pointer:not(.task-rect):not(.task-inner){cursor:pointer}
 .cursor-pointer:not(.task-rect):not(.task-inner):hover{opacity:.9;filter:brightness(1.1)}
@@ -83,3 +83,5 @@
 .weekend-toggle input:checked+.w-12{background-color:#4f46e5}
 .weekend-toggle input:checked+.w-12:after{transform:translateX(1.5rem)}
 @media(max-width:640px){.toggle-button{padding:8px 12px;font-size:12px}.toggle-button span{font-size:11px}.task-selector-menu{min-width:240px;max-width:calc(100vw - 24px)}.task-selector-header{padding:12px 14px 6px;font-size:14px}.task-selector-subtitle{padding:0 14px 10px;font-size:11px}.task-selector-item{padding:10px 12px;font-size:13px}.controls-row{flex-direction:column}.zoom-controls,.weekend-toggle{width:100%;justify-content:center}}
+/* Descripción de tarea con saltos de línea y límite de 3 líneas */
+.task-description-clamp{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap;word-break:break-word;line-height:1.4}
