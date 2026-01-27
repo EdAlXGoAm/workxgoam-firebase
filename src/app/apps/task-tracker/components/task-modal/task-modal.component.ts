@@ -56,6 +56,7 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   selectableTaskTypes: TaskType[] = [];
   taskGroups: TaskGroup[] = [];
   isLoading = false;
+  isLoadingTaskTypes = false;
   
   // Referencias para el selector de emojis
   @ViewChild('emojiButton', { static: false }) emojiButton!: ElementRef;
@@ -689,9 +690,16 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
 
   async onProjectChange() {
     if (this.task.project) {
+      // Deshabilitar selector de tipos mientras carga
+      this.isLoadingTaskTypes = true;
+      this.selectableTaskTypes = [];
+      this.buildTaskTypeOptions();
+      
       await this.loadTaskTypes();
       this.selectableTaskTypes = this.taskTypes.filter(t => t.projectId === this.task.project);
       this.buildTaskTypeOptions(); // Actualizar opciones de tipo de tarea
+      this.isLoadingTaskTypes = false;
+      
       // Cargar grupos de tareas cuando se selecciona un proyecto
       await this.loadTaskGroups();
       // Cargar tareas recientes cuando se selecciona un proyecto (solo si no estamos editando)
@@ -707,6 +715,7 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
       this.recentTasks = [];
       this.showRecentTasksSelector = false;
       this.selectedRecentTaskIndex = '';
+      this.isLoadingTaskTypes = false;
     }
     // Si el tipo actual no está en los tipos seleccionables, limpiarlo
     if (this.task.type && !this.selectableTaskTypes.find(t => t.id === this.task.type)) {

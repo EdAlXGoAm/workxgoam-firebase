@@ -1,0 +1,174 @@
+.custom-select-container {
+  position: relative;
+  width: 100%;
+}
+
+.custom-select-container.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.custom-select-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+  min-height: 42px;
+}
+
+.custom-select-input:hover:not(.disabled) {
+  border-color: #9ca3af;
+}
+
+.custom-select-input.open {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.custom-select-input.disabled {
+  background: #f3f4f6;
+  cursor: not-allowed;
+}
+
+.selected-text {
+  font-size: 0.875rem;
+  color: #111827;
+}
+
+.placeholder-text {
+  font-size: 0.875rem;
+  color: #9ca3af;
+}
+
+.custom-select-dropdown {
+  position: fixed;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  z-index: 99999;
+  overflow: hidden;
+}
+
+.options-list {
+  overflow-y: auto;
+  max-height: inherit;
+}
+
+.option-item {
+  padding: 0.625rem 0.75rem;
+  cursor: pointer;
+  transition: background-color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.option-item:last-child {
+  border-bottom: none;
+}
+
+.option-item:hover {
+  background-color: #f9fafb;
+}
+
+.option-item.selected {
+  background-color: #eef2ff;
+}
+
+.option-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.option-label {
+  display: block;
+  font-size: 0.875rem;
+  color: #111827;
+  font-weight: 500;
+}
+
+.option-subtitle {
+  display: block;
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-top: 0.125rem;
+}
+
+/* Estilos responsive para móviles */
+@media (max-width: 768px) {
+  .custom-select-input {
+    font-size: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    min-height: 38px;
+  }
+  
+  .selected-text,
+  .placeholder-text {
+    font-size: 0.75rem;
+  }
+  
+  .option-item {
+    padding: 0.5rem 0.75rem;
+  }
+  
+  .option-label {
+    font-size: 0.75rem;
+  }
+  
+  .option-subtitle {
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .custom-select-input {
+    font-size: 0.7rem;
+    padding: 0.4rem 0.6rem;
+    min-height: 36px;
+  }
+  
+  .selected-text,
+  .placeholder-text {
+    font-size: 0.7rem;
+  }
+  
+  .option-item {
+    padding: 0.4rem 0.6rem;
+  }
+  
+  .option-label {
+    font-size: 0.7rem;
+  }
+  
+  .option-subtitle {
+    font-size: 0.65rem;
+  }
+}
+
+/* Scrollbar personalizado */
+.options-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.options-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.options-list::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.options-list::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}

@@ -1,0 +1,53 @@
+<div class="custom-select-container" [class.disabled]="disabled">
+  <!-- Input clickeable que muestra la opción seleccionada -->
+  <div 
+    class="custom-select-input"
+    [class.open]="isOpen"
+    [class.disabled]="disabled"
+    [class.rounded-r-none]="!roundedRight"
+    (click)="toggleDropdown($event)">
+    <div class="flex-1 truncate flex items-center gap-2">
+      <img *ngIf="selectedOption?.image" 
+           [src]="selectedOption?.image" 
+           class="w-6 h-6 rounded-md object-cover flex-shrink-0"
+           alt="">
+      <span *ngIf="selectedOption" class="selected-text">{{ selectedOption.label }}</span>
+      <span *ngIf="!selectedOption" class="placeholder-text">{{ placeholder }}</span>
+    </div>
+    <i class="fas transition-transform duration-200" 
+       [class.fa-chevron-down]="!isOpen"
+       [class.fa-chevron-up]="isOpen"></i>
+  </div>
+  
+  <!-- Dropdown con las opciones - position fixed para salir del contenedor -->
+  <div 
+    *ngIf="isOpen" 
+    class="custom-select-dropdown"
+    [style.top.px]="dropdownTop"
+    [style.left.px]="dropdownLeft"
+    [style.width.px]="dropdownWidth"
+    [class.max-h-60]="!maxHeightClass"
+    [class]="maxHeightClass">
+    <div class="options-list">
+      <div 
+        *ngFor="let option of options"
+        class="option-item"
+        [class.selected]="value === option.value"
+        (click)="selectOption(option, $event)">
+        <img *ngIf="option.image" 
+             [src]="option.image" 
+             class="w-8 h-8 rounded-md object-cover flex-shrink-0"
+             alt="">
+        <div class="option-content">
+          <span class="option-label">{{ option.label }}</span>
+          <span *ngIf="option.subtitle" class="option-subtitle">{{ option.subtitle }}</span>
+        </div>
+        <i *ngIf="value === option.value" class="fas fa-check text-indigo-600"></i>
+      </div>
+      
+      <div *ngIf="options.length === 0" class="option-item text-center text-gray-400">
+        {{ emptyMessage }}
+      </div>
+    </div>
+  </div>
+</div>

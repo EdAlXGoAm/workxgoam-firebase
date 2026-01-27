@@ -40,14 +40,8 @@
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Ambiente</label>
               <div class="flex gap-0">
-                <!-- Selector nativo para desktop (≥768px) -->
-                <select [(ngModel)]="task.environment" (ngModelChange)="onEnvironmentChange()" name="environment" class="hidden md:block w-full px-3 py-2 border rounded-lg rounded-r-none bg-white">
-                  <option value="">Seleccionar ambiente</option>
-                  <option *ngFor="let env of environments" [value]="env.id">{{env.emoji ? env.emoji + ' ' + env.name : env.name}}</option>
-                </select>
-                
-                <!-- Selector personalizado para móvil (<768px) -->
-                <div class="block md:hidden flex-1">
+                <!-- Selector personalizado para todas las resoluciones -->
+                <div class="flex-1">
                   <app-custom-select
                     [options]="environmentOptions"
                     [(ngModel)]="task.environment"
@@ -58,7 +52,7 @@
                   </app-custom-select>
                 </div>
                 
-                <button type="button" (click)="openEnvironmentModal.emit()" class="px-3 py-2 bg-gray-200 border md:border-l-0 rounded-r-lg flex-shrink-0">
+                <button type="button" (click)="openEnvironmentModal.emit()" class="px-3 py-2 bg-gray-200 border border-l-0 rounded-r-lg flex-shrink-0">
                   <i class="fas fa-plus"></i>
                 </button>
               </div>
@@ -67,24 +61,8 @@
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Proyecto</label>
               <div class="flex gap-0">
-                <!-- Imagen del proyecto seleccionado (desktop) -->
-                <div *ngIf="getSelectedProjectImage()" class="hidden md:flex items-center justify-center px-2 border border-r-0 rounded-l-lg bg-white">
-                  <img [src]="getSelectedProjectImage()" class="w-8 h-8 rounded-md object-cover" alt="">
-                </div>
-                
-                <!-- Selector nativo para desktop (≥768px) -->
-                <select [(ngModel)]="task.project" (ngModelChange)="onProjectChange()" name="project" 
-                        class="hidden md:block w-full px-3 py-2 border bg-white"
-                        [class.rounded-lg]="!getSelectedProjectImage()"
-                        [class.rounded-r-none]="true"
-                        [class.rounded-l-none]="getSelectedProjectImage()"
-                        [disabled]="!task.environment || selectableProjects.length === 0">
-                  <option value="">Seleccionar proyecto</option>
-                  <option *ngFor="let proj of selectableProjects" [value]="proj.id">{{proj.name}}</option>
-                </select>
-                
-                <!-- Selector personalizado para móvil (<768px) -->
-                <div class="block md:hidden flex-1">
+                <!-- Selector personalizado para todas las resoluciones -->
+                <div class="flex-1">
                   <app-custom-select
                     [options]="projectOptions"
                     [(ngModel)]="task.project"
@@ -96,7 +74,7 @@
                   </app-custom-select>
                 </div>
                 
-                <button type="button" (click)="openProjectModal.emit()" class="px-3 py-2 bg-gray-200 border md:border-l-0 rounded-r-lg flex-shrink-0">
+                <button type="button" (click)="openProjectModal.emit()" class="px-3 py-2 bg-gray-200 border border-l-0 rounded-r-lg flex-shrink-0">
                   <i class="fas fa-plus"></i>
                 </button>
               </div>
@@ -107,23 +85,15 @@
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Tarea</label>
             <div class="flex gap-0">
-              <!-- Selector nativo para desktop (≥768px) -->
-              <select [(ngModel)]="task.type" name="type" class="hidden md:block w-full px-3 py-2 border rounded-lg rounded-r-none bg-white" [disabled]="!task.project">
-                <option [ngValue]="undefined">Sin tipo</option>
-                <option *ngFor="let type of selectableTaskTypes" [ngValue]="type.id">
-                  {{type.name}}
-                </option>
-              </select>
-              
-              <!-- Selector personalizado para móvil (<768px) -->
-              <div class="block md:hidden flex-1">
+              <!-- Selector personalizado para todas las resoluciones -->
+              <div class="flex-1">
                 <app-custom-select
                   [options]="taskTypeOptions"
                   [(ngModel)]="task.type"
                   (optionSelected)="onTaskTypeSelectCustom($event)"
                   name="taskTypeCustom"
                   placeholder="Sin tipo"
-                  [disabled]="!task.project"
+                  [disabled]="!task.project || isLoadingTaskTypes"
                   [roundedRight]="false">
                 </app-custom-select>
               </div>
@@ -131,8 +101,8 @@
               <button 
                 type="button" 
                 (click)="openTaskTypeModal.emit()" 
-                class="px-3 py-2 bg-gray-200 border md:border-l-0 rounded-r-lg flex-shrink-0"
-                [disabled]="!task.project"
+                class="px-3 py-2 bg-gray-200 border border-l-0 rounded-r-lg flex-shrink-0"
+                [disabled]="!task.project || isLoadingTaskTypes"
                 [title]="task.project ? 'Agregar tipo de tarea' : 'Selecciona un proyecto primero'">
                 <i class="fas fa-plus"></i>
               </button>
@@ -709,33 +679,7 @@
     
     <!-- Contenido scrollable -->
     <div class="flex-1 overflow-y-auto p-4 md:p-6">
-      <!-- Selector nativo para desktop (≥768px) -->
-      <select 
-        *ngIf="recentTasks.length > 0"
-        [(ngModel)]="selectedRecentTaskIndex"
-        (change)="onRecentTaskSelectNative(selectedRecentTaskIndex)"
-        name="recentTaskSelectorModal"
-        class="hidden md:block w-full px-3 py-2 border border-indigo-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-4">
-        <option value="">Selecciona una tarea para autocompletar...</option>
-        <option *ngFor="let task of recentTasks; let i = index" [value]="i">
-          {{task.emoji || '📝'}} {{task.name}} 
-          <span class="text-gray-500 text-xs">
-            ({{formatReminderDateTime(task.updatedAt || task.createdAt)}})
-          </span>
-        </option>
-      </select>
-      
-      <!-- Selector personalizado para móvil (<768px) -->
-      <div *ngIf="recentTasks.length > 0" class="block md:hidden mb-4">
-        <app-custom-select
-          [options]="recentTasksOptions"
-          (optionSelected)="onRecentTaskSelect($event)"
-          placeholder="Selecciona una tarea para autocompletar..."
-          maxHeightClass="max-h-72">
-        </app-custom-select>
-      </div>
-      
-      <!-- Lista de tareas recientes (alternativa visual) -->
+      <!-- Lista de tareas recientes -->
       <div class="space-y-2">
         <div *ngFor="let task of recentTasks; let i = index" 
              (click)="applyRecentTaskData(i)"
