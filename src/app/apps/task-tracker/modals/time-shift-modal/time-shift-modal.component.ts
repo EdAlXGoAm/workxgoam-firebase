@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output, OnInit, OnDestroy, ElementRef, Renderer2 } from '@angular/core';
+import { Component, EventEmitter, Input, Output, OnInit, OnDestroy, ElementRef, Renderer2, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Task } from '../../models/task.model';
@@ -664,6 +664,12 @@ export class TimeShiftModalComponent implements OnInit, OnDestroy {
     }
     
     this.confirm.emit(result);
+  }
+
+  @HostListener('document:keydown.escape', ['$event'])
+  onEscapeKey(event: KeyboardEvent): void {
+    event.preventDefault();
+    this.onCancel();
   }
 
   onCancel(): void {
