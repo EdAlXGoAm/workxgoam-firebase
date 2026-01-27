@@ -477,12 +477,8 @@ import { TaskGroup } from '../../models/task-group.model';
     .progress-completed { width: 100%; background-color: #10b981; }
     .task-overdue { border: 2px solid #ef4444; box-shadow: 0 0 8px rgba(239, 68, 68, 0.6), 0 0 16px rgba(239, 68, 68, 0.3); position: relative; }
     .task-overdue:hover { }
-    .task-running { border: 3px solid transparent; animation: running-pulse 1.5s infinite; position: relative; }
-    @keyframes running-pulse {
-      0%, 100% { border-color: #10b981; box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.4), 0 0 20px rgba(16, 185, 129, 0.3), 0 0 40px rgba(16, 185, 129, 0.2); }
-      50% { border-color: #ffffff; box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.8), 0 0 25px rgba(255, 255, 255, 0.6), 0 0 45px rgba(255, 255, 255, 0.4); }
-    }
-    .task-running:hover { animation: running-pulse 1.5s infinite; transform: translateY(-2px); }
+    .task-running { box-shadow: inset 0 0 0 3px #10b981; position: relative; }
+    .task-running:hover { transform: translateY(-2px); }
     button[disabled] { opacity: 0.4; cursor: not-allowed; }
     button[disabled]:hover { opacity: 0.4; }
     /* Descripción de tarea con saltos de línea y límite de 3 líneas */

@@ -268,36 +268,16 @@
 .task-overdue:hover {
 }
 
-/* Tareas en progreso - efecto parpadeante verde-blanco */
+/* Tareas en progreso - línea verde gruesa interior */
 .task-running {
-  border: 3px solid transparent;
-  animation: running-pulse 1.5s infinite;
+  box-shadow: inset 0 0 0 3px #10b981;
+  border-color: #10b981; /* Fallback o refuerzo */
   position: relative;
-}
-
-@keyframes running-pulse {
-  0%, 100% {
-    border-color: #10b981;
-    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.4), 
-                0 0 20px rgba(16, 185, 129, 0.3),
-                0 0 40px rgba(16, 185, 129, 0.2);
-  }
-  50% {
-    border-color: #ffffff;
-    box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.8), 
-                0 0 25px rgba(255, 255, 255, 0.6),
-                0 0 45px rgba(255, 255, 255, 0.4);
-  }
 }
 
 /* Asegurar que el efecto se vea incluso en tareas hover */
 .task-running:hover {
-  animation: running-pulse 1.5s infinite;
   transform: translateY(-2px);
-}
-
-.task-running::before {
-  animation: pulse 2s infinite;
 }
 
 .reminder-item {
@@ -307,17 +287,6 @@
 .reminder-item:hover {
   background-color: #f3f4f6;
   border: 1px solid #e5e7eb;
-}
-
-@keyframes pulse {
-  0%, 100% {
-    transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
-  }
-  50% {
-    transform: scale(1.05);
-    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.5);
-  }
 }
 
 /* Descripción de tarea con saltos de línea y límite de 3 líneas */

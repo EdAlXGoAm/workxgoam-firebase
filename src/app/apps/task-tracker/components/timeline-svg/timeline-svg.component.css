@@ -51,11 +51,9 @@
 .task-hidden{opacity:.5}
 .task-hidden text{fill:#888!important}
 .task-overdue{filter:drop-shadow(0 0 3px rgba(239,68,68,.5)) drop-shadow(0 0 6px rgba(239,68,68,.3))}
-.task-running{filter:drop-shadow(0 0 3px rgba(16,185,129,.5)) drop-shadow(0 0 6px rgba(16,185,129,.3));animation:rp 1.5s infinite}
-@keyframes rp{0%,100%{filter:drop-shadow(0 0 3px rgba(16,185,129,.5)) drop-shadow(0 0 6px rgba(16,185,129,.3))}50%{filter:drop-shadow(0 0 4px rgba(255,255,255,.8)) drop-shadow(0 0 8px rgba(255,255,255,.4))}}
+.task-running .task-rect{stroke:#10b981!important;stroke-width:4px!important}
 .task-overlapping.task-overdue{filter:drop-shadow(0 0 2px rgba(239,68,68,.2)) drop-shadow(0 0 4px rgba(239,68,68,.12))}
-.task-overlapping.task-running{filter:drop-shadow(0 0 2px rgba(16,185,129,.2)) drop-shadow(0 0 4px rgba(16,185,129,.12));animation:rpo 1.5s infinite}
-@keyframes rpo{0%,100%{filter:drop-shadow(0 0 2px rgba(16,185,129,.2)) drop-shadow(0 0 4px rgba(16,185,129,.12))}50%{filter:drop-shadow(0 0 3px rgba(255,255,255,.3)) drop-shadow(0 0 6px rgba(255,255,255,.15))}}
+.task-overlapping.task-running .task-rect{stroke:#10b981!important;stroke-width:3px!important}
 .task-selector-menu{position:fixed;background:#fff;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:10001;min-width:280px;max-width:360px;overflow:hidden;animation:tsFade .2s}
 @keyframes tsFade{from{opacity:0;transform:scale(.92) translateY(-8px)}to{opacity:1;transform:scale(1)}}
 .task-selector-header{padding:14px 18px 8px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;display:flex;align-items:center;font-size:15px}
