@@ -100,7 +100,7 @@ import { TaskGroup } from '../../models/task-group.model';
           </div>
 
           <div *ngIf="!isLoadingEnvironmentOrder" class="environments-grid">
-        <div *ngFor="let env of orderedEnvironments" class="board-column" [class.board-column-empty]="!environmentHasTasks(env.id)">
+        <div *ngFor="let env of orderedEnvironments" class="board-column" [class.board-column-empty]="!environmentHasTasks(env.id)" [class.board-column-collapsed]="isEnvironmentCollapsed(env.id)">
           <div class="environment-header p-4 pb-2">
             <div class="flex items-center justify-between">
               <h3 class="font-medium px-3 py-1.5 rounded-full text-sm flex-1 inline-flex items-center gap-1 text-gray-700"
@@ -455,6 +455,15 @@ import { TaskGroup } from '../../models/task-group.model';
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      transition: background-color 0.2s ease;
+    }
+    
+    .board-column-collapsed {
+      background-color: #d1d5db;
+    }
+    
+    .board-column-collapsed .environment-header {
+      background-color: #d1d5db;
     }
     
     @media (min-width: 1650px) {
@@ -472,6 +481,7 @@ import { TaskGroup } from '../../models/task-group.model';
       background-color: #f3f4f6;
       z-index: 10;
       border-radius: 8px 8px 0 0;
+      transition: background-color 0.2s ease;
     }
     .environment-content {
       flex: 1;
