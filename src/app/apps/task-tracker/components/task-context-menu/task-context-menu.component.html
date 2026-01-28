@@ -30,6 +30,16 @@
     <i class="fas fa-eye-slash mr-2"></i>
     Ocultar
   </button>
+  <div class="context-menu-divider"></div>
+  <div class="context-menu-item-with-submenu" 
+       (mouseenter)="onActionsMouseEnter($event)" 
+       (mouseleave)="onActionsMouseLeave()">
+    <button class="context-menu-item">
+      <i class="fas fa-clock mr-2"></i>
+      Acciones
+      <i class="fas fa-chevron-right ml-auto"></i>
+    </button>
+  </div>
   <div *ngIf="isOverdue || isRunning" class="context-menu-divider"></div>
   <button *ngIf="(isOverdue || isRunning) && task.status !== 'completed'" 
           class="context-menu-item context-menu-item-completed" 

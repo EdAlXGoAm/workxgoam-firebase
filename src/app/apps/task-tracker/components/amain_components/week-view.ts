@@ -40,6 +40,8 @@ import { TaskGroup } from '../../models/task-group.model';
             [taskGroups]="taskGroups"
             (editTask)="editTask.emit($event)" 
             (deleteTask)="deleteTask.emit($event)"
+            (toggleHidden)="toggleHidden.emit($event)"
+            (changeStatus)="changeStatus.emit($event)"
             (taskUpdated)="taskUpdated.emit($event)"
             (createTaskWithRange)="createTaskWithRange.emit($event)">
           </app-week-timeline-svg>
@@ -925,6 +927,8 @@ export class WeekViewComponent implements OnChanges, AfterViewInit, AfterViewChe
 
   @Output() editTask = new EventEmitter<Task>();
   @Output() deleteTask = new EventEmitter<Task>();
+  @Output() toggleHidden = new EventEmitter<Task>();
+  @Output() changeStatus = new EventEmitter<{ task: Task; status: 'pending' | 'in-progress' | 'completed' }>();
   @Output() taskUpdated = new EventEmitter<Task>();
   @Output() taskContextMenu = new EventEmitter<{ mouseEvent: MouseEvent; task: Task }>();
   @Output() taskQuickContextMenu = new EventEmitter<{ mouseEvent: MouseEvent; task: Task }>();

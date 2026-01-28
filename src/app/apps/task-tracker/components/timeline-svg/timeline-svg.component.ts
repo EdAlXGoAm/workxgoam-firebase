@@ -126,6 +126,8 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
   contextMenuTask: Task | null = null;
   contextMenuX: number = 0;
   contextMenuY: number = 0;
+  private submenuElement: HTMLElement | null = null;
+  private submenuCloseTimeout: any = null;
 
   // 🎯 SISTEMA DE SELECCIÓN DE TAREAS SUPERPUESTAS
   showTaskSelector: boolean = false;
@@ -1685,6 +1687,219 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
       this.changeStatus.emit({ task: this.contextMenuTask, status });
       this.closeContextMenu();
     }
+  }
+
+  /**
+   * Desplaza la tarea 15 minutos hacia adelante
+   */
+  shiftTaskForward(): void {
+    if (this.contextMenuTask) {
+      this.timeShiftTask = this.contextMenuTask;
+      this.timeShiftFragmentIndex = null;
+      this.suggestedShiftDirection = 'forward';
+      this.suggestedShiftMinutes = 15;
+      this.showTimeShiftModal = true;
+      this.closeContextMenu();
+      this.cdr.detectChanges();
+    }
+  }
+
+  /**
+   * Desplaza la tarea 15 minutos hacia atrás
+   */
+  shiftTaskBackward(): void {
+    if (this.contextMenuTask) {
+      this.timeShiftTask = this.contextMenuTask;
+      this.timeShiftFragmentIndex = null;
+      this.suggestedShiftDirection = 'backward';
+      this.suggestedShiftMinutes = 15;
+      this.showTimeShiftModal = true;
+      this.closeContextMenu();
+      this.cdr.detectChanges();
+    }
+  }
+
+  /**
+   * Extiende la duración de la tarea 15 minutos
+   */
+  extendTask(): void {
+    if (this.contextMenuTask) {
+      this.durationTask = this.contextMenuTask;
+      this.durationFragmentIndex = null;
+      this.suggestedAdjustStart = false; // Mantener inicio, extender fin
+      const currentDuration = this.taskTimeService.getTaskDurationMinutes(this.contextMenuTask);
+      this.suggestedDurationMinutes = currentDuration + 15;
+      this.showDurationModal = true;
+      this.closeContextMenu();
+      this.cdr.detectChanges();
+    }
+  }
+
+  /**
+   * Contrae la duración de la tarea 15 minutos
+   */
+  shrinkTask(): void {
+    if (this.contextMenuTask) {
+      this.durationTask = this.contextMenuTask;
+      this.durationFragmentIndex = null;
+      this.suggestedAdjustStart = false; // Mantener inicio, contraer fin
+      const currentDuration = this.taskTimeService.getTaskDurationMinutes(this.contextMenuTask);
+      this.suggestedDurationMinutes = Math.max(15, currentDuration - 15);
+      this.showDurationModal = true;
+      this.closeContextMenu();
+      this.cdr.detectChanges();
+    }
+  }
+
+  /**
+   * Maneja el mouseenter en el botón de Acciones para mostrar el submenú como overlay
+   */
+  onActionsMouseEnter(event: MouseEvent): void {
+    // Cancelar timeout de cierre si existe
+    if (this.submenuCloseTimeout) {
+      clearTimeout(this.submenuCloseTimeout);
+      this.submenuCloseTimeout = null;
+    }
+    
+    if (this.submenuElement) {
+      return; // Ya está abierto
+    }
+
+    const target = event.currentTarget as HTMLElement;
+    const rect = target.getBoundingClientRect();
+    
+    // Crear elemento directamente en el body con position fixed
+    this.submenuElement = document.createElement('div');
+    this.submenuElement.className = 'context-submenu-overlay';
+    this.submenuElement.innerHTML = `
+      <button class="context-menu-item" data-action="shiftForward">
+        <i class="fas fa-forward mr-2"></i>
+        Desplazar 15 min adelante
+      </button>
+      <button class="context-menu-item" data-action="shiftBackward">
+        <i class="fas fa-backward mr-2"></i>
+        Desplazar 15 min atrás
+      </button>
+      <div class="context-menu-divider"></div>
+      <button class="context-menu-item" data-action="extend">
+        <i class="fas fa-expand-arrows-alt mr-2"></i>
+        Extender 15 minutos
+      </button>
+      <button class="context-menu-item" data-action="shrink">
+        <i class="fas fa-compress-arrows-alt mr-2"></i>
+        Contraer 15 minutos
+      </button>
+    `;
+
+    // Agregar estilos inline al submenu con position fixed
+    this.submenuElement.style.cssText = `
+      position: fixed;
+      left: ${rect.right}px;
+      top: ${rect.top}px;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      min-width: 220px;
+      overflow: hidden;
+      z-index: 10002;
+    `;
+
+    // Agregar event listeners
+    this.submenuElement.querySelectorAll('button').forEach(btn => {
+      (btn as HTMLElement).style.cssText = `
+        width: 100%;
+        padding: 12px 16px;
+        text-align: left;
+        border: none;
+        background: #fff;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        font-size: 14px;
+        color: #374151;
+        transition: background 0.15s;
+      `;
+      btn.addEventListener('mouseenter', () => {
+        (btn as HTMLElement).style.background = '#f3f4f6';
+      });
+      btn.addEventListener('mouseleave', () => {
+        (btn as HTMLElement).style.background = '#fff';
+      });
+      btn.addEventListener('click', () => {
+        const action = btn.getAttribute('data-action');
+        if (action) {
+          this.handleSubmenuAction(action);
+        }
+      });
+    });
+
+    // Estilos para el divider
+    const divider = this.submenuElement.querySelector('.context-menu-divider') as HTMLElement;
+    if (divider) {
+      divider.style.cssText = 'height: 1px; background: #e5e7eb;';
+    }
+
+    // Estilos para los iconos
+    this.submenuElement.querySelectorAll('i').forEach(icon => {
+      (icon as HTMLElement).style.cssText = 'width: 20px; text-align: center; margin-right: 8px;';
+    });
+
+    // Cerrar submenú cuando el mouse sale
+    this.submenuElement.addEventListener('mouseenter', () => {
+      if (this.submenuCloseTimeout) {
+        clearTimeout(this.submenuCloseTimeout);
+        this.submenuCloseTimeout = null;
+      }
+    });
+    
+    this.submenuElement.addEventListener('mouseleave', () => {
+      this.scheduleSubmenuClose();
+    });
+
+    // Agregar al body
+    document.body.appendChild(this.submenuElement);
+  }
+
+  onActionsMouseLeave(): void {
+    this.scheduleSubmenuClose();
+  }
+
+  private scheduleSubmenuClose(): void {
+    if (this.submenuCloseTimeout) {
+      clearTimeout(this.submenuCloseTimeout);
+    }
+    this.submenuCloseTimeout = setTimeout(() => {
+      this.closeActionsSubmenu();
+    }, 150);
+  }
+
+  private closeActionsSubmenu(): void {
+    if (this.submenuCloseTimeout) {
+      clearTimeout(this.submenuCloseTimeout);
+      this.submenuCloseTimeout = null;
+    }
+    if (this.submenuElement) {
+      this.submenuElement.remove();
+      this.submenuElement = null;
+    }
+  }
+
+  private handleSubmenuAction(action: string): void {
+    switch (action) {
+      case 'shiftForward':
+        this.shiftTaskForward();
+        break;
+      case 'shiftBackward':
+        this.shiftTaskBackward();
+        break;
+      case 'extend':
+        this.extendTask();
+        break;
+      case 'shrink':
+        this.shrinkTask();
+        break;
+    }
+    this.closeActionsSubmenu();
   }
 
   @HostListener('document:click', ['$event'])

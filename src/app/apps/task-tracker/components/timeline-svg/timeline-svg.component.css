@@ -73,3 +73,7 @@
 @media(max-width:640px){.context-menu{min-width:180px;max-width:calc(100vw - 32px)}.context-menu-header,.context-menu-item{padding:10px 14px;font-size:13px}.task-selector-menu{min-width:240px;max-width:calc(100vw - 24px)}.task-selector-header{padding:12px 14px 6px;font-size:14px}.task-selector-subtitle{padding:0 14px 10px;font-size:11px}.task-selector-item{padding:10px 12px;font-size:13px}}
 /* Descripción de tarea con saltos de línea y límite de 3 líneas */
 .task-description-clamp{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap;word-break:break-word;line-height:1.4}
+/* Submenu de acciones en menu contextual */
+.context-menu-item-with-submenu{position:relative}
+.context-menu-item-with-submenu>.context-menu-item{justify-content:flex-start}
+.context-menu-item-with-submenu .ml-auto{margin-left:auto}

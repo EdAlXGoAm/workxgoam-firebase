@@ -123,6 +123,8 @@
         [tasksUpdatingStatus]="tasksUpdatingStatusMap"
         (editTask)="editTask($event)"
         (deleteTask)="deleteTaskFromTimeline($event)"
+        (toggleHidden)="toggleHidden($event)"
+        (changeStatus)="changeStatus($event.task, $event.status)"
         (taskUpdated)="onTaskTimeUpdated($event)"
         (moveEnvironmentUp)="moveEnvironmentUp($event)"
         (moveEnvironmentDown)="moveEnvironmentDown($event)"

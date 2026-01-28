@@ -4,7 +4,7 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   min-width: 200px;
   max-width: 280px;
-  overflow: hidden;
+  overflow: visible;
   animation: contextFadeIn 0.15s;
 }
 
@@ -26,6 +26,7 @@
   display: flex;
   align-items: center;
   font-size: 14px;
+  border-radius: 8px 8px 0 0;
 }
 
 .context-menu-header .truncate {
@@ -101,4 +102,16 @@
 .context-menu-item i {
   width: 20px;
   text-align: center;
+}
+
+.context-menu-item-with-submenu {
+  position: relative;
+}
+
+.context-menu-item-with-submenu > .context-menu-item {
+  justify-content: flex-start;
+}
+
+.context-menu-item-with-submenu .ml-auto {
+  margin-left: auto;
 }

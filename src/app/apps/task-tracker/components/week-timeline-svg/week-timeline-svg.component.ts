@@ -1895,7 +1895,72 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
           this.changeStatus.emit({ task: event.task, status: event.status });
         }
         break;
+      case 'shiftForward':
+        this.timeShiftTask = event.task;
+        this.timeShiftFragmentIndex = null;
+        this.suggestedShiftDirection = 'forward';
+        this.suggestedShiftMinutes = 15;
+        this.showTimeShiftModal = true;
+        this.closeContextMenu();
+        break;
+      case 'shiftBackward':
+        this.timeShiftTask = event.task;
+        this.timeShiftFragmentIndex = null;
+        this.suggestedShiftDirection = 'backward';
+        this.suggestedShiftMinutes = 15;
+        this.showTimeShiftModal = true;
+        this.closeContextMenu();
+        break;
+      case 'extend':
+        this.durationTask = event.task;
+        this.durationFragmentIndex = null;
+        this.suggestedAdjustStart = false;
+        const currentDuration = this.taskTimeService.getTaskDurationMinutes(event.task);
+        this.suggestedDurationMinutes = currentDuration + 15;
+        this.showDurationModal = true;
+        this.closeContextMenu();
+        break;
+      case 'shrink':
+        this.durationTask = event.task;
+        this.durationFragmentIndex = null;
+        this.suggestedAdjustStart = false;
+        const currentDurationShrink = this.taskTimeService.getTaskDurationMinutes(event.task);
+        this.suggestedDurationMinutes = Math.max(15, currentDurationShrink - 15);
+        this.showDurationModal = true;
+        this.closeContextMenu();
+        break;
     }
+  }
+
+  /**
+   * Desplaza la tarea en el tiempo
+   */
+  private shiftTask(task: Task, minutes: number): void {
+    const startDate = new Date(task.start);
+    const endDate = new Date(task.end);
+    startDate.setMinutes(startDate.getMinutes() + minutes);
+    endDate.setMinutes(endDate.getMinutes() + minutes);
+    
+    const updatedTask = {
+      ...task,
+      start: startDate.toISOString(),
+      end: endDate.toISOString()
+    };
+    this.taskUpdated.emit(updatedTask);
+  }
+
+  /**
+   * Extiende o contrae la duración de la tarea
+   */
+  private extendTaskDuration(task: Task, minutes: number): void {
+    const endDate = new Date(task.end);
+    endDate.setMinutes(endDate.getMinutes() + minutes);
+    
+    const updatedTask = {
+      ...task,
+      end: endDate.toISOString()
+    };
+    this.taskUpdated.emit(updatedTask);
   }
 
   /**

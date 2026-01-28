@@ -1333,13 +1333,14 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
   }
 
   async completeAndHide(task: Task) {
+    // Cerrar menús inmediatamente
+    this.closeContextMenu();
+    this.closeQuickContextMenu();
     try {
       // Aplicar directamente: marcar completada y ocultar
       await this.applyStatusChange(task, 'completed', true);
-      this.closeQuickContextMenu();
     } catch (error) {
       console.error('Error al completar y ocultar:', error);
-      this.closeQuickContextMenu();
     }
   }
 
