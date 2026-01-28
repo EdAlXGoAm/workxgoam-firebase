@@ -152,8 +152,8 @@ import { TaskGroup } from '../../models/task-group.model';
 
           <div class="environment-content px-4">
             <div *ngIf="!isEnvironmentCollapsed(env.id)" class="space-y-4">
-              <!-- Proyectos con tareas visibles -->
-              <div *ngFor="let project of getProjectsWithVisibleTasks(env.id)" class="project-section">
+              <!-- PRIMERA ITERACIÓN: Proyectos con tareas HOY/ACTIVAS -->
+              <div *ngFor="let project of getProjectsWithTodayTasksInEnv(env.id)" class="project-section">
                 <div class="flex items-center justify-between mb-2 p-2 rounded-lg" style="background-color: #283E4B;">
                   <div class="flex items-center gap-2">
                     <button (click)="projectContextMenu.emit({ mouseEvent: $event, project })" class="p-1 text-white hover:text-gray-300">
@@ -166,11 +166,11 @@ import { TaskGroup } from '../../models/task-group.model';
                     <h4 class="text-sm font-medium text-white">
                       <i *ngIf="!project.image" class="fas fa-folder mr-1 text-white"></i>{{project.name}}
                     </h4>
-                    <button *ngIf="getTasksByProject(project.id).length > 0"
-                            (click)="toggleProjectCollapse(project.id)"
+                    <button *ngIf="getTodayTasksByProject(project.id).length > 0"
+                            (click)="toggleProjectSectionCollapse(project.id, 'today')"
                             class="p-1 text-white hover:text-gray-300"
-                            [title]="isProjectCollapsed(project.id) ? 'Expandir proyecto' : 'Contraer proyecto'">
-                      <i class="fas text-white" [ngClass]="isProjectCollapsed(project.id) ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
+                            [title]="isProjectSectionCollapsed(project.id, 'today') ? 'Expandir tareas' : 'Contraer tareas'">
+                      <i class="fas text-white" [ngClass]="isProjectSectionCollapsed(project.id, 'today') ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
                     </button>
                   </div>
                   <button 
@@ -182,7 +182,7 @@ import { TaskGroup } from '../../models/task-group.model';
                 </div>
 
                 <!-- SECCIÓN HOY/ACTIVAS -->
-                <div *ngIf="!isProjectCollapsed(project.id) && getTodayTasksByProject(project.id).length > 0" 
+                <div *ngIf="getTodayTasksByProject(project.id).length > 0" 
                      class="tasks-section tasks-section-today">
                   <div class="section-header section-header-today" 
                        (click)="toggleProjectSectionCollapse(project.id, 'today')">
@@ -275,9 +275,39 @@ import { TaskGroup } from '../../models/task-group.model';
                     </ng-container>
                   </div>
                 </div>
+              </div>
+
+              <!-- SEGUNDA ITERACIÓN: Proyectos con tareas PRÓXIMAS -->
+              <div *ngFor="let project of getProjectsWithFutureTasksInEnv(env.id)" class="project-section">
+                <div class="flex items-center justify-between mb-2 p-2 rounded-lg" style="background-color: #283E4B;">
+                  <div class="flex items-center gap-2">
+                    <button (click)="projectContextMenu.emit({ mouseEvent: $event, project })" class="p-1 text-white hover:text-gray-300">
+                      <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <img *ngIf="project.image" 
+                         [src]="project.image" 
+                         class="w-6 h-6 rounded object-cover flex-shrink-0"
+                         alt="">
+                    <h4 class="text-sm font-medium text-white">
+                      <i *ngIf="!project.image" class="fas fa-folder mr-1 text-white"></i>{{project.name}}
+                    </h4>
+                    <button *ngIf="getFutureTasksByProject(project.id).length > 0"
+                            (click)="toggleProjectSectionCollapse(project.id, 'future')"
+                            class="p-1 text-white hover:text-gray-300"
+                            [title]="isProjectSectionCollapsed(project.id, 'future') ? 'Expandir tareas' : 'Contraer tareas'">
+                      <i class="fas text-white" [ngClass]="isProjectSectionCollapsed(project.id, 'future') ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
+                    </button>
+                  </div>
+                  <button 
+                    (click)="addTaskToProject.emit({ environmentId: env.id, projectId: project.id })"
+                    class="bg-indigo-600 text-white px-2 py-1 rounded text-xs hover:bg-indigo-700 transition-colors"
+                    title="Agregar tarea a {{project.name}}">
+                    <i class="fas fa-plus mr-1"></i>Agregar
+                  </button>
+                </div>
 
                 <!-- SECCIÓN PRÓXIMAS -->
-                <div *ngIf="!isProjectCollapsed(project.id) && getFutureTasksByProject(project.id).length > 0" 
+                <div *ngIf="getFutureTasksByProject(project.id).length > 0" 
                      class="tasks-section tasks-section-future">
                   <div class="section-header section-header-future"
                        (click)="toggleProjectSectionCollapse(project.id, 'future')">
@@ -1038,6 +1068,22 @@ export class WeekViewComponent implements OnChanges, AfterViewInit, AfterViewChe
     return this.projects.filter(project => 
       project.environment === environmentId && 
       this.getTasksByProject(project.id).length === 0
+    );
+  }
+
+  // Proyectos que tienen al menos una tarea activa/hoy en el environment
+  getProjectsWithTodayTasksInEnv(environmentId: string): Project[] {
+    return this.projects.filter(project => 
+      project.environment === environmentId && 
+      this.getTodayTasksByProject(project.id).length > 0
+    );
+  }
+
+  // Proyectos que tienen al menos una tarea futura en el environment
+  getProjectsWithFutureTasksInEnv(environmentId: string): Project[] {
+    return this.projects.filter(project => 
+      project.environment === environmentId && 
+      this.getFutureTasksByProject(project.id).length > 0
     );
   }
 

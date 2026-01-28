@@ -7,7 +7,9 @@ type Priority = 'low' | 'medium' | 'high' | 'critical';
 interface PriorityLevel {
   value: Priority;
   label: string;
+  shortLabel: string;
   color: string;
+  bgColor: string;
 }
 
 @Component({
@@ -22,84 +24,123 @@ interface PriorityLevel {
     }
   ],
   template: `
-    <div class="priority-selector">
+    <div class="priority-slider">
       <div 
-        *ngFor="let level of priorityLevels; let i = index"
-        class="priority-item"
+        *ngFor="let level of priorityLevels; let i = index; let first = first; let last = last"
+        class="priority-segment"
         [class.selected]="selectedPriority === level.value"
+        [class.first]="first"
+        [class.last]="last"
+        [style.--segment-color]="level.color"
+        [style.--segment-bg]="level.bgColor"
         (click)="selectPriority(level.value)">
-        <div 
-          class="priority-point"
-          [style.background-color]="level.color"
-          [class.selected-point]="selectedPriority === level.value">
-        </div>
-        <span 
-          class="priority-label"
-          [class.selected-label]="selectedPriority === level.value">
-          {{ level.label }}
-        </span>
+        <span class="priority-dot" [style.background-color]="level.color"></span>
+        <span class="priority-label-full">{{ level.label }}</span>
+        <span class="priority-label-short">{{ level.shortLabel }}</span>
       </div>
     </div>
   `,
   styles: [`
-    .priority-selector {
+    .priority-slider {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin: 10px 0;
-      gap: 8px;
-    }
-
-    .priority-item {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      cursor: pointer;
-      flex: 1;
-      padding: 8px 4px;
+      align-items: stretch;
+      background: #f3f4f6;
       border-radius: 8px;
-      transition: background-color 0.2s ease;
+      padding: 2px;
+      gap: 2px;
+      height: 32px;
     }
 
-    .priority-item:hover {
-      background-color: rgba(0, 0, 0, 0.05);
-    }
-
-    .priority-point {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      margin-bottom: 6px;
-      transition: all 0.3s ease;
-      border: 2px solid transparent;
-    }
-
-    .priority-item:hover .priority-point {
-      transform: scale(1.1);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-    }
-
-    .selected-point {
-      border: 2px solid #000 !important;
-      transform: scale(1.2);
-      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
-    }
-
-    .priority-label {
-      font-size: 12px;
-      color: #666;
-      text-align: center;
+    .priority-segment {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      flex: 1;
+      padding: 0 8px;
+      cursor: pointer;
+      border-radius: 6px;
       transition: all 0.2s ease;
       user-select: none;
+      background: transparent;
     }
 
-    .selected-label {
-      font-weight: bold;
-      color: #333;
+    .priority-segment:hover:not(.selected) {
+      background: rgba(0, 0, 0, 0.05);
     }
 
-    .priority-item:hover .priority-label {
-      color: #333;
+    .priority-segment.selected {
+      background: var(--segment-bg);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .priority-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      transition: transform 0.2s ease;
+    }
+
+    .priority-segment.selected .priority-dot {
+      transform: scale(1.2);
+      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8);
+    }
+
+    .priority-label-full,
+    .priority-label-short {
+      font-size: 12px;
+      font-weight: 500;
+      color: #6b7280;
+      white-space: nowrap;
+      transition: color 0.2s ease;
+    }
+
+    .priority-label-short {
+      display: none;
+    }
+
+    .priority-segment.selected .priority-label-full,
+    .priority-segment.selected .priority-label-short {
+      color: #1f2937;
+      font-weight: 600;
+    }
+
+    /* Responsive: pantallas estrechas */
+    @media (max-width: 400px) {
+      .priority-slider {
+        height: 28px;
+      }
+
+      .priority-segment {
+        padding: 0 4px;
+        gap: 4px;
+      }
+
+      .priority-label-full {
+        display: none;
+      }
+
+      .priority-label-short {
+        display: inline;
+      }
+
+      .priority-dot {
+        width: 8px;
+        height: 8px;
+      }
+    }
+
+    /* Pantallas muy estrechas: solo puntos */
+    @media (max-width: 300px) {
+      .priority-label-short {
+        display: none;
+      }
+
+      .priority-dot {
+        width: 12px;
+        height: 12px;
+      }
     }
   `]
 })
@@ -109,10 +150,10 @@ export class PrioritySelectorComponent implements ControlValueAccessor {
   selectedPriority: Priority = 'medium';
 
   priorityLevels: PriorityLevel[] = [
-    { value: 'low', label: 'Baja', color: '#4caf50' },
-    { value: 'medium', label: 'Media', color: '#ff9800' },
-    { value: 'high', label: 'Alta', color: '#f44336' },
-    { value: 'critical', label: 'Crítica', color: '#9c27b0' }
+    { value: 'low', label: 'Baja', shortLabel: 'B', color: '#4caf50', bgColor: '#e8f5e9' },
+    { value: 'medium', label: 'Media', shortLabel: 'M', color: '#ff9800', bgColor: '#fff3e0' },
+    { value: 'high', label: 'Alta', shortLabel: 'A', color: '#f44336', bgColor: '#ffebee' },
+    { value: 'critical', label: 'Critica', shortLabel: 'C', color: '#9c27b0', bgColor: '#f3e5f5' }
   ];
 
   private onChange = (value: Priority) => {};

@@ -58,6 +58,9 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   isLoading = false;
   isLoadingTaskTypes = false;
   
+  // Tab activo para Descripción/Acciones
+  activeDetailTab: 'description' | 'actions' = 'description';
+  
   // Referencias para el selector de emojis
   @ViewChild('emojiButton', { static: false }) emojiButton!: ElementRef;
   
