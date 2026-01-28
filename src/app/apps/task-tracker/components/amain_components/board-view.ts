@@ -142,7 +142,132 @@ import { TaskGroup } from '../../models/task-group.model';
           <div class="environment-content-wrapper">
           <div class="environment-content px-4">
             <div *ngIf="!isEnvironmentCollapsed(env.id)" class="space-y-4">
-              <!-- PRIMERA ITERACIÓN: Proyectos con tareas HOY/ACTIVAS -->
+              <!-- PRIMERA ITERACIÓN: Proyectos con tareas PASADAS -->
+              <div *ngFor="let project of getProjectsWithPastTasksInEnv(env.id)" class="project-section">
+                <div class="flex items-center justify-between mb-2 p-2 rounded-lg" style="background-color: #283E4B;">
+                  <div class="flex items-center gap-2">
+                    <button (click)="projectContextMenu.emit({ mouseEvent: $event, project })" class="p-1 text-white hover:text-gray-300">
+                      <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <img *ngIf="project.image" 
+                         [src]="project.image" 
+                         class="w-6 h-6 rounded object-cover flex-shrink-0"
+                         alt="">
+                    <h4 class="text-sm font-medium text-white">
+                      <i *ngIf="!project.image" class="fas fa-folder mr-1 text-white"></i>{{project.name}}
+                    </h4>
+                    <button *ngIf="getPastTasksByProject(project.id).length > 0"
+                            (click)="toggleProjectSectionCollapse(project.id, 'past')"
+                            class="p-1 text-white hover:text-gray-300"
+                            [title]="isProjectSectionCollapsed(project.id, 'past') ? 'Expandir tareas' : 'Contraer tareas'">
+                      <i class="fas text-white" [ngClass]="isProjectSectionCollapsed(project.id, 'past') ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
+                    </button>
+                  </div>
+                  <button 
+                    (click)="addTaskToProject.emit({ environmentId: env.id, projectId: project.id })"
+                    class="bg-indigo-600 text-white px-2 py-1 rounded text-xs hover:bg-indigo-700 transition-colors"
+                    title="Agregar tarea a {{project.name}}">
+                    <i class="fas fa-plus mr-1"></i>Agregar
+                  </button>
+                </div>
+
+                <!-- SECCIÓN PASADAS -->
+                <div *ngIf="getPastTasksByProject(project.id).length > 0" 
+                     class="tasks-section tasks-section-past">
+                  <div class="section-header section-header-past" 
+                       (click)="toggleProjectSectionCollapse(project.id, 'past')">
+                    <div class="section-divider"></div>
+                    <span class="section-label">
+                      <i class="fas fa-history mr-1"></i>Pasadas ({{getPastTasksByProject(project.id).length}})
+                    </span>
+                    <i class="fas text-xs" [ngClass]="isProjectSectionCollapsed(project.id, 'past') ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
+                  </div>
+                  <div class="space-y-2 ml-2" *ngIf="!isProjectSectionCollapsed(project.id, 'past')">
+                    <ng-container *ngFor="let task of getPastTasksByProject(project.id); let i = index">
+                      <ng-container *ngIf="getEnvironmentViewMode(env.id) === 'list'; else cardItemPast">
+                        <div class="task-card-wrapper">
+                          <div class="task-bar-running" *ngIf="isTaskRunning(task)"></div>
+                          <div class="task-bar-status"
+                               [class.bar-pending]="task.status === 'pending'"
+                               [class.bar-in-progress]="task.status === 'in-progress'"
+                               [class.bar-completed]="task.status === 'completed'"></div>
+                          <div class="task-list-item" 
+                               [class.status-completed]="task.status === 'completed'"
+                               [class.task-overdue]="isTaskOverdue(task)"
+                               (click)="taskContextMenu.emit({ mouseEvent: $event, task })"
+                               (contextmenu)="taskContextMenu.emit({ mouseEvent: $event, task })"
+                               [attr.title]="getTaskTooltip(task)">
+                            <div *ngIf="isTaskUpdating(task)" class="task-loading-overlay">
+                              <div class="task-loading-spinner">
+                                <i class="fas fa-spinner fa-spin"></i>
+                              </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                              <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-xs"></i>
+                              <span class="text-base">{{ task.emoji || '📋' }}</span>
+                              <div *ngIf="getTaskTypeColor(task)" 
+                                   class="w-3 h-3 rounded-full border-2 border-white shadow-sm flex-shrink-0" 
+                                   [style.background-color]="getTaskTypeColor(task)"></div>
+                              <span class="truncate flex-1">{{task.name}}</span>
+                              <span class="text-xs text-gray-500 ml-2 whitespace-nowrap">{{ formatTime12(task.start) }}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </ng-container>
+                      <ng-template #cardItemPast>
+                        <div class="task-card-wrapper">
+                          <div class="task-bar-running" *ngIf="isTaskRunning(task)"></div>
+                          <div class="task-bar-status"
+                               [class.bar-pending]="task.status === 'pending'"
+                               [class.bar-in-progress]="task.status === 'in-progress'"
+                               [class.bar-completed]="task.status === 'completed'"></div>
+                          <div class="task-card-content bg-white p-3 rounded-lg shadow-sm border border-gray-200 relative"
+                               [class.status-completed]="task.status === 'completed'"
+                               [class.task-overdue]="isTaskOverdue(task)">
+                            <div *ngIf="isTaskUpdating(task)" class="task-loading-overlay">
+                              <div class="task-loading-spinner">
+                                <i class="fas fa-spinner fa-spin"></i>
+                              </div>
+                            </div>
+                            <div class="progress-bar-container">
+                              <div class="progress-bar" 
+                                   [class.progress-pending]="task.status === 'pending'"
+                                   [class.progress-in-progress]="task.status === 'in-progress'"
+                                   [class.progress-completed]="task.status === 'completed'">
+                              </div>
+                            </div>
+                            <button (click)="taskContextMenu.emit({ mouseEvent: $event, task })" (contextmenu)="taskQuickContextMenu.emit({ mouseEvent: $event, task })" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
+                              <i class="fas fa-ellipsis-v"></i>
+                            </button>
+                            <div class="flex items-center justify-between mb-2">
+                              <div class="flex items-center gap-1">
+                                <span class="text-lg">{{ task.emoji || '📋' }}</span>
+                                <div *ngIf="getTaskTypeColor(task)" 
+                                     class="w-3 h-3 rounded-full border-2 border-white shadow-sm flex-shrink-0" 
+                                     [style.background-color]="getTaskTypeColor(task)"></div>
+                                <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-sm" title="Tarea oculta"></i>
+                              </div>
+                              <span class="text-xs px-2 py-1 rounded" [class]="'priority-' + task.priority">
+                                {{task.priority}}
+                              </span>
+                            </div>
+                            <h4 class="font-medium flex items-center gap-2">
+                              <span>{{task.name}}</span>
+                            </h4>
+                            <p class="text-sm text-gray-600 mt-1 task-description-clamp">{{task.description}}</p>
+                            <div class="mt-2 text-xs text-gray-500">
+                              <div>Inicio: {{formatDate(task.start)}}</div>
+                              <div>Fin: {{formatDate(task.end)}}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </ng-template>
+                    </ng-container>
+                  </div>
+                </div>
+              </div>
+
+              <!-- SEGUNDA ITERACIÓN: Proyectos con tareas HOY/ACTIVAS -->
               <div *ngFor="let project of getProjectsWithTodayTasksInEnv(env.id)" class="project-section">
                 <div class="flex items-center justify-between mb-2 p-2 rounded-lg" style="background-color: #283E4B;">
                   <div class="flex items-center gap-2">
@@ -195,7 +320,7 @@ import { TaskGroup } from '../../models/task-group.model';
                                [class.status-completed]="task.status === 'completed'"
                                [class.task-overdue]="isTaskOverdue(task)"
                                (click)="taskContextMenu.emit({ mouseEvent: $event, task })"
-                               (contextmenu)="taskQuickContextMenu.emit({ mouseEvent: $event, task })"
+                               (contextmenu)="taskContextMenu.emit({ mouseEvent: $event, task })"
                                [attr.title]="getTaskTooltip(task)">
                             <div *ngIf="isTaskUpdating(task)" class="task-loading-overlay">
                               <div class="task-loading-spinner">
@@ -267,7 +392,7 @@ import { TaskGroup } from '../../models/task-group.model';
                 </div>
               </div>
 
-              <!-- SEGUNDA ITERACIÓN: Proyectos con tareas PRÓXIMAS -->
+              <!-- TERCERA ITERACIÓN: Proyectos con tareas PRÓXIMAS -->
               <div *ngFor="let project of getProjectsWithFutureTasksInEnv(env.id)" class="project-section">
                 <div class="flex items-center justify-between mb-2 p-2 rounded-lg" style="background-color: #283E4B;">
                   <div class="flex items-center gap-2">
@@ -320,7 +445,7 @@ import { TaskGroup } from '../../models/task-group.model';
                                [class.status-completed]="task.status === 'completed'"
                                [class.task-overdue]="isTaskOverdue(task)"
                                (click)="taskContextMenu.emit({ mouseEvent: $event, task })"
-                               (contextmenu)="taskQuickContextMenu.emit({ mouseEvent: $event, task })"
+                               (contextmenu)="taskContextMenu.emit({ mouseEvent: $event, task })"
                                [attr.title]="getTaskTooltip(task)">
                             <div *ngIf="isTaskUpdating(task)" class="task-loading-overlay">
                               <div class="task-loading-spinner">
@@ -1004,6 +1129,14 @@ export class BoardViewComponent implements OnChanges, AfterViewInit, AfterViewCh
     );
   }
 
+  // Proyectos que tienen al menos una tarea pasada en el environment
+  getProjectsWithPastTasksInEnv(environmentId: string): Project[] {
+    return this.projects.filter(project => 
+      project.environment === environmentId && 
+      this.getPastTasksByProject(project.id).length > 0
+    );
+  }
+
   // Proyectos que tienen al menos una tarea activa/hoy en el environment
   getProjectsWithTodayTasksInEnv(environmentId: string): Project[] {
     return this.projects.filter(project => 
@@ -1183,12 +1316,12 @@ export class BoardViewComponent implements OnChanges, AfterViewInit, AfterViewCh
     this.collapsedProjects[projectId] = !this.isProjectCollapsed(projectId);
   }
 
-  // Control de colapso por sección de proyecto (today/future)
-  isProjectSectionCollapsed(projectId: string, section: 'today' | 'future'): boolean {
+  // Control de colapso por sección de proyecto (past/today/future)
+  isProjectSectionCollapsed(projectId: string, section: 'past' | 'today' | 'future'): boolean {
     return !!this.collapsedProjectSections[`${projectId}_${section}`];
   }
 
-  toggleProjectSectionCollapse(projectId: string, section: 'today' | 'future'): void {
+  toggleProjectSectionCollapse(projectId: string, section: 'past' | 'today' | 'future'): void {
     const key = `${projectId}_${section}`;
     this.collapsedProjectSections[key] = !this.collapsedProjectSections[key];
   }
@@ -1198,15 +1331,24 @@ export class BoardViewComponent implements OnChanges, AfterViewInit, AfterViewCh
     if (projects.length === 0) return false;
     const projectsWithTasks = projects.filter(p => this.getTasksByProject(p.id).length > 0);
     if (projectsWithTasks.length === 0) return false;
-    return projectsWithTasks.every(p => this.isProjectCollapsed(p.id));
+    // Verificar que todas las secciones (past, today, future) de cada proyecto estén colapsadas
+    const sections: ('past' | 'today' | 'future')[] = ['past', 'today', 'future'];
+    return projectsWithTasks.every(p => 
+      sections.every(section => this.isProjectSectionCollapsed(p.id, section))
+    );
   }
 
   toggleCollapseAllProjectsInEnvironment(environmentId: string): void {
     const shouldCollapse = !this.areAllProjectsCollapsed(environmentId);
+    const sections: ('past' | 'today' | 'future')[] = ['past', 'today', 'future'];
     this.getProjectsByEnvironment(environmentId)
       .filter(p => this.getTasksByProject(p.id).length > 0)
       .forEach(p => {
         this.collapsedProjects[p.id] = shouldCollapse;
+        // También colapsar/expandir todas las secciones del proyecto
+        sections.forEach(section => {
+          this.collapsedProjectSections[`${p.id}_${section}`] = shouldCollapse;
+        });
       });
   }
 
@@ -1310,9 +1452,24 @@ export class BoardViewComponent implements OnChanges, AfterViewInit, AfterViewCh
     return this.getTasksByProject(projectId).filter(task => this.isTaskForToday(task));
   }
 
-  // Tareas futuras por proyecto  
+  // Verifica si una tarea ya pasó (endDate < now y no es de hoy)
+  isTaskPast(task: Task): boolean {
+    const now = new Date();
+    const endDate = new Date(task.end + (task.end.includes('Z') ? '' : 'Z'));
+    // Es pasada si ya terminó y no es de hoy
+    return endDate < now && !this.isTaskForToday(task);
+  }
+
+  // Tareas pasadas por proyecto
+  getPastTasksByProject(projectId: string): Task[] {
+    return this.getTasksByProject(projectId).filter(task => this.isTaskPast(task));
+  }
+
+  // Tareas futuras por proyecto (excluyendo pasadas)
   getFutureTasksByProject(projectId: string): Task[] {
-    return this.getTasksByProject(projectId).filter(task => !this.isTaskForToday(task));
+    return this.getTasksByProject(projectId).filter(task => 
+      !this.isTaskForToday(task) && !this.isTaskPast(task)
+    );
   }
 
   canMoveEnvironmentUp(envId: string): boolean {

@@ -2354,14 +2354,19 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
 
   async deleteTask(task: Task) {
     if (confirm('¿Estás seguro de que quieres eliminar esta tarea?')) {
+      this.tasksUpdatingStatus.add(task.id);
+      this.closeContextMenu();
       try {
         await this.taskService.deleteTask(task.id);
         await this.loadTasks();
       } catch (error) {
         console.error('Error al eliminar la tarea:', error);
+      } finally {
+        this.tasksUpdatingStatus.delete(task.id);
       }
+    } else {
+      this.closeContextMenu();
     }
-    this.closeContextMenu();
   }
 
   // Método para eliminar tarea desde el timeline

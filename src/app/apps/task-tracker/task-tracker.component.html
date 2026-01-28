@@ -367,11 +367,11 @@
        [style.left]="contextMenuPosition.x + 'px'" 
        [style.top]="contextMenuPosition.y + 'px'"
        (click)="$event.stopPropagation()">
-    <div class="context-menu-item" (click)="editTask(selectedTask!)">
+    <div class="context-menu-item context-menu-item-edit" (click)="editTask(selectedTask!)">
       <i class="fas fa-edit"></i>
       <span>Editar</span>
     </div>
-    <div class="context-menu-item" (click)="deleteTask(selectedTask!)">
+    <div class="context-menu-item context-menu-item-danger" (click)="deleteTask(selectedTask!)">
       <i class="fas fa-trash"></i>
       <span>Eliminar</span>
     </div>
@@ -391,16 +391,9 @@
       <i class="fas fa-play"></i>
       <span>Marcar pendiente</span>
     </div>
-  </div>
-
-  <!-- Quick Context Menu (Completar y Ocultar) -->
-  <div *ngIf="showQuickContextMenu"
-       class="context-menu"
-       [style.left]="quickContextMenuPosition.x + 'px'"
-       [style.top]="quickContextMenuPosition.y + 'px'"
-       (click)="$event.stopPropagation()">
+    <hr class="my-1 border-gray-200">
     <div class="context-menu-item context-menu-item-completed" (click)="completeAndHide(selectedTask!)">
-      <i class="fas fa-check"></i>
+      <i class="fas fa-check-double"></i>
       <span>Completar y Ocultar</span>
     </div>
   </div>

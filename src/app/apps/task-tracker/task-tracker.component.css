@@ -111,6 +111,7 @@
   cursor: pointer;
   transition: background 0.2s ease;
   max-width: 75%;
+  position: relative;
 }
 .task-list-item:hover {
   background: #f9fafb;
@@ -223,6 +224,15 @@
 }
 
 .context-menu-item-pending:hover {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.context-menu-item-edit {
+  color: #3b82f6;
+}
+
+.context-menu-item-edit:hover {
   background: #eff6ff;
   color: #2563eb;
 }
