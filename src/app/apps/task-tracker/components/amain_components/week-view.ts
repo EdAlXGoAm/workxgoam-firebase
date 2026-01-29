@@ -58,6 +58,25 @@ import { TaskGroup } from '../../models/task-group.model';
                 <span class="sm:hidden">Sincronizar:</span>
               </div>
               
+              <!-- Barra de búsqueda -->
+              <div class="flex items-center gap-1.5 flex-1 max-w-xs">
+                <div class="relative flex-1">
+                  <input 
+                    type="text"
+                    [(ngModel)]="searchFilterText"
+                    (input)="onSearchFilterChange()"
+                    placeholder="Buscar tarea..."
+                    class="w-full pl-7 pr-7 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+                  <i class="fas fa-search absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                  <button 
+                    *ngIf="searchFilterText"
+                    (click)="clearSearchFilter()"
+                    class="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5">
+                    <i class="fas fa-times text-xs"></i>
+                  </button>
+                </div>
+              </div>
+              
               <!-- Botones compactos -->
               <div class="flex items-center gap-1.5">
                 <button 
@@ -220,6 +239,10 @@ import { TaskGroup } from '../../models/task-group.model';
                               <div *ngIf="getTaskTypeColor(task)" 
                                    class="w-3 h-3 rounded-full border-2 border-white shadow-sm flex-shrink-0" 
                                    [style.background-color]="getTaskTypeColor(task)"></div>
+                              <span *ngIf="getTaskGroupName(task)" 
+                                    class="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium">
+                                {{getTaskGroupName(task)}}
+                              </span>
                               <span class="truncate flex-1">{{task.name}}</span>
                               <span class="text-xs text-gray-500 ml-2 whitespace-nowrap">{{ formatTime12(task.start) }}</span>
                             </div>
@@ -257,6 +280,10 @@ import { TaskGroup } from '../../models/task-group.model';
                                 <div *ngIf="getTaskTypeColor(task)" 
                                      class="w-3 h-3 rounded-full border-2 border-white shadow-sm flex-shrink-0" 
                                      [style.background-color]="getTaskTypeColor(task)"></div>
+                                <span *ngIf="getTaskGroupName(task)" 
+                                      class="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium ml-1">
+                                  {{getTaskGroupName(task)}}
+                                </span>
                                 <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-sm" title="Tarea oculta"></i>
                               </div>
                               <span class="text-xs px-2 py-1 rounded" [class]="'priority-' + task.priority">
@@ -345,6 +372,10 @@ import { TaskGroup } from '../../models/task-group.model';
                               <div *ngIf="getTaskTypeColor(task)" 
                                    class="w-3 h-3 rounded-full border-2 border-white shadow-sm flex-shrink-0" 
                                    [style.background-color]="getTaskTypeColor(task)"></div>
+                              <span *ngIf="getTaskGroupName(task)" 
+                                    class="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium">
+                                {{getTaskGroupName(task)}}
+                              </span>
                               <span class="truncate flex-1">{{task.name}}</span>
                               <span class="text-xs text-gray-500 ml-2 whitespace-nowrap">{{ formatTime12(task.start) }}</span>
                             </div>
@@ -382,6 +413,10 @@ import { TaskGroup } from '../../models/task-group.model';
                                 <div *ngIf="getTaskTypeColor(task)" 
                                      class="w-3 h-3 rounded-full border-2 border-white shadow-sm flex-shrink-0" 
                                      [style.background-color]="getTaskTypeColor(task)"></div>
+                                <span *ngIf="getTaskGroupName(task)" 
+                                      class="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium ml-1">
+                                  {{getTaskGroupName(task)}}
+                                </span>
                                 <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-sm" title="Tarea oculta"></i>
                               </div>
                               <span class="text-xs px-2 py-1 rounded" [class]="'priority-' + task.priority">
@@ -470,6 +505,10 @@ import { TaskGroup } from '../../models/task-group.model';
                               <div *ngIf="getTaskTypeColor(task)" 
                                    class="w-3 h-3 rounded-full border-2 border-white shadow-sm flex-shrink-0" 
                                    [style.background-color]="getTaskTypeColor(task)"></div>
+                              <span *ngIf="getTaskGroupName(task)" 
+                                    class="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium">
+                                {{getTaskGroupName(task)}}
+                              </span>
                               <span class="truncate flex-1">{{task.name}}</span>
                               <span class="text-xs text-gray-500 ml-2 whitespace-nowrap">{{ formatTime12(task.start) }}</span>
                             </div>
@@ -507,6 +546,10 @@ import { TaskGroup } from '../../models/task-group.model';
                                 <div *ngIf="getTaskTypeColor(task)" 
                                      class="w-3 h-3 rounded-full border-2 border-white shadow-sm flex-shrink-0" 
                                      [style.background-color]="getTaskTypeColor(task)"></div>
+                                <span *ngIf="getTaskGroupName(task)" 
+                                      class="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium ml-1">
+                                  {{getTaskGroupName(task)}}
+                                </span>
                                 <i *ngIf="task.hidden" class="fas fa-eye-slash text-gray-400 text-sm" title="Tarea oculta"></i>
                               </div>
                               <span class="text-xs px-2 py-1 rounded" [class]="'priority-' + task.priority">
@@ -951,7 +994,13 @@ export class WeekViewComponent implements OnChanges, AfterViewInit, AfterViewChe
   private resizeObserver?: ResizeObserver;
   private resizeListener?: () => void;
 
-  constructor(private cdr: ChangeDetectorRef, private ngZone: NgZone) {}
+  searchFilterText: string = '';
+  private readonly SEARCH_FILTER_CACHE_KEY = 'taskTracker_searchFilterText';
+
+  constructor(private cdr: ChangeDetectorRef, private ngZone: NgZone) {
+    // Cargar el texto de búsqueda desde localStorage
+    this.searchFilterText = localStorage.getItem(this.SEARCH_FILTER_CACHE_KEY) || '';
+  }
   
   isTaskUpdating(task: Task): boolean {
     return !!this.tasksUpdatingStatus[task.id];
@@ -1308,7 +1357,8 @@ export class WeekViewComponent implements OnChanges, AfterViewInit, AfterViewChe
           }
         }
         return true;
-      });
+      })
+      .filter(task => this.taskMatchesSearchFilter(task));
     
     const sortOrder = this.getEnvironmentSortOrder(environmentId);
     
@@ -1354,7 +1404,8 @@ export class WeekViewComponent implements OnChanges, AfterViewInit, AfterViewChe
         }
       }
       return true;
-    });
+    })
+    .filter(task => this.taskMatchesSearchFilter(task));
     
     const sortOrder = this.getEnvironmentSortOrder(environmentId);
     
@@ -1503,6 +1554,35 @@ export class WeekViewComponent implements OnChanges, AfterViewInit, AfterViewChe
     if (!task.type || !this.taskTypes.length) return null;
     const taskType = this.taskTypes.find(t => t.id === task.type);
     return taskType?.color || null;
+  }
+
+  getTaskGroupName(task: Task): string | null {
+    if (!task.taskGroupId) return null;
+    const group = this.taskGroups.find(g => g.id === task.taskGroupId);
+    return group?.name || null;
+  }
+
+  taskMatchesSearchFilter(task: Task): boolean {
+    if (!this.searchFilterText.trim()) return true;
+    const searchLower = this.searchFilterText.toLowerCase().trim();
+    
+    // Buscar en el nombre de la tarea
+    if (task.name.toLowerCase().includes(searchLower)) return true;
+    
+    // Buscar en el nombre del grupo (Complex title)
+    const groupName = this.getTaskGroupName(task);
+    if (groupName && groupName.toLowerCase().includes(searchLower)) return true;
+    
+    return false;
+  }
+
+  onSearchFilterChange(): void {
+    localStorage.setItem(this.SEARCH_FILTER_CACHE_KEY, this.searchFilterText);
+  }
+
+  clearSearchFilter(): void {
+    this.searchFilterText = '';
+    localStorage.removeItem(this.SEARCH_FILTER_CACHE_KEY);
   }
 
   // Verifica si una tarea es de "hoy" (inicio hoy O activa ahora)
