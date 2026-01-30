@@ -34,11 +34,12 @@ import { SumsBubbleComponent } from './components/sums-bubble/sums-bubble.compon
 import { ProjectModalComponent } from './components/project-modal/project-modal.component';
 import { TaskGroupService } from './services/task-group.service';
 import { TaskGroup } from './models/task-group.model';
+import { ProjectTasksModalComponent } from './modals/project-tasks-modal/project-tasks-modal.component';
 
 @Component({
   selector: 'app-task-tracker',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, CurrentTaskInfoComponent, PendingTasksBubbleComponent, TaskModalComponent, RemindersModalComponent, TaskTrackerHeaderComponent, EnvironmentModalComponent, BoardViewComponent, WeekViewComponent, ChangeStatusModalComponent, DateRangeModalComponent, TaskTypeModalComponent, CustomSelectComponent, WeekTimelineSvgComponent, SumsBubbleComponent, ProjectModalComponent],
+  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, CurrentTaskInfoComponent, PendingTasksBubbleComponent, TaskModalComponent, RemindersModalComponent, TaskTrackerHeaderComponent, EnvironmentModalComponent, BoardViewComponent, WeekViewComponent, ChangeStatusModalComponent, DateRangeModalComponent, TaskTypeModalComponent, CustomSelectComponent, WeekTimelineSvgComponent, SumsBubbleComponent, ProjectModalComponent, ProjectTasksModalComponent],
   templateUrl: './task-tracker.component.html',
   styleUrls: ['./task-tracker.component.css']
 })
@@ -182,6 +183,7 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
   showSaveSumTemplateModal = false;
   newSumTemplateName = '';
   editingTemplateId: string | null = null;
+  editingTemplateSelectedTaskIds: string[] | null = null;
   startDateFilter: string = '';
   endDateFilter: string = '';
   // Variables para filtro manual con botón
@@ -1610,13 +1612,95 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
     this.projectTaskGroups = [];
     this.hasFilterChanges = false;
     this.isFilteringTasks = false;
-    // Limpiar filtros y estado de edición solo si no estamos guardando
-    if (!this.showSaveSumTemplateModal) {
+    // Limpiar filtros y estado de edición
+    this.editingTemplateId = null;
+    this.editingTemplateSelectedTaskIds = null;
+    this.startDateFilter = '';
+    this.endDateFilter = '';
+    this.pendingStartDateFilter = '';
+    this.pendingEndDateFilter = '';
+  }
+
+  async onSaveSumTemplateFromModal(event: { name: string, selectedTaskIds: string[], startDateFilter: string, endDateFilter: string }) {
+    if (!event.name.trim() || !this.selectedProjectForTasksModal) {
+      alert('Por favor ingresa un nombre para la suma');
+      return;
+    }
+
+    try {
+      // Calcular suma total
+      let totalHours = 0;
+      const taskGroups = new Map<string, Task[]>();
+      const individualTasks: Task[] = [];
+      
+      event.selectedTaskIds.forEach(taskId => {
+        const task = this.tasks.find(t => t.id === taskId);
+        if (task) {
+          if (task.taskGroupId) {
+            if (!taskGroups.has(task.taskGroupId)) {
+              taskGroups.set(task.taskGroupId, []);
+            }
+            taskGroups.get(task.taskGroupId)!.push(task);
+          } else {
+            individualTasks.push(task);
+          }
+        }
+      });
+      
+      taskGroups.forEach(groupTasks => {
+        groupTasks.forEach(task => {
+          const duration = this.getTaskDuration(task);
+          if (duration !== null) {
+            totalHours += duration;
+          }
+        });
+      });
+      
+      individualTasks.forEach(task => {
+        const duration = this.getTaskDuration(task);
+        if (duration !== null) {
+          totalHours += duration;
+        }
+      });
+
+      const project = this.projects.find(p => p.id === this.selectedProjectForTasksModal!.id);
+      if (!project) {
+        alert('Error: No se pudo encontrar el proyecto');
+        return;
+      }
+
+      const templateData: any = {
+        name: event.name.trim(),
+        projectId: this.selectedProjectForTasksModal.id,
+        environmentId: project.environment,
+        selectedTaskIds: event.selectedTaskIds,
+        totalDuration: totalHours
+      };
+
+      if (event.startDateFilter) {
+        templateData.startDateFilter = event.startDateFilter;
+      }
+      if (event.endDateFilter) {
+        templateData.endDateFilter = event.endDateFilter;
+      }
+
+      const isEditing = !!this.editingTemplateId;
+      
+      if (isEditing) {
+        await this.taskSumTemplateService.updateTemplate(this.editingTemplateId!, templateData);
+      } else {
+        await this.taskSumTemplateService.createTemplate(templateData);
+      }
+
+      await this.loadTaskSumTemplates();
+
       this.editingTemplateId = null;
-      this.startDateFilter = '';
-      this.endDateFilter = '';
-      this.pendingStartDateFilter = '';
-      this.pendingEndDateFilter = '';
+      this.editingTemplateSelectedTaskIds = null;
+
+      alert(`Suma "${event.name}" ${isEditing ? 'actualizada' : 'guardada'} exitosamente`);
+    } catch (error) {
+      console.error('Error al guardar plantilla de suma:', error);
+      alert('Error al guardar la suma. Por favor intenta nuevamente.');
     }
   }
 
@@ -1812,19 +1896,14 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
 
     // Establecer estado de edición
     this.editingTemplateId = template.id;
+    this.editingTemplateSelectedTaskIds = template.selectedTaskIds || [];
     
     // Cargar filtros de fecha si existen (robusto para plantillas antiguas)
     this.startDateFilter = template.startDateFilter || '';
     this.endDateFilter = template.endDateFilter || '';
 
-    // Abrir el modal del proyecto (aplicará los filtros automáticamente)
+    // Abrir el modal del proyecto (el componente aplicará los filtros y selección)
     await this.openProjectTasksModal(project);
-
-    // Restaurar la selección de checkboxes
-    this.projectTaskIncluded = {};
-    this.projectTasksForModal.forEach(task => {
-      this.projectTaskIncluded[task.id] = template.selectedTaskIds.includes(task.id);
-    });
   }
 
   async deleteTaskSumTemplate(id: string) {
