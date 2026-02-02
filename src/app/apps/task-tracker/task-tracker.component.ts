@@ -88,11 +88,6 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
   orderSyncMessage: string = '';
   orderSyncMessageType: 'success' | 'error' | 'info' = 'info';
   private orderSyncMessageTimeout: any = null;
-  // Throttle para guardar la posición del scroll
-  private scrollSaveTimeout: any = null;
-  // Listener de scroll para limpiar al destruir
-  private scrollHandler: (() => void) | null = null;
-  private beforeUnloadHandler: (() => void) | null = null;
   // Ambiente enfocado en la línea de tiempo (null = sin enfoque)
   // Usamos un objeto wrapper para que Angular detecte cambios por referencia
   focusedEnvironment: { id: string | null } = { id: null };
@@ -318,10 +313,6 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
     // Iniciar carga del orden
     this.isLoadingEnvironmentOrder = true;
     
-    // Exponer el componente en window para depuración
-    (window as any).taskTrackerComponent = this;
-    console.log('🔧 Componente expuesto en window.taskTrackerComponent para depuración');
-    
     await this.loadInitialData();
     this.initializeNewTask();
     // Cargar el estado del filtro desde localStorage
@@ -339,15 +330,7 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
     requestAnimationFrame(() => {
       this.isLoadingEnvironmentOrder = false;
       this.cdr.detectChanges();
-      // Restaurar posición del scroll después de que el contenido esté completamente renderizado
-      // Esperar un poco más para asegurar que el DOM esté estable
-      setTimeout(() => {
-        this.restoreScrollPosition();
-      }, 150);
     });
-
-    // Configurar listener para guardar posición del scroll antes de recargar
-    this.setupScrollSave();
   }
 
   ngAfterViewChecked() {
@@ -371,95 +354,11 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
   }
 
   ngOnDestroy(): void {
-    // Guardar posición del scroll antes de destruir el componente
-    this.saveScrollPosition();
-    
-    // Limpiar listeners
-    if (this.scrollHandler) {
-      window.removeEventListener('scroll', this.scrollHandler);
-    }
-    if (this.beforeUnloadHandler) {
-      window.removeEventListener('beforeunload', this.beforeUnloadHandler);
-    }
-    if (this.scrollSaveTimeout) {
-      clearTimeout(this.scrollSaveTimeout);
-    }
     if (this.orderSyncMessageTimeout) {
       clearTimeout(this.orderSyncMessageTimeout);
     }
-    
-    // Limpiar referencia en window
-    if ((window as any).taskTrackerComponent === this) {
-      delete (window as any).taskTrackerComponent;
-    }
   }
 
-  private setupScrollSave(): void {
-    console.log('🎬 CONFIGURANDO listener de scroll...');
-    // Guardar posición del scroll cuando el usuario hace scroll (con throttling)
-    this.scrollHandler = () => {
-      if (this.scrollSaveTimeout) {
-        clearTimeout(this.scrollSaveTimeout);
-      }
-      this.scrollSaveTimeout = setTimeout(() => {
-        this.saveScrollPosition();
-      }, 250); // Guardar después de 250ms sin scroll
-    };
-    window.addEventListener('scroll', this.scrollHandler, { passive: true });
-    console.log('✅ Listener de scroll agregado');
-
-    // Guardar posición del scroll antes de que la página se recargue
-    this.beforeUnloadHandler = () => {
-      console.log('🔄 beforeunload detectado, guardando scroll...');
-      this.saveScrollPosition();
-    };
-    window.addEventListener('beforeunload', this.beforeUnloadHandler);
-    console.log('✅ Listener de beforeunload agregado');
-  }
-
-  private saveScrollPosition(): void {
-    try {
-      const scrollPosition = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
-      localStorage.setItem('taskTracker_scrollPosition', JSON.stringify(scrollPosition));
-    } catch (error) {
-      console.error('Error al guardar la posición del scroll:', error);
-    }
-  }
-
-  private restoreScrollPosition(): void {
-    try {
-      console.log('🔍 INTENTANDO restaurar posición de scroll...');
-      const savedPosition = localStorage.getItem('taskTracker_scrollPosition');
-      console.log('📦 Valor guardado en localStorage:', savedPosition);
-      
-      if (savedPosition) {
-        const scrollPosition = JSON.parse(savedPosition);
-        console.log('📊 Posición parseada:', scrollPosition, 'Tipo:', typeof scrollPosition);
-        
-        if (typeof scrollPosition === 'number' && scrollPosition > 0) {
-          console.log('✅ Posición válida, aplicando scroll a:', scrollPosition);
-          // Usar setTimeout para asegurar que el DOM esté completamente renderizado
-          setTimeout(() => {
-            console.log('⏱️ Ejecutando scrollTo después del timeout...');
-            window.scrollTo({
-              top: scrollPosition,
-              behavior: 'auto' // Sin animación para que sea instantáneo
-            });
-            console.log('✅ Scroll aplicado, posición actual:', window.pageYOffset);
-            // Limpiar la posición guardada después de restaurarla
-            localStorage.removeItem('taskTracker_scrollPosition');
-            console.log('🗑️ Posición limpiada de localStorage');
-          }, 100);
-        } else {
-          console.log('⚠️ Posición inválida o cero');
-        }
-      } else {
-        console.log('ℹ️ No hay posición guardada en localStorage');
-      }
-    } catch (error) {
-      console.error('❌ Error al restaurar la posición del scroll:', error);
-    }
-  }
 
   async loadInitialData(): Promise<void> {
     try {
@@ -3606,7 +3505,6 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
   }
   
   // Función de utilidad para reorganizar alfabéticamente (solo móviles)
-  // Ejecutar desde consola: (window as any).taskTrackerComponent.reorganizeEnvironmentsAlphabetically()
   reorganizeEnvironmentsAlphabetically(): void {
     const isMobile = window.innerWidth < 768;
     
