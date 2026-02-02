@@ -1233,6 +1233,11 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
   }
   
   openEmojiPicker() {
+    // Verificar que el botón existe ANTES de cambiar el estado
+    if (!this.emojiButton || !this.emojiButton.nativeElement) {
+      return;
+    }
+    
     // Cerrar todos los selectores si están abiertos
     if (this.projectSelect && this.projectSelect.isOpen) {
       this.projectSelect.isOpen = false;
@@ -1246,24 +1251,11 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
       this.taskTypeSelect.isOpen = false;
     }
     
+    // Cambiar el estado
     this.showEmojiPicker = true;
-    this.cdr.detectChanges();
     
-    // Esperar a que el botón esté disponible y el DOM se actualice
-    setTimeout(() => {
-      if (!this.emojiButton || !this.emojiButton.nativeElement) {
-        // Si el botón aún no está disponible, intentar de nuevo
-        setTimeout(() => {
-          if (this.emojiButton && this.emojiButton.nativeElement) {
-            this.createEmojiPickerElement();
-          } else {
-            this.showEmojiPicker = false;
-          }
-        }, 100);
-        return;
-      }
-      this.createEmojiPickerElement();
-    }, 0);
+    // Crear el elemento INMEDIATAMENTE sin setTimeout ni detectChanges
+    this.createEmojiPickerElement();
   }
   
   closeEmojiPicker() {
@@ -1308,9 +1300,43 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
     const button = this.emojiButton.nativeElement as HTMLElement;
     const buttonRect = button.getBoundingClientRect();
     
+    // Calcular posición PRIMERO
+    const pickerWidth = 500;
+    const pickerHeight = 380;
+    const margin = 8;
+    
+    let left = buttonRect.left;
+    let top = buttonRect.bottom + margin;
+    
+    // Ajustar si se sale de la pantalla por la derecha
+    if (left + pickerWidth > window.innerWidth) {
+      left = window.innerWidth - pickerWidth - 16;
+    }
+    
+    // Ajustar si se sale de la pantalla por la izquierda
+    if (left < 16) {
+      left = 16;
+    }
+    
+    // Ajustar si se sale por abajo (mostrar arriba)
+    if (top + pickerHeight > window.innerHeight) {
+      top = buttonRect.top - pickerHeight - margin;
+    }
+    
+    // Asegurar que no se salga por arriba
+    if (top < 16) {
+      top = 16;
+    }
+    
     // Crear el contenedor del picker
     const picker = this.renderer.createElement('div');
     this.renderer.addClass(picker, 'emoji-picker-portal');
+    
+    // CRÍTICO: Establecer posición ANTES de crear contenido
+    this.renderer.setStyle(picker, 'position', 'fixed');
+    this.renderer.setStyle(picker, 'left', `${left}px`);
+    this.renderer.setStyle(picker, 'top', `${top}px`);
+    this.renderer.setStyle(picker, 'z-index', '10000');
     
     // Prevenir que los clics dentro del picker se propaguen y cierren el picker
     this.renderer.listen(picker, 'click', (event: MouseEvent) => {
@@ -1461,40 +1487,7 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
       });
     }, 0);
     
-    // Calcular posición
-    const pickerWidth = 288; // width del picker
-    const pickerHeight = 380; // max-height del picker (aumentado para incluir barra de categorías)
-    const margin = 8;
-    
-    let left = buttonRect.left;
-    let top = buttonRect.bottom + margin;
-    
-    // Ajustar si se sale de la pantalla por la derecha
-    if (left + pickerWidth > window.innerWidth) {
-      left = window.innerWidth - pickerWidth - 16;
-    }
-    
-    // Ajustar si se sale de la pantalla por la izquierda
-    if (left < 16) {
-      left = 16;
-    }
-    
-    // Ajustar si se sale por abajo (mostrar arriba)
-    if (top + pickerHeight > window.innerHeight) {
-      top = buttonRect.top - pickerHeight - margin;
-    }
-    
-    // Asegurar que no se salga por arriba
-    if (top < 16) {
-      top = 16;
-    }
-    
-    this.renderer.setStyle(picker, 'position', 'fixed');
-    this.renderer.setStyle(picker, 'left', `${left}px`);
-    this.renderer.setStyle(picker, 'top', `${top}px`);
-    this.renderer.setStyle(picker, 'z-index', '10000');
-    
-    // Agregar al body
+    // Agregar al body (ya está completamente posicionado)
     this.renderer.appendChild(document.body, picker);
     this.emojiPickerElement = picker;
     

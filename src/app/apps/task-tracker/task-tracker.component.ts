@@ -27,7 +27,6 @@ import { TaskType } from './models/task-type.model';
 import { TimelineFocusService } from './services/timeline-focus.service';
 import { TaskTimeService } from './services/task-time.service';
 import { CustomSelectComponent, SelectOption } from './components/custom-select/custom-select.component';
-import { WeekTimelineSvgComponent } from './components/week-timeline-svg/week-timeline-svg.component';
 import { TaskSumTemplateService } from './services/task-sum-template.service';
 import { TaskSumTemplate } from './models/task-sum-template.model';
 import { SumsBubbleComponent } from './components/sums-bubble/sums-bubble.component';
@@ -40,7 +39,7 @@ import { SyncService } from './services/sync.service';
 @Component({
   selector: 'app-task-tracker',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, CurrentTaskInfoComponent, PendingTasksBubbleComponent, TaskModalComponent, RemindersModalComponent, TaskTrackerHeaderComponent, EnvironmentModalComponent, BoardViewComponent, WeekViewComponent, ChangeStatusModalComponent, DateRangeModalComponent, TaskTypeModalComponent, CustomSelectComponent, WeekTimelineSvgComponent, SumsBubbleComponent, ProjectModalComponent, ProjectTasksModalComponent],
+  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, CurrentTaskInfoComponent, PendingTasksBubbleComponent, TaskModalComponent, RemindersModalComponent, TaskTrackerHeaderComponent, EnvironmentModalComponent, BoardViewComponent, WeekViewComponent, ChangeStatusModalComponent, DateRangeModalComponent, TaskTypeModalComponent, CustomSelectComponent, SumsBubbleComponent, ProjectModalComponent, ProjectTasksModalComponent],
   templateUrl: './task-tracker.component.html',
   styleUrls: ['./task-tracker.component.css']
 })
