@@ -1,3 +1,8 @@
+/* Clase para ocultar elementos sin destruir el DOM (optimización de rendimiento) */
+.hidden {
+  display: none !important;
+}
+
 .emoji-picker {
   position: absolute;
   top: 100%;

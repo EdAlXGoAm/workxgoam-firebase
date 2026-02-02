@@ -65,6 +65,15 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
   // Tab activo para Descripción/Acciones
   activeDetailTab: 'description' | 'actions' = 'description';
   
+  // ===== PROPIEDADES PRE-CALCULADAS PARA ACCIONES (evita funciones en template) =====
+  remainingMinutes: number = 0;
+  canAdd5: boolean = false;
+  canAdd10: boolean = false;
+  canAdd15: boolean = false;
+  tooltip5: string = '';
+  tooltip10: string = '';
+  tooltip15: string = '';
+  
   // Referencias para el selector de emojis
   @ViewChild('emojiButton', { static: false }) emojiButton!: ElementRef;
   
@@ -1189,6 +1198,9 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
         this.endTime = fragmentEnd.time;
       }
     }
+    
+    // Inicializar estado de acciones
+    this.updateActionState();
   }
   
   closeModal() {
@@ -2079,6 +2091,7 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
       }
       this.updateDuration();
       this.validateDates();
+      this.updateActionState();
     }
   }
   
@@ -2088,6 +2101,7 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
     this.syncFirstFragmentEnd();
     this.updateDuration();
     this.validateDates();
+    this.updateActionState();
   }
   
   onDeadlineTimeChange(time: string) {
@@ -3210,7 +3224,9 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
    * Agrega una nueva acción con la duración especificada
    */
   addAction(minutes: number) {
-    if (!this.canAddAction(minutes)) {
+    // Usar las propiedades pre-calculadas en lugar de llamar a canAddAction()
+    const canAdd = minutes === 5 ? this.canAdd5 : minutes === 10 ? this.canAdd10 : this.canAdd15;
+    if (!canAdd) {
       return;
     }
     
@@ -3227,6 +3243,9 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
       description: ''
     });
     
+    // Actualizar estado de acciones
+    this.updateActionState();
+    
     // Forzar actualización de la vista
     this.cdr.detectChanges();
   }
@@ -3237,8 +3256,36 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
   removeLastAction() {
     if (this.task.actionsPerformed && this.task.actionsPerformed.length > 0) {
       this.task.actionsPerformed.pop();
+      this.updateActionState();
       this.cdr.detectChanges();
     }
+  }
+  
+  /**
+   * Actualiza las propiedades pre-calculadas del estado de acciones.
+   * Llamar cuando cambia startTime, endTime, o actionsPerformed.
+   */
+  updateActionState() {
+    this.remainingMinutes = this.getRemainingMinutesForActions();
+    this.canAdd5 = this.remainingMinutes >= 5;
+    this.canAdd10 = this.remainingMinutes >= 10;
+    this.canAdd15 = this.remainingMinutes >= 15;
+    
+    // Pre-calcular tooltips
+    if (this.remainingMinutes <= 0) {
+      this.tooltip5 = this.tooltip10 = this.tooltip15 = 'No hay tiempo restante disponible';
+    } else {
+      this.tooltip5 = this.canAdd5 ? 'Agregar acción de 5 minutos' : `Solo quedan ${this.remainingMinutes} minutos disponibles`;
+      this.tooltip10 = this.canAdd10 ? 'Agregar acción de 10 minutos' : `Solo quedan ${this.remainingMinutes} minutos disponibles`;
+      this.tooltip15 = this.canAdd15 ? 'Agregar acción de 15 minutos' : `Solo quedan ${this.remainingMinutes} minutos disponibles`;
+    }
+  }
+  
+  /**
+   * TrackBy para el *ngFor de acciones
+   */
+  trackByActionIndex(index: number): number {
+    return index;
   }
   
   /**
