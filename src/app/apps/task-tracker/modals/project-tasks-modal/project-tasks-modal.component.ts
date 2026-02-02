@@ -7,6 +7,7 @@ import { Environment } from '../../models/environment.model';
 import { TaskType } from '../../models/task-type.model';
 import { TaskGroup } from '../../models/task-group.model';
 import { WeekTimelineSvgComponent } from '../../components/week-timeline-svg/week-timeline-svg.component';
+import { AndroidDatePickerComponent } from '../../components/android-date-picker/android-date-picker.component';
 
 export interface ProjectTasksModalData {
   project: Project;
@@ -21,7 +22,7 @@ export interface ProjectTasksModalData {
 @Component({
   selector: 'app-project-tasks-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule, WeekTimelineSvgComponent],
+  imports: [CommonModule, FormsModule, WeekTimelineSvgComponent, AndroidDatePickerComponent],
   templateUrl: './project-tasks-modal.component.html',
   styleUrls: ['./project-tasks-modal.component.css']
 })

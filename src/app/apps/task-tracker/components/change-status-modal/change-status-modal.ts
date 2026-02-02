@@ -34,18 +34,39 @@ import { Task } from '../../models/task.model';
         <div class="flex justify-end space-x-3">
           <button 
             type="button" 
+            (click)="close()"
+            [disabled]="isSaving"
+            [class.opacity-50]="isSaving"
+            [class.cursor-not-allowed]="isSaving"
+            class="px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:hover:bg-white">
+            Cancelar
+          </button>
+          <button 
+            type="button" 
             (click)="confirm(false)"
-            class="px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50">
+            [disabled]="isSaving"
+            [class.opacity-50]="isSaving"
+            [class.cursor-not-allowed]="isSaving"
+            class="px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:hover:bg-white">
             <span *ngIf="statusChangeWillHide">No ocultar</span>
             <span *ngIf="!statusChangeWillHide">No mostrar</span>
           </button>
           <button 
             type="button" 
             (click)="confirm(true)"
-            class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700">
-            <i class="fas mr-2" [ngClass]="statusChangeWillHide ? 'fa-eye-slash' : 'fa-eye'"></i>
-            <span *ngIf="statusChangeWillHide">Sí, ocultar</span>
-            <span *ngIf="!statusChangeWillHide">Sí, mostrar</span>
+            [disabled]="isSaving"
+            [class.opacity-50]="isSaving"
+            [class.cursor-not-allowed]="isSaving"
+            class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:hover:bg-indigo-600 flex items-center justify-center gap-2">
+            <span *ngIf="isSaving" class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+            <ng-container *ngIf="!isSaving">
+              <i class="fas" [ngClass]="statusChangeWillHide ? 'fa-eye-slash' : 'fa-eye'"></i>
+            </ng-container>
+            <span *ngIf="isSaving">{{ statusChangeWillHide ? 'Ocultando...' : 'Mostrando...' }}</span>
+            <span *ngIf="!isSaving">
+              <ng-container *ngIf="statusChangeWillHide">Sí, ocultar</ng-container>
+              <ng-container *ngIf="!statusChangeWillHide">Sí, mostrar</ng-container>
+            </span>
           </button>
         </div>
       </div>
@@ -59,6 +80,8 @@ export class ChangeStatusModalComponent implements OnInit, OnDestroy {
 
   @Output() closeModal = new EventEmitter<void>();
   @Output() confirmChangeVisibility = new EventEmitter<boolean>();
+  
+  isSaving = false;
 
   ngOnInit() {
     const scrollY = window.scrollY;
@@ -84,6 +107,7 @@ export class ChangeStatusModalComponent implements OnInit, OnDestroy {
   }
 
   confirm(changeVisibility: boolean) {
+    this.isSaving = true;
     this.confirmChangeVisibility.emit(changeVisibility);
   }
 

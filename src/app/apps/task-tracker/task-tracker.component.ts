@@ -46,6 +46,7 @@ import { ProjectTasksModalComponent } from './modals/project-tasks-modal/project
 export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked {
   @ViewChild('newTaskModal') newTaskModal?: TaskModalComponent;
   @ViewChild('editTaskModal') editTaskModal?: TaskModalComponent;
+  @ViewChild(ChangeStatusModalComponent) changeStatusModal?: ChangeStatusModalComponent;
   
   currentView: 'board' | 'week' = 'board';
   showNewTaskModal = false;
@@ -769,6 +770,10 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
   async saveTask() {
     // Validar fechas antes de guardar
     if (!this.validateNewTaskDates()) {
+      // Desactivar el spinner si hay error de validación
+      if (this.newTaskModal) {
+        this.newTaskModal.isSaving = false;
+      }
       return; // No guardar si hay errores de validación
     }
 
@@ -779,6 +784,11 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
       this.resetNewTask();
     } catch (error) {
       console.error('Error al guardar la tarea:', error);
+    } finally {
+      // Desactivar el spinner en el modal
+      if (this.newTaskModal) {
+        this.newTaskModal.isSaving = false;
+      }
     }
   }
 
@@ -2545,6 +2555,10 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
     
     // Validar fechas antes de guardar
     if (!this.validateEditTaskDates()) {
+      // Desactivar el spinner si hay error de validación
+      if (this.editTaskModal) {
+        this.editTaskModal.isSaving = false;
+      }
       return; // No guardar si hay errores de validación
     }
     
@@ -2557,6 +2571,11 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
       this.selectedTask = null;
     } catch (error) {
       console.error('Error al actualizar la tarea:', error);
+    } finally {
+      // Desactivar el spinner en el modal
+      if (this.editTaskModal) {
+        this.editTaskModal.isSaving = false;
+      }
     }
   }
 
@@ -3780,16 +3799,29 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
   closeStatusChangeModal() {
     this.showStatusChangeModal = false;
     this.pendingStatusChange = null;
+    // Resetear el spinner al cerrar
+    if (this.changeStatusModal) {
+      this.changeStatusModal.isSaving = false;
+    }
   }
 
   async confirmStatusChangeWithVisibility(changeVisibility: boolean) {
     if (this.pendingStatusChange) {
-      await this.applyStatusChange(
-        this.pendingStatusChange.task, 
-        this.pendingStatusChange.status, 
-        changeVisibility
-      );
-      this.closeStatusChangeModal();
+      try {
+        await this.applyStatusChange(
+          this.pendingStatusChange.task, 
+          this.pendingStatusChange.status, 
+          changeVisibility
+        );
+        this.closeStatusChangeModal();
+      } catch (error) {
+        console.error('Error al cambiar estado:', error);
+      } finally {
+        // Desactivar el spinner en el modal
+        if (this.changeStatusModal) {
+          this.changeStatusModal.isSaving = false;
+        }
+      }
     }
   }
 

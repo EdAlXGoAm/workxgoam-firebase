@@ -57,6 +57,7 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   taskGroups: TaskGroup[] = [];
   isLoading = false;
   isLoadingTaskTypes = false;
+  isSaving = false;
   
   // Tab activo para Descripción/Acciones
   activeDetailTab: 'description' | 'actions' = 'description';
@@ -250,6 +251,7 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
       this.showRecentTasksModal = false;
       this.selectedRecentTaskIndex = '';
       this.isLoading = false;
+      this.isSaving = false;
       // Cerrar el selector de emojis si está abierto
       this.closeEmojiPicker();
     }
@@ -366,6 +368,8 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     this.enableBodyScroll();
     this.closeEmojiPicker();
     this.closeRecentTasksModal();
+    // Resetear el spinner al cerrar
+    this.isSaving = false;
     this.closeModalEvent.emit();
   }
   
@@ -379,6 +383,9 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   
   saveTask() {
     if (!this.isFormValid()) return;
+    
+    // Activar el estado de guardado
+    this.isSaving = true;
     
     // Update task with combined date/time values
     this.task.start = this.combineDateTime(this.startDate, this.startTime);

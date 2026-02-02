@@ -626,16 +626,22 @@
     <!-- Botones fijos al final -->
     <div *ngIf="!isLoading" class="p-4 md:p-6 border-t border-gray-200 bg-gray-50 flex-shrink-0">
       <div class="flex justify-end space-x-3">
-        <button type="button" (click)="closeModal()" class="px-4 py-2 border rounded-lg font-medium">
+        <button type="button" 
+                (click)="closeModal()" 
+                [disabled]="isSaving"
+                [class.opacity-50]="isSaving"
+                [class.cursor-not-allowed]="isSaving"
+                class="px-4 py-2 border rounded-lg font-medium">
           Cancelar
         </button>
         <button type="submit" 
                 [attr.form]="formId"
-                [disabled]="!isFormValid()" 
-                [class.opacity-50]="!isFormValid()"
-                [class.cursor-not-allowed]="!isFormValid()"
-                class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:hover:bg-indigo-600">
-          {{ isEditing ? 'Guardar Cambios' : 'Guardar Tarea' }}
+                [disabled]="!isFormValid() || isSaving" 
+                [class.opacity-50]="!isFormValid() || isSaving"
+                [class.cursor-not-allowed]="!isFormValid() || isSaving"
+                class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:hover:bg-indigo-600 flex items-center justify-center gap-2">
+          <span *ngIf="isSaving" class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+          <span>{{ isSaving ? 'Guardando...' : (isEditing ? 'Guardar Cambios' : 'Guardar Tarea') }}</span>
         </button>
       </div>
     </div>
