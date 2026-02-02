@@ -9,18 +9,63 @@ import { TaskType } from '../../models/task-type.model';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div *ngIf="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]" style="overflow: hidden;">
-      <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" (click)="$event.stopPropagation()">
+    <div *ngIf="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]" style="overflow: hidden;" (click)="onClose()">
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col relative" (click)="$event.stopPropagation()">
+        <!-- Overlay de carga que bloquea todo el modal -->
+        <div *ngIf="isSaving" class="absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center z-50 rounded-xl">
+          <div class="text-center">
+            <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
+            <p class="text-gray-600 font-medium">Guardando tipo de tarea...</p>
+          </div>
+        </div>
+        
         <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200 flex-shrink-0">
           <h3 class="text-xl font-semibold text-gray-800">Gestionar Tipos de Tarea</h3>
-          <button (click)="onClose()" class="text-gray-400 hover:text-gray-600 transition">
+          <button (click)="onClose()" class="text-gray-400 hover:text-gray-600 transition" [disabled]="isSaving" [class.opacity-50]="isSaving" [class.cursor-not-allowed]="isSaving">
             <i class="fas fa-times fa-lg"></i>
           </button>
         </div>
         
-        <div class="flex-1 overflow-y-auto p-6">
-          <!-- Formulario para crear nuevo tipo -->
-          <div class="mb-6 pb-6 border-b border-gray-200">
+        <div class="flex-1 flex flex-col overflow-hidden p-6" [class.pointer-events-none]="isSaving" [class.opacity-50]="isSaving">
+          <!-- Lista de tipos existentes con scroll fijo -->
+          <div class="flex-shrink-0 mb-6 pb-6 border-b border-gray-200">
+            <h4 class="text-lg font-medium text-gray-700 mb-4">Tipos Existentes</h4>
+            <div class="max-h-[40vh] min-h-[80px] overflow-y-auto pr-2 md:max-h-[45vh]" style="scrollbar-width: thin;">
+              <!-- Spinner de carga -->
+              <div *ngIf="isLoading" class="flex items-center justify-center py-8">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                <span class="ml-3 text-gray-500">Cargando tipos...</span>
+              </div>
+              
+              <!-- Estado vacio (solo si no esta cargando) -->
+              <div *ngIf="!isLoading && taskTypes.length === 0" class="text-center text-gray-500 py-8">
+                <i class="fas fa-tags text-3xl mb-2"></i>
+                <p>No hay tipos de tarea creados aún</p>
+              </div>
+              
+              <!-- Lista de tipos (solo si no esta cargando) -->
+              <div *ngIf="!isLoading && taskTypes.length > 0" class="space-y-2">
+                <div *ngFor="let type of taskTypes" 
+                     class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+                  <div class="flex items-center gap-3">
+                    <div class="w-6 h-6 rounded-full border-2 border-white shadow-sm" 
+                         [style.background-color]="type.color"></div>
+                    <span class="font-medium text-gray-700">{{ type.name }}</span>
+                  </div>
+                  <button 
+                    type="button"
+                    (click)="onDelete(type.id)"
+                    class="text-red-500 hover:text-red-700 transition-colors"
+                    title="Eliminar tipo">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Formulario para crear nuevo tipo (sin scroll, siempre visible) -->
+          <div class="flex-shrink-0">
             <h4 class="text-lg font-medium text-gray-700 mb-4">Nuevo Tipo de Tarea</h4>
             <form (ngSubmit)="onCreateSubmit()" class="space-y-4">
               <div>
@@ -31,7 +76,8 @@ import { TaskType } from '../../models/task-type.model';
                   name="typeName" 
                   [(ngModel)]="newTypeName" 
                   required 
-                  class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  [disabled]="isSaving"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                   placeholder="Ej: Reunión, Análisis, Ejecución...">
               </div>
               <div>
@@ -43,7 +89,8 @@ import { TaskType } from '../../models/task-type.model';
                       *ngFor="let colorOpt of suggestedColors"
                       type="button"
                       (click)="selectSuggestedColor(colorOpt)"
-                      class="w-8 h-8 rounded-full border-2 hover:scale-110 transition-transform focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                      [disabled]="isSaving"
+                      class="w-8 h-8 rounded-full border-2 hover:scale-110 transition-transform focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       [style.background-color]="colorOpt"
                       [class.border-gray-800]="newTypeColor === colorOpt"
                       [class.border-gray-300]="newTypeColor !== colorOpt"
@@ -58,8 +105,10 @@ import { TaskType } from '../../models/task-type.model';
                     <div class="relative">
                       <div 
                         class="w-48 h-32 border border-gray-300 rounded-lg cursor-crosshair relative overflow-hidden"
+                        [class.opacity-50]="isSaving"
+                        [class.cursor-not-allowed]="isSaving"
                         [style.background]="'linear-gradient(to right, white, hsl(' + colorPickerHue + ', 100%, 50%)), linear-gradient(to top, black, transparent)'"
-                        (click)="onColorAreaClick($event)">
+                        (click)="!isSaving && onColorAreaClick($event)">
                         <div 
                           class="absolute w-3 h-3 border-2 border-white rounded-full transform -translate-x-1/2 -translate-y-1/2 pointer-events-none"
                           [style.left]="colorPickerSaturation + '%'"
@@ -72,6 +121,8 @@ import { TaskType } from '../../models/task-type.model';
                     <div class="relative">
                       <div 
                         class="w-6 h-32 border border-gray-300 rounded cursor-pointer"
+                        [class.opacity-50]="isSaving"
+                        [class.cursor-not-allowed]="isSaving"
                         style="background: linear-gradient(to bottom, 
                           hsl(0, 100%, 50%) 0%, 
                           hsl(60, 100%, 50%) 16.66%, 
@@ -80,7 +131,7 @@ import { TaskType } from '../../models/task-type.model';
                           hsl(240, 100%, 50%) 66.66%, 
                           hsl(300, 100%, 50%) 83.33%, 
                           hsl(360, 100%, 50%) 100%)"
-                        (click)="onHueBarClick($event)">
+                        (click)="!isSaving && onHueBarClick($event)">
                         <div 
                           class="absolute w-full h-0.5 bg-white border border-gray-400 transform -translate-y-1/2 pointer-events-none"
                           [style.top]="(colorPickerHue / 360) * 100 + '%'">
@@ -100,51 +151,19 @@ import { TaskType } from '../../models/task-type.model';
                 </div>
               </div>
               <div class="flex justify-end space-x-3">
-                <button type="button" (click)="resetNewTypeForm()"
-                        class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none">
-                  Limpiar
+                <button type="button" (click)="onClose()"
+                        [disabled]="isSaving"
+                        class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed">
+                  Cancelar
                 </button>
                 <button type="submit"
-                        class="px-4 py-2 bg-indigo-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                  Crear Tipo
+                        [disabled]="isSaving"
+                        class="px-4 py-2 bg-indigo-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                  <span *ngIf="isSaving" class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                  <span>{{ isSaving ? 'Guardando...' : 'Crear Tipo' }}</span>
                 </button>
               </div>
             </form>
-          </div>
-
-          <!-- Lista de tipos existentes -->
-          <div>
-            <h4 class="text-lg font-medium text-gray-700 mb-4">Tipos Existentes</h4>
-            <div *ngIf="taskTypes.length === 0" class="text-center text-gray-500 py-8">
-              <i class="fas fa-tags text-3xl mb-2"></i>
-              <p>No hay tipos de tarea creados aún</p>
-            </div>
-            <div *ngIf="taskTypes.length > 0" class="space-y-2">
-              <div *ngFor="let type of taskTypes" 
-                   class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
-                <div class="flex items-center gap-3">
-                  <div class="w-6 h-6 rounded-full border-2 border-white shadow-sm" 
-                       [style.background-color]="type.color"></div>
-                  <span class="font-medium text-gray-700">{{ type.name }}</span>
-                </div>
-                <button 
-                  type="button"
-                  (click)="onDelete(type.id)"
-                  class="text-red-500 hover:text-red-700 transition-colors"
-                  title="Eliminar tipo">
-                  <i class="fas fa-trash"></i>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex-shrink-0">
-          <div class="flex justify-end">
-            <button type="button" (click)="onClose()"
-                    class="px-4 py-2 bg-gray-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
-              Cerrar
-            </button>
           </div>
         </div>
       </div>
@@ -154,12 +173,16 @@ import { TaskType } from '../../models/task-type.model';
 export class TaskTypeModalComponent implements OnInit, OnChanges, OnDestroy {
   @Input() showModal: boolean = false;
   @Input() projectId: string = '';
+  @Input() cachedTaskTypes: TaskType[] = [];
   @Output() closeModal = new EventEmitter<void>();
   @Output() taskTypeCreated = new EventEmitter<void>();
+  @Output() taskTypeDeleted = new EventEmitter<void>();
 
   taskTypes: TaskType[] = [];
   newTypeName: string = '';
   newTypeColor: string = '#3B82F6';
+  isSaving: boolean = false;
+  isLoading: boolean = false;
 
   // Color picker state
   colorPickerHue: number = 220;
@@ -208,18 +231,37 @@ export class TaskTypeModalComponent implements OnInit, OnChanges, OnDestroy {
     if (changes['projectId']) {
       this.loadTaskTypes();
     }
+    // Si cambia el cache y hay projectId, actualizar la lista filtrada
+    if (changes['cachedTaskTypes'] && this.projectId) {
+      this.taskTypes = this.cachedTaskTypes.filter(t => t.projectId === this.projectId);
+    }
   }
 
   async loadTaskTypes() {
     if (!this.projectId) {
       this.taskTypes = [];
+      this.isLoading = false;
       return;
     }
+    
+    // Usar cache inmediatamente si existe
+    if (this.cachedTaskTypes && this.cachedTaskTypes.length > 0) {
+      this.taskTypes = this.cachedTaskTypes.filter(t => t.projectId === this.projectId);
+    }
+    
+    // Si no hay cache o no hay tipos filtrados, mostrar spinner y cargar desde Firestore
+    if (this.taskTypes.length === 0) {
+      this.isLoading = true;
+    }
+    
     try {
-      this.taskTypes = await this.taskTypeService.getTaskTypesByProject(this.projectId);
+      const freshTypes = await this.taskTypeService.getTaskTypesByProject(this.projectId);
+      this.taskTypes = freshTypes;
     } catch (error) {
       console.error('Error cargando tipos de tarea:', error);
       this.taskTypes = [];
+    } finally {
+      this.isLoading = false;
     }
   }
 
@@ -229,8 +271,9 @@ export class TaskTypeModalComponent implements OnInit, OnChanges, OnDestroy {
 
   async onCreateSubmit(): Promise<void> {
     const trimmedName = (this.newTypeName || '').trim();
-    if (!trimmedName || !this.projectId) return;
+    if (!trimmedName || !this.projectId || this.isSaving) return;
 
+    this.isSaving = true;
     try {
       await this.taskTypeService.createTaskType({
         projectId: this.projectId,
@@ -243,6 +286,8 @@ export class TaskTypeModalComponent implements OnInit, OnChanges, OnDestroy {
     } catch (error) {
       console.error('Error creando tipo de tarea:', error);
       alert('Error al crear el tipo de tarea. Por favor, intenta de nuevo.');
+    } finally {
+      this.isSaving = false;
     }
   }
 
@@ -254,7 +299,7 @@ export class TaskTypeModalComponent implements OnInit, OnChanges, OnDestroy {
     try {
       await this.taskTypeService.deleteTaskType(taskTypeId);
       await this.loadTaskTypes();
-      this.taskTypeCreated.emit();
+      this.taskTypeDeleted.emit();
     } catch (error) {
       console.error('Error eliminando tipo de tarea:', error);
       alert('Error al eliminar el tipo de tarea. Por favor, intenta de nuevo.');

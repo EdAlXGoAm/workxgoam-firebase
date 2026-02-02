@@ -30,6 +30,8 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   @Input() isEditing = false;
   @Input() environments: Environment[] = [];
   @Input() projects: Project[] = [];
+  @Input() allTasks: Task[] = []; // Todas las tareas del usuario para busqueda local
+  @Input() allTaskTypes: TaskType[] = []; // Todos los tipos de tarea para evitar carga de Firestore
   
   @Output() closeModalEvent = new EventEmitter<void>();
   @Output() saveTaskEvent = new EventEmitter<Partial<Task>>();
@@ -705,12 +707,14 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     // Si se seleccionó un environment, hay proyectos disponibles y no hay proyecto seleccionado,
     // abrir automáticamente el selector de proyecto
     if (this.task.environment && this.selectableProjects.length > 0 && !this.task.project) {
-      // Usar setTimeout para esperar a que Angular actualice la vista y el selector esté habilitado
-      setTimeout(() => {
+      // OPTIMIZACIÓN: Usar detectChanges + requestAnimationFrame en lugar de setTimeout
+      // para evitar bloqueo por múltiples ciclos de change detection
+      this.cdr.detectChanges();
+      requestAnimationFrame(() => {
         if (this.projectSelect && !this.task.project) {
           this.projectSelect.open();
         }
-      }, 100);
+      });
     }
   }
 
@@ -721,17 +725,21 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
       this.selectableTaskTypes = [];
       this.buildTaskTypeOptions();
       
+      // OPTIMIZACIÓN: Cargar solo tipos de forma bloqueante, grupos y tareas en paralelo sin bloquear
+      // Esperar SOLO a tipos (rápido desde Input)
       await this.loadTaskTypes();
+      
+      // Cargar grupos en background (no bloqueante)
+      this.loadTaskGroups();
+      
+      // Cargar tareas recientes en paralelo (solo si no estamos editando)
+      if (!this.isEditing) {
+        this.loadRecentTasks(); // No await - carga en paralelo
+      }
+      
       this.selectableTaskTypes = this.taskTypes.filter(t => t.projectId === this.task.project);
       this.buildTaskTypeOptions(); // Actualizar opciones de tipo de tarea
       this.isLoadingTaskTypes = false;
-      
-      // Cargar grupos de tareas cuando se selecciona un proyecto
-      await this.loadTaskGroups();
-      // Cargar tareas recientes cuando se selecciona un proyecto (solo si no estamos editando)
-      if (!this.isEditing) {
-        this.loadRecentTasks();
-      }
     } else {
       this.selectableTaskTypes = [];
       this.buildTaskTypeOptions(); // Actualizar opciones de tipo de tarea
@@ -755,6 +763,13 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
 
   async loadTaskTypes() {
     try {
+      // Si ya tenemos tipos desde el Input, usarlos (instantáneo)
+      if (this.allTaskTypes && this.allTaskTypes.length > 0) {
+        this.taskTypes = this.allTaskTypes;
+        return;
+      }
+      
+      // Fallback: cargar desde Firestore
       this.taskTypes = await this.taskTypeService.getTaskTypes();
     } catch (error) {
       console.error('Error cargando tipos de tarea:', error);
@@ -788,13 +803,21 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   async refreshTaskTypes() {
-    await this.loadTaskTypes();
+    // Si hay tipos actualizados desde el Input, usarlos primero
+    if (this.allTaskTypes && this.allTaskTypes.length >= 0) {
+      this.taskTypes = this.allTaskTypes;
+    } else {
+      // Fallback: cargar desde Firestore
+      await this.loadTaskTypes();
+    }
     // Solo actualizar los tipos seleccionables si hay un proyecto seleccionado
     if (this.task.project) {
       this.selectableTaskTypes = this.taskTypes.filter(t => t.projectId === this.task.project);
     }
     // Actualizar las opciones del dropdown de Android también
     this.buildTaskTypeOptions();
+    // Forzar detección de cambios
+    this.cdr.detectChanges();
   }
 
   refreshProjects() {
@@ -817,6 +840,23 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
       return;
     }
 
+    // Si hay tareas en el Input, filtrar localmente (instantaneo)
+    if (this.allTasks && this.allTasks.length > 0) {
+      this.recentTasks = this.allTasks
+        .filter(t => t.project === this.task.project)
+        .sort((a, b) => {
+          const dateA = new Date(a.updatedAt || a.createdAt).getTime();
+          const dateB = new Date(b.updatedAt || b.createdAt).getTime();
+          return dateB - dateA; // Mas reciente primero
+        })
+        .slice(0, 20);
+      
+      this.showRecentTasksSelector = this.recentTasks.length > 0;
+      this.recentTasksOptions = this.buildRecentTasksOptions();
+      return;
+    }
+
+    // Fallback: cargar desde Firestore
     try {
       this.recentTasks = await this.taskService.getRecentTasksByProject(this.task.project, 20);
       this.showRecentTasksSelector = this.recentTasks.length > 0;
@@ -1963,11 +2003,27 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     }
     
     try {
-      // Buscar tareas con el mismo nombre y proyecto
-      const matchingTasks = await this.taskService.getTasksByNameAndProject(
-        this.task.name.trim(), 
-        this.task.project
-      );
+      let matchingTasks: Task[] = [];
+      
+      // Si hay tareas en el Input, buscar localmente (instantaneo)
+      if (this.allTasks && this.allTasks.length > 0) {
+        matchingTasks = this.allTasks
+          .filter(t => 
+            t.project === this.task.project && 
+            t.name.trim().toLowerCase() === this.task.name!.trim().toLowerCase()
+          )
+          .sort((a, b) => {
+            const dateA = new Date(a.updatedAt || a.createdAt).getTime();
+            const dateB = new Date(b.updatedAt || b.createdAt).getTime();
+            return dateB - dateA; // Mas reciente primero
+          });
+      } else {
+        // Fallback: buscar en Firestore
+        matchingTasks = await this.taskService.getTasksByNameAndProject(
+          this.task.name.trim(), 
+          this.task.project
+        );
+      }
       
       // Si hay coincidencias, tomar la más reciente (ya viene ordenada)
       if (matchingTasks.length > 0) {

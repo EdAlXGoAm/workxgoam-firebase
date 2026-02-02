@@ -35,6 +35,7 @@ import { ProjectModalComponent } from './components/project-modal/project-modal.
 import { TaskGroupService } from './services/task-group.service';
 import { TaskGroup } from './models/task-group.model';
 import { ProjectTasksModalComponent } from './modals/project-tasks-modal/project-tasks-modal.component';
+import { SyncService } from './services/sync.service';
 
 @Component({
   selector: 'app-task-tracker',
@@ -96,6 +97,11 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
   get focusedEnvironmentId(): string | null {
     return this.focusedEnvironment.id;
   }
+
+  // Estado de sincronización
+  isSyncing = false;
+  lastSyncTime: string | null = null;
+  dataLoadedFromCache = false;
 
   newTask: Partial<Task> = {
     name: '',
@@ -302,6 +308,7 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
     private taskGroupService: TaskGroupService,
     private timelineFocusService: TimelineFocusService,
     private taskTimeService: TaskTimeService,
+    private syncService: SyncService,
     private elementRef: ElementRef,
     private cdr: ChangeDetectorRef
   ) {}
@@ -313,7 +320,45 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
     // Iniciar carga del orden
     this.isLoadingEnvironmentOrder = true;
     
-    await this.loadInitialData();
+    // Cargar datos con caché: primero desde caché, luego sincronizar en background
+    try {
+      const cacheResult = await this.syncService.loadWithCache();
+      
+      if (cacheResult.fromCache) {
+        // Datos cargados desde caché - UI lista inmediatamente
+        this.dataLoadedFromCache = true;
+        this.tasks = cacheResult.tasks;
+        this.environments = cacheResult.environments;
+        this.projects = cacheResult.projects;
+        this.taskTypes = cacheResult.taskTypes;
+        this.allTaskGroups = cacheResult.taskGroups;
+        this.taskSumTemplates = cacheResult.taskSumTemplates;
+        this.filteredProjects = [...this.projects];
+        this.updateOrderedEnvironmentsCache();
+        this.processTasks();
+        
+        // Sincronizar en background
+        this.isSyncing = true;
+        this.syncService.syncInBackground().then(() => {
+          // Actualizar datos si hay cambios después de sincronización
+          this.isSyncing = false;
+          this.lastSyncTime = this.syncService.getLastSyncTime();
+          this.refreshDataFromSync();
+        }).catch(() => {
+          this.isSyncing = false;
+        });
+      } else {
+        // Sin caché - cargar normal (primera vez)
+        this.dataLoadedFromCache = false;
+        await this.loadInitialData();
+        this.lastSyncTime = this.syncService.getLastSyncTime();
+      }
+    } catch (error) {
+      console.error('Error al cargar datos con caché:', error);
+      // Fallback a carga normal
+      await this.loadInitialData();
+    }
+    
     this.initializeNewTask();
     // Cargar el estado del filtro desde localStorage
     this.loadShowHiddenState();
@@ -374,6 +419,20 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
       // Nota: initializeEnvironmentOrder se llama en ngOnInit después de cargar el orden desde localStorage
     } catch (error) {
       console.error("Error loading initial data for TaskTrackerComponent:", error);
+    }
+  }
+
+  /**
+   * Refresca los datos después de una sincronización en background
+   */
+  private async refreshDataFromSync(): Promise<void> {
+    try {
+      // Recargar datos desde Firestore para obtener los más recientes
+      await this.loadInitialData();
+      this.processTasks();
+      this.cdr.detectChanges();
+    } catch (error) {
+      console.error('Error al refrescar datos después de sincronización:', error);
     }
   }
 
@@ -679,6 +738,8 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
     try {
       await this.taskService.createTask(this.newTask as Omit<Task, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'completed' | 'completedAt'>);
       await this.loadTasks();
+      // Actualizar caché después de crear tarea
+      await this.syncService.updateCacheAfterWrite(this.tasks);
       this.closeNewTaskModal();
       this.resetNewTask();
     } catch (error) {
@@ -826,8 +887,19 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
         : '';
   }
 
-  closeNewTaskTypeModal() {
+  async closeNewTaskTypeModal() {
     this.showNewTaskTypeModal = false;
+    // Recargar tipos en el componente padre primero
+    await this.loadTaskTypes();
+    // Esperar un ciclo de detección de cambios para que Angular actualice los Inputs
+    await new Promise(resolve => setTimeout(resolve, 0));
+    // Refrescar tipos en el modal de tarea si está abierto
+    if (this.showNewTaskModal && this.newTaskModal) {
+      await this.newTaskModal.refreshTaskTypes();
+    }
+    if (this.showEditTaskModal && this.editTaskModal) {
+      await this.editTaskModal.refreshTaskTypes();
+    }
   }
 
   async onTaskTypeCreated() {
@@ -844,6 +916,21 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
     
     // Cerrar el modal de tipos después de crear un tipo
     this.closeNewTaskTypeModal();
+  }
+
+  async onTaskTypeDeleted() {
+    // Recargar los tipos de tarea después de eliminar uno
+    await this.loadTaskTypes();
+    
+    // Recargar los tipos en el modal de tarea si está abierto
+    if (this.showNewTaskModal && this.newTaskModal) {
+      await this.newTaskModal.refreshTaskTypes();
+    }
+    if (this.showEditTaskModal && this.editTaskModal) {
+      await this.editTaskModal.refreshTaskTypes();
+    }
+    
+    // NO cerrar el modal de tipos después de eliminar un tipo
   }
 
   openManagementModal() {
@@ -2348,6 +2435,8 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
       try {
         await this.taskService.deleteTask(task.id);
         await this.loadTasks();
+        // Actualizar caché después de eliminar tarea
+        await this.syncService.updateCacheAfterWrite(this.tasks);
       } catch (error) {
         console.error('Error al eliminar la tarea:', error);
       } finally {
@@ -2365,6 +2454,8 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
       try {
         await this.taskService.deleteTask(task.id);
         await this.loadTasks();
+        // Actualizar caché después de eliminar tarea
+        await this.syncService.updateCacheAfterWrite(this.tasks);
         console.log('✅ Tarea eliminada correctamente');
       } catch (error) {
         console.error('❌ Error al eliminar la tarea:', error);
@@ -2377,12 +2468,16 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
   async onTaskTimeUpdated(task: Task) {
     console.log('🔄 Tarea actualizada desde timeline:', task.name);
     await this.loadTasks();
+    // Actualizar caché después de actualizar tiempo
+    await this.syncService.updateCacheAfterWrite(this.tasks);
   }
 
   async toggleHidden(task: Task) {
     try {
       await this.taskService.updateTask(task.id, { hidden: !task.hidden });
       await this.loadTasks();
+      // Actualizar caché después de cambiar visibilidad
+      await this.syncService.updateCacheAfterWrite(this.tasks);
     } catch (error) {
       console.error('Error al cambiar visibilidad:', error);
     }
@@ -2441,6 +2536,8 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
       
       await this.taskService.updateTask(task.id, updates);
       await this.loadTasks();
+      // Actualizar caché después de cambiar estado
+      await this.syncService.updateCacheAfterWrite(this.tasks);
     } catch (error) {
       console.error('Error al cambiar estado:', error);
     } finally {
@@ -2466,6 +2563,8 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
       const { id, userId, createdAt, ...updates } = this.selectedTask;
       await this.taskService.updateTask(this.selectedTask.id, updates);
       await this.loadTasks();
+      // Actualizar caché después de editar tarea
+      await this.syncService.updateCacheAfterWrite(this.tasks);
       this.showEditTaskModal = false;
       this.selectedTask = null;
     } catch (error) {
@@ -2499,6 +2598,8 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
       });
       
       await this.loadTasks();
+      // Actualizar caché después de actualizar proyecto
+      await this.syncService.updateCacheAfterWrite(this.tasks);
     } catch (error) {
       console.error('Error al actualizar el proyecto de la tarea:', error);
       alert('Error al actualizar el proyecto. Por favor, intenta de nuevo.');

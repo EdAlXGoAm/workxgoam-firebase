@@ -6,6 +6,14 @@
     (createTask)="openNewTaskModal()">
   </app-task-tracker-header>
 
+  <!-- Indicador de sincronización (discreto) -->
+  <div *ngIf="dataLoadedFromCache" class="fixed top-16 right-4 z-40 flex items-center gap-2 text-xs text-gray-500 bg-white px-2 py-1 rounded shadow-sm">
+    <i *ngIf="isSyncing" class="fas fa-sync fa-spin"></i>
+    <i *ngIf="!isSyncing" class="fas fa-check-circle text-green-500"></i>
+    <span *ngIf="isSyncing">Sincronizando...</span>
+    <span *ngIf="!isSyncing && lastSyncTime">Sincronizado</span>
+  </div>
+
   <!-- Main Content con padding-top para compensar el header fijo -->
   <main class="w-full px-2 md:px-4 lg:px-6 py-6 pt-8">
     <!-- Current Task Info Card -->
@@ -264,6 +272,8 @@
     [task]="newTask"
     [environments]="orderedEnvironments"
     [projects]="projects"
+    [allTasks]="tasks"
+    [allTaskTypes]="taskTypes"
     (closeModalEvent)="closeNewTaskModal()"
     (saveTaskEvent)="saveTask()"
     (openEnvironmentModal)="openNewEnvironmentModal()"
@@ -302,8 +312,10 @@
     *ngIf="showNewTaskTypeModal"
     [showModal]="showNewTaskTypeModal"
     [projectId]="getCurrentProjectIdForTaskTypeModal()"
+    [cachedTaskTypes]="taskTypes"
     (closeModal)="closeNewTaskTypeModal()"
-    (taskTypeCreated)="onTaskTypeCreated()">
+    (taskTypeCreated)="onTaskTypeCreated()"
+    (taskTypeDeleted)="onTaskTypeDeleted()">
   </app-task-type-modal>
 
   <!-- New Project Modal -->
@@ -510,6 +522,8 @@
     [task]="selectedTask || {}"
     [environments]="orderedEnvironments"
     [projects]="projects"
+    [allTasks]="tasks"
+    [allTaskTypes]="taskTypes"
     (closeModalEvent)="showEditTaskModal = false"
     (saveTaskEvent)="saveEditedTask()"
     (openEnvironmentModal)="openNewEnvironmentModal()"
