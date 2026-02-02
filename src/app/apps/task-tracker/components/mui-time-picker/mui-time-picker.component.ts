@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, forwardRef, OnInit, HostListener, ElementRef } from '@angular/core';
+import { Component, Input, Output, EventEmitter, forwardRef, OnInit, OnChanges, OnDestroy, SimpleChanges, ElementRef, ChangeDetectionStrategy, ChangeDetectorRef, NgZone, ViewChild, AfterViewInit } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 
@@ -6,6 +6,7 @@ import { CommonModule } from '@angular/common';
   selector: 'app-mui-time-picker',
   standalone: true,
   imports: [CommonModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [
     {
       provide: NG_VALUE_ACCESSOR,
@@ -27,29 +28,26 @@ import { CommonModule } from '@angular/common';
       <!-- Modal del Time Picker -->
       <div *ngIf="isPickerOpen" 
            class="picker-overlay" 
-           (mousedown)="onBackdropMouseDown($event)"
-           (mouseup)="onBackdropMouseUp($event)">
-        <div class="picker-modal" 
-             (mousedown)="$event.stopPropagation()"
-             (mouseup)="$event.stopPropagation()">
+           (click)="onOverlayClick($event)">
+        <div class="picker-modal" (click)="$event.stopPropagation()">
           <!-- Header con tiempo seleccionado -->
           <div class="picker-header">
-            <!-- Tiempos de referencia (nueva versión) -->
-            <div *ngIf="getAllReferences().length > 0" class="reference-times">
-              <div *ngFor="let ref of getAllReferences()" class="reference-time">
+            <!-- Tiempos de referencia -->
+            <div *ngIf="cachedReferences.length > 0" class="reference-times">
+              <div *ngFor="let ref of cachedReferences; trackBy: trackByRefTime" class="reference-time">
                 <span class="reference-label">{{ ref.label }}:</span>
-                <span class="reference-value">{{ formatReferenceTime(ref.time) }}</span>
+                <span class="reference-value">{{ ref.formattedTime }}</span>
               </div>
             </div>
             
             <div class="selected-time-display">
               <div class="time-digits">
-                <span class="hour-display" [class.selected]="currentView === 'hour'" (click)="setView('hour')">
-                  {{ formatHour(selectedHour) }}
+                <span #hourDisplay class="hour-display" [class.selected]="currentView === 'hour'" (click)="setView('hour')">
+                  {{ formattedHour }}
                 </span>
                 <span class="separator">:</span>
-                <span class="minute-display" [class.selected]="currentView === 'minute'" (click)="setView('minute')">
-                  {{ selectedMinute.toString().padStart(2, '0') }}
+                <span #minuteDisplay class="minute-display" [class.selected]="currentView === 'minute'" (click)="setView('minute')">
+                  {{ formattedMinute }}
                 </span>
               </div>
               <div class="am-pm-selector">
@@ -67,105 +65,63 @@ import { CommonModule } from '@angular/common';
           
           <!-- Clock Container -->
           <div class="clock-container">
-            <!-- Vista de Horas -->
-            <div *ngIf="currentView === 'hour'" class="clock-view">
-              <svg class="clock-face" viewBox="0 0 240 240" width="240" height="240">
-                <!-- Círculo exterior del reloj -->
-                <circle cx="120" cy="120" r="110" fill="none" stroke="#e0e0e0" stroke-width="1"/>
+            <svg #clockSvg 
+                 class="clock-face" 
+                 viewBox="0 0 240 240" 
+                 width="240" 
+                 height="240">
+              <!-- Círculo exterior del reloj -->
+              <circle cx="120" cy="120" r="110" fill="none" stroke="#e0e0e0" stroke-width="1"/>
+              
+              <!-- Área interactiva transparente -->
+              <circle cx="120" cy="120" r="110" fill="transparent" class="clock-interactive-area"/>
+              
+              <!-- Vista de Horas (siempre en DOM, se oculta con CSS) -->
+              <g class="hour-numbers" [class.hidden]="currentView !== 'hour'">
+                <!-- Elementos de hora con IDs para manipulación directa -->
+                <circle *ngFor="let i of [0,1,2,3,4,5,6,7,8,9,10,11]"
+                  [id]="'hour-circle-' + i"
+                  [attr.cx]="hourPositions[i].x" 
+                  [attr.cy]="hourPositions[i].y" 
+                  r="20"
+                  class="hour-circle"/>
+                <text *ngFor="let i of [0,1,2,3,4,5,6,7,8,9,10,11]"
+                  [id]="'hour-text-' + i"
+                  [attr.x]="hourPositions[i].x" 
+                  [attr.y]="hourPositions[i].y" 
+                  text-anchor="middle" 
+                  dominant-baseline="central"
+                  class="hour-text">{{ hourNumbers[i] }}</text>
                 
-                <!-- Números de las horas -->
-                <g class="hour-numbers">
-                  <g *ngFor="let hour of hourNumbers; let i = index">
-                    <circle 
-                      [attr.cx]="getHourPosition(i).x" 
-                      [attr.cy]="getHourPosition(i).y" 
-                      r="20"
-                      [class.selected]="hour === selectedHour"
-                      class="hour-circle"
-                      (click)="selectHour(hour)"/>
-                    <text 
-                      [attr.x]="getHourPosition(i).x" 
-                      [attr.y]="getHourPosition(i).y" 
-                      text-anchor="middle" 
-                      dominant-baseline="central"
-                      class="hour-text"
-                      [class.selected]="hour === selectedHour"
-                      (click)="selectHour(hour)">
-                      {{ hour }}
-                    </text>
-                  </g>
-                </g>
-                
-                <!-- Línea que conecta el centro con la hora seleccionada -->
-                <line 
-                  x1="120" 
-                  y1="120" 
-                  [attr.x2]="hourHandPosition.x" 
-                  [attr.y2]="hourHandPosition.y" 
-                  stroke="#1565c0" 
-                  stroke-width="2"/>
-                
-                <!-- Círculo en la hora seleccionada -->
-                <circle 
-                  [attr.cx]="hourHandPosition.x" 
-                  [attr.cy]="hourHandPosition.y" 
-                  r="4" 
-                  fill="#1565c0"/>
-                
-                <!-- Centro del reloj -->
+                <!-- Manecilla de hora -->
+                <line id="hour-hand-line" x1="120" y1="120" x2="120" y2="40" stroke="#1565c0" stroke-width="2"/>
+                <circle id="hour-hand-dot" cx="120" cy="40" r="4" fill="#1565c0"/>
                 <circle cx="120" cy="120" r="4" fill="#1565c0"/>
-              </svg>
-            </div>
+              </g>
 
-            <!-- Vista de Minutos -->
-            <div *ngIf="currentView === 'minute'" class="clock-view">
-              <svg class="clock-face" viewBox="0 0 240 240" width="240" height="240">
-                <!-- Círculo exterior del reloj -->
-                <circle cx="120" cy="120" r="110" fill="none" stroke="#e0e0e0" stroke-width="1"/>
+              <!-- Vista de Minutos (siempre en DOM, se oculta con CSS) -->
+              <g class="minute-numbers" [class.hidden]="currentView !== 'minute'">
+                <!-- Elementos de minuto con IDs para manipulación directa -->
+                <circle *ngFor="let i of [0,1,2,3,4,5,6,7,8,9,10,11]"
+                  [id]="'minute-circle-' + i"
+                  [attr.cx]="minutePositions[i].x" 
+                  [attr.cy]="minutePositions[i].y" 
+                  r="16"
+                  class="minute-circle"/>
+                <text *ngFor="let i of [0,1,2,3,4,5,6,7,8,9,10,11]"
+                  [id]="'minute-text-' + i"
+                  [attr.x]="minutePositions[i].x" 
+                  [attr.y]="minutePositions[i].y" 
+                  text-anchor="middle" 
+                  dominant-baseline="central"
+                  class="minute-text">{{ minuteOptions[i].toString().padStart(2, '0') }}</text>
                 
-                <!-- Números de los minutos -->
-                <g class="minute-numbers">
-                  <g *ngFor="let minute of minuteOptions; let i = index">
-                    <circle 
-                      [attr.cx]="getMinutePosition(i).x" 
-                      [attr.cy]="getMinutePosition(i).y" 
-                      r="16"
-                      [class.selected]="minute === selectedMinute"
-                      class="minute-circle"
-                      (click)="selectMinute(minute)"/>
-                    <text 
-                      [attr.x]="getMinutePosition(i).x" 
-                      [attr.y]="getMinutePosition(i).y" 
-                      text-anchor="middle" 
-                      dominant-baseline="central"
-                      class="minute-text"
-                      [class.selected]="minute === selectedMinute"
-                      (click)="selectMinute(minute)">
-                      {{ minute.toString().padStart(2, '0') }}
-                    </text>
-                  </g>
-                </g>
-                
-                <!-- Línea que conecta el centro con el minuto seleccionado -->
-                <line 
-                  x1="120" 
-                  y1="120" 
-                  [attr.x2]="minuteHandPosition.x" 
-                  [attr.y2]="minuteHandPosition.y" 
-                  stroke="#1565c0" 
-                  stroke-width="2"/>
-                
-                <!-- Círculo en el minuto seleccionado -->
-                <circle 
-                  [attr.cx]="minuteHandPosition.x" 
-                  [attr.cy]="minuteHandPosition.y" 
-                  r="4" 
-                  fill="#1565c0"/>
-                
-                <!-- Centro del reloj -->
+                <!-- Manecilla de minuto -->
+                <line id="minute-hand-line" x1="120" y1="120" x2="120" y2="40" stroke="#1565c0" stroke-width="2"/>
+                <circle id="minute-hand-dot" cx="120" cy="40" r="4" fill="#1565c0"/>
                 <circle cx="120" cy="120" r="4" fill="#1565c0"/>
-              </svg>
-            </div>
+              </g>
+            </svg>
           </div>
           
           <!-- Actions -->
@@ -314,24 +270,23 @@ import { CommonModule } from '@angular/common';
       padding: 24px;
       display: flex;
       justify-content: center;
-    }
-    
-    .clock-view {
-      position: relative;
+      touch-action: none;
     }
     
     .clock-face {
       user-select: none;
+      cursor: pointer;
+      touch-action: none;
+    }
+    
+    .clock-interactive-area {
+      cursor: pointer;
     }
     
     .hour-circle, .minute-circle {
       fill: transparent;
       cursor: pointer;
-      transition: fill 0.2s;
-    }
-    
-    .hour-circle:hover, .minute-circle:hover {
-      fill: rgba(21, 101, 192, 0.1);
+      pointer-events: none;
     }
     
     .hour-circle.selected, .minute-circle.selected {
@@ -342,8 +297,8 @@ import { CommonModule } from '@angular/common';
       font-size: 16px;
       cursor: pointer;
       fill: #333;
-      transition: fill 0.2s;
       font-weight: 400;
+      pointer-events: none;
     }
     
     .hour-text.selected, .minute-text.selected {
@@ -389,76 +344,122 @@ import { CommonModule } from '@angular/common';
     .ok-btn:hover {
       background: rgba(21, 101, 192, 0.05);
     }
+    
+    .hidden {
+      display: none;
+    }
   `]
 })
-export class MuiTimePickerComponent implements OnInit, ControlValueAccessor {
+export class MuiTimePickerComponent implements OnInit, OnChanges, OnDestroy, AfterViewInit, ControlValueAccessor {
+  @ViewChild('clockSvg') clockSvg!: ElementRef<SVGSVGElement>;
+  @ViewChild('hourDisplay') hourDisplayEl!: ElementRef<HTMLSpanElement>;
+  @ViewChild('minuteDisplay') minuteDisplayEl!: ElementRef<HTMLSpanElement>;
+  
   @Input() label: string = 'Seleccionar hora';
   @Input() placeholder: string = 'HH:MM AM/PM';
-  @Input() referenceTime: string = ''; // Tiempo de referencia a mostrar (mantenido para compatibilidad)
-  @Input() referenceLabel: string = ''; // Etiqueta para el tiempo de referencia (mantenido para compatibilidad)
-  @Input() referenceTimes: { time: string, label: string }[] = []; // Múltiples referencias de tiempo
+  @Input() referenceTime: string = '';
+  @Input() referenceLabel: string = '';
+  @Input() referenceTimes: { time: string, label: string }[] = [];
   @Output() timeChange = new EventEmitter<string>();
 
   isPickerOpen = false;
   selectedHour = 12;
   selectedMinute = 0;
-  ampm = 'AM';
+  ampm: 'AM' | 'PM' = 'AM';
   currentView: 'hour' | 'minute' = 'hour';
   
-  hourNumbers = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-  minuteOptions = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+  // Valores formateados para el header
+  formattedHour = '12';
+  formattedMinute = '00';
+  
+  // Arrays estáticos
+  readonly hourNumbers = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+  readonly minuteOptions = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+  
+  // Posiciones pre-calculadas
+  readonly hourPositions: { x: number, y: number }[];
+  readonly minutePositions: { x: number, y: number }[];
+  
+  // Referencias cacheadas
+  cachedReferences: { time: string, label: string, formattedTime: string }[] = [];
   
   private value: string = '';
   private onChange = (value: string) => {};
   private onTouched = () => {};
-  private backdropMouseDownPos: { x: number, y: number } | null = null;
+  
+  // Estado del drag
+  private isDragging = false;
+  private readonly CENTER = { x: 120, y: 120 };
+  private readonly RADIUS = 80;
+  
+  // ===== CACHE DE ELEMENTOS DOM PARA MANIPULACIÓN DIRECTA =====
+  private hourCircles: SVGCircleElement[] = [];
+  private hourTexts: SVGTextElement[] = [];
+  private minuteCircles: SVGCircleElement[] = [];
+  private minuteTexts: SVGTextElement[] = [];
+  private hourHandLine: SVGLineElement | null = null;
+  private hourHandDot: SVGCircleElement | null = null;
+  private minuteHandLine: SVGLineElement | null = null;
+  private minuteHandDot: SVGCircleElement | null = null;
+  
+  // Índices actuales para saber qué elemento tiene la clase selected
+  private currentHourIndex = 0;
+  private currentMinuteIndex = 0;
+  
+  // Event listeners para cleanup
+  private boundMouseMove: ((e: MouseEvent) => void) | null = null;
+  private boundMouseUp: ((e: MouseEvent) => void) | null = null;
+  private boundTouchMove: ((e: TouchEvent) => void) | null = null;
+  private boundTouchEnd: ((e: TouchEvent) => void) | null = null;
+  private boundKeyDown: ((e: KeyboardEvent) => void) | null = null;
 
-  constructor(private elementRef: ElementRef) {}
+  constructor(
+    private elementRef: ElementRef,
+    private cdr: ChangeDetectorRef,
+    private ngZone: NgZone
+  ) {
+    // Pre-calcular posiciones
+    this.hourPositions = this.hourNumbers.map((_, i) => {
+      const angle = (i * 30 - 90) * Math.PI / 180;
+      return {
+        x: this.CENTER.x + this.RADIUS * Math.cos(angle),
+        y: this.CENTER.y + this.RADIUS * Math.sin(angle)
+      };
+    });
+    
+    this.minutePositions = this.minuteOptions.map((_, i) => {
+      const angle = (i * 30 - 90) * Math.PI / 180;
+      return {
+        x: this.CENTER.x + this.RADIUS * Math.cos(angle),
+        y: this.CENTER.y + this.RADIUS * Math.sin(angle)
+      };
+    });
+  }
 
   ngOnInit() {
-    // Inicializar con hora actual si no hay valor
     if (!this.value) {
       const now = new Date();
       this.selectedHour = now.getHours() > 12 ? now.getHours() - 12 : (now.getHours() === 0 ? 12 : now.getHours());
       this.selectedMinute = Math.round(now.getMinutes() / 5) * 5;
+      if (this.selectedMinute >= 60) this.selectedMinute = 55;
       this.ampm = now.getHours() >= 12 ? 'PM' : 'AM';
     }
+    this.updateFormattedValues();
+    this.currentHourIndex = this.hourNumbers.indexOf(this.selectedHour);
+    this.currentMinuteIndex = this.minuteOptions.indexOf(this.selectedMinute);
+    this.updateCachedReferences();
   }
 
-  // Detectar clicks fuera del componente
-  @HostListener('document:click', ['$event'])
-  onDocumentClick(event: Event) {
-    if (this.isPickerOpen && !this.elementRef.nativeElement.contains(event.target)) {
-      this.cancelSelection();
+  ngAfterViewInit() {}
+
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['referenceTime'] || changes['referenceLabel'] || changes['referenceTimes']) {
+      this.updateCachedReferences();
     }
   }
 
-  // Detectar Escape key para cerrar
-  @HostListener('document:keydown.escape')
-  onEscapeKey() {
-    if (this.isPickerOpen) {
-      this.cancelSelection();
-    }
-  }
-
-  onBackdropMouseDown(event: MouseEvent) {
-    // Guardar la posición del mousedown para comparar con mouseup
-    this.backdropMouseDownPos = { x: event.clientX, y: event.clientY };
-  }
-
-  onBackdropMouseUp(event: MouseEvent) {
-    // Solo cerrar si el mouseup está cerca del mousedown (es un click, no un drag)
-    if (this.backdropMouseDownPos) {
-      const deltaX = Math.abs(event.clientX - this.backdropMouseDownPos.x);
-      const deltaY = Math.abs(event.clientY - this.backdropMouseDownPos.y);
-      const threshold = 5; // Píxeles de tolerancia para considerar que es un click
-      
-      if (deltaX <= threshold && deltaY <= threshold) {
-        this.cancelSelection();
-      }
-    }
-    
-    this.backdropMouseDownPos = null;
+  ngOnDestroy() {
+    this.removeGlobalListeners();
   }
 
   get displayValue(): string {
@@ -474,8 +475,300 @@ export class MuiTimePickerComponent implements OnInit, ControlValueAccessor {
     this.isPickerOpen = true;
     this.onTouched();
     
-    // Bloquear scroll del body
+    this.updateFormattedValues();
+    this.currentHourIndex = this.hourNumbers.indexOf(this.selectedHour);
+    this.currentMinuteIndex = this.minuteOptions.indexOf(this.selectedMinute);
+    
     document.body.style.overflow = 'hidden';
+    this.cdr.markForCheck();
+    
+    // Configurar después de que el DOM se actualice
+    setTimeout(() => {
+      this.cacheClockElements();
+      this.initializeClockState();
+      this.setupClockListeners();
+    }, 0);
+  }
+
+  // ===== CACHE DE ELEMENTOS DOM =====
+  private cacheClockElements() {
+    if (!this.clockSvg?.nativeElement) return;
+    
+    const svg = this.clockSvg.nativeElement;
+    
+    // Cachear elementos de hora
+    this.hourCircles = [];
+    this.hourTexts = [];
+    for (let i = 0; i < 12; i++) {
+      const circle = svg.getElementById(`hour-circle-${i}`) as SVGCircleElement;
+      const text = svg.getElementById(`hour-text-${i}`) as SVGTextElement;
+      if (circle) this.hourCircles.push(circle);
+      if (text) this.hourTexts.push(text);
+    }
+    
+    // Cachear elementos de minuto
+    this.minuteCircles = [];
+    this.minuteTexts = [];
+    for (let i = 0; i < 12; i++) {
+      const circle = svg.getElementById(`minute-circle-${i}`) as SVGCircleElement;
+      const text = svg.getElementById(`minute-text-${i}`) as SVGTextElement;
+      if (circle) this.minuteCircles.push(circle);
+      if (text) this.minuteTexts.push(text);
+    }
+    
+    // Cachear manecillas
+    this.hourHandLine = svg.getElementById('hour-hand-line') as SVGLineElement;
+    this.hourHandDot = svg.getElementById('hour-hand-dot') as SVGCircleElement;
+    this.minuteHandLine = svg.getElementById('minute-hand-line') as SVGLineElement;
+    this.minuteHandDot = svg.getElementById('minute-hand-dot') as SVGCircleElement;
+  }
+
+  // ===== INICIALIZAR ESTADO VISUAL =====
+  private initializeClockState() {
+    // Establecer estado inicial de horas
+    if (this.hourCircles.length > 0 && this.currentHourIndex >= 0) {
+      this.hourCircles[this.currentHourIndex]?.classList.add('selected');
+      this.hourTexts[this.currentHourIndex]?.classList.add('selected');
+      this.updateHourHandDirect(this.currentHourIndex);
+    }
+    
+    // Establecer estado inicial de minutos
+    if (this.minuteCircles.length > 0 && this.currentMinuteIndex >= 0) {
+      this.minuteCircles[this.currentMinuteIndex]?.classList.add('selected');
+      this.minuteTexts[this.currentMinuteIndex]?.classList.add('selected');
+      this.updateMinuteHandDirect(this.currentMinuteIndex);
+    }
+  }
+
+  private setupClockListeners() {
+    if (!this.clockSvg?.nativeElement) return;
+    
+    const svg = this.clockSvg.nativeElement;
+    
+    this.ngZone.runOutsideAngular(() => {
+      svg.addEventListener('mousedown', this.onClockMouseDown.bind(this));
+      svg.addEventListener('touchstart', this.onClockTouchStart.bind(this), { passive: false });
+      
+      this.boundKeyDown = this.onKeyDown.bind(this);
+      document.addEventListener('keydown', this.boundKeyDown);
+    });
+  }
+
+  private removeClockListeners() {
+    if (this.clockSvg?.nativeElement) {
+      const svg = this.clockSvg.nativeElement;
+      svg.removeEventListener('mousedown', this.onClockMouseDown.bind(this));
+      svg.removeEventListener('touchstart', this.onClockTouchStart.bind(this));
+    }
+    
+    if (this.boundKeyDown) {
+      document.removeEventListener('keydown', this.boundKeyDown);
+      this.boundKeyDown = null;
+    }
+  }
+
+  private removeGlobalListeners() {
+    if (this.boundMouseMove) {
+      document.removeEventListener('mousemove', this.boundMouseMove);
+      this.boundMouseMove = null;
+    }
+    if (this.boundMouseUp) {
+      document.removeEventListener('mouseup', this.boundMouseUp);
+      this.boundMouseUp = null;
+    }
+    if (this.boundTouchMove) {
+      document.removeEventListener('touchmove', this.boundTouchMove);
+      this.boundTouchMove = null;
+    }
+    if (this.boundTouchEnd) {
+      document.removeEventListener('touchend', this.boundTouchEnd);
+      this.boundTouchEnd = null;
+    }
+  }
+
+  // ========== MOUSE EVENTS ==========
+  private onClockMouseDown(e: MouseEvent) {
+    e.preventDefault();
+    this.isDragging = true;
+    
+    this.handleClockInteraction(e.clientX, e.clientY);
+    
+    this.boundMouseMove = this.onMouseMove.bind(this);
+    this.boundMouseUp = this.onMouseUp.bind(this);
+    document.addEventListener('mousemove', this.boundMouseMove);
+    document.addEventListener('mouseup', this.boundMouseUp);
+  }
+
+  private onMouseMove(e: MouseEvent) {
+    if (!this.isDragging) return;
+    e.preventDefault();
+    this.handleClockInteraction(e.clientX, e.clientY);
+  }
+
+  private onMouseUp(e: MouseEvent) {
+    if (!this.isDragging) return;
+    this.isDragging = false;
+    this.removeGlobalListeners();
+    
+    if (this.currentView === 'hour') {
+      this.ngZone.run(() => {
+        this.currentView = 'minute';
+        this.cdr.markForCheck();
+      });
+    }
+  }
+
+  // ========== TOUCH EVENTS ==========
+  private onClockTouchStart(e: TouchEvent) {
+    e.preventDefault();
+    this.isDragging = true;
+    
+    const touch = e.touches[0];
+    this.handleClockInteraction(touch.clientX, touch.clientY);
+    
+    this.boundTouchMove = this.onTouchMove.bind(this);
+    this.boundTouchEnd = this.onTouchEnd.bind(this);
+    document.addEventListener('touchmove', this.boundTouchMove, { passive: false });
+    document.addEventListener('touchend', this.boundTouchEnd);
+  }
+
+  private onTouchMove(e: TouchEvent) {
+    if (!this.isDragging) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    this.handleClockInteraction(touch.clientX, touch.clientY);
+  }
+
+  private onTouchEnd(e: TouchEvent) {
+    if (!this.isDragging) return;
+    this.isDragging = false;
+    this.removeGlobalListeners();
+    
+    if (this.currentView === 'hour') {
+      this.ngZone.run(() => {
+        this.currentView = 'minute';
+        this.cdr.markForCheck();
+      });
+    }
+  }
+
+  // ========== CLOCK INTERACTION (MANIPULACIÓN DIRECTA DEL DOM) ==========
+  private handleClockInteraction(clientX: number, clientY: number) {
+    if (!this.clockSvg?.nativeElement) return;
+    
+    const svg = this.clockSvg.nativeElement;
+    const rect = svg.getBoundingClientRect();
+    
+    const scaleX = 240 / rect.width;
+    const scaleY = 240 / rect.height;
+    const x = (clientX - rect.left) * scaleX;
+    const y = (clientY - rect.top) * scaleY;
+    
+    const dx = x - this.CENTER.x;
+    const dy = y - this.CENTER.y;
+    let angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    angle = (angle + 90 + 360) % 360;
+    
+    if (this.currentView === 'hour') {
+      this.selectHourDirect(angle);
+    } else {
+      this.selectMinuteDirect(angle);
+    }
+  }
+
+  // ===== SELECCIÓN DIRECTA DE HORA (SIN ANGULAR) =====
+  private selectHourDirect(angle: number) {
+    const newIndex = Math.round(angle / 30) % 12;
+    
+    if (newIndex !== this.currentHourIndex) {
+      // Quitar selected del anterior
+      this.hourCircles[this.currentHourIndex]?.classList.remove('selected');
+      this.hourTexts[this.currentHourIndex]?.classList.remove('selected');
+      
+      // Agregar selected al nuevo
+      this.hourCircles[newIndex]?.classList.add('selected');
+      this.hourTexts[newIndex]?.classList.add('selected');
+      
+      // Actualizar manecilla directamente
+      this.updateHourHandDirect(newIndex);
+      
+      // Actualizar estado interno
+      this.currentHourIndex = newIndex;
+      this.selectedHour = this.hourNumbers[newIndex];
+      this.formattedHour = this.selectedHour.toString().padStart(2, '0');
+      
+      // Actualizar solo el header (mínimo uso de Angular)
+      if (this.hourDisplayEl?.nativeElement) {
+        this.hourDisplayEl.nativeElement.textContent = this.formattedHour;
+      }
+    }
+  }
+
+  // ===== SELECCIÓN DIRECTA DE MINUTO (SIN ANGULAR) =====
+  private selectMinuteDirect(angle: number) {
+    const newIndex = Math.round(angle / 30) % 12;
+    
+    if (newIndex !== this.currentMinuteIndex) {
+      // Quitar selected del anterior
+      this.minuteCircles[this.currentMinuteIndex]?.classList.remove('selected');
+      this.minuteTexts[this.currentMinuteIndex]?.classList.remove('selected');
+      
+      // Agregar selected al nuevo
+      this.minuteCircles[newIndex]?.classList.add('selected');
+      this.minuteTexts[newIndex]?.classList.add('selected');
+      
+      // Actualizar manecilla directamente
+      this.updateMinuteHandDirect(newIndex);
+      
+      // Actualizar estado interno
+      this.currentMinuteIndex = newIndex;
+      this.selectedMinute = this.minuteOptions[newIndex];
+      this.formattedMinute = this.selectedMinute.toString().padStart(2, '0');
+      
+      // Actualizar solo el header
+      if (this.minuteDisplayEl?.nativeElement) {
+        this.minuteDisplayEl.nativeElement.textContent = this.formattedMinute;
+      }
+    }
+  }
+
+  // ===== ACTUALIZAR MANECILLAS DIRECTAMENTE =====
+  private updateHourHandDirect(index: number) {
+    const pos = this.hourPositions[index];
+    if (this.hourHandLine) {
+      this.hourHandLine.setAttribute('x2', pos.x.toString());
+      this.hourHandLine.setAttribute('y2', pos.y.toString());
+    }
+    if (this.hourHandDot) {
+      this.hourHandDot.setAttribute('cx', pos.x.toString());
+      this.hourHandDot.setAttribute('cy', pos.y.toString());
+    }
+  }
+
+  private updateMinuteHandDirect(index: number) {
+    const pos = this.minutePositions[index];
+    if (this.minuteHandLine) {
+      this.minuteHandLine.setAttribute('x2', pos.x.toString());
+      this.minuteHandLine.setAttribute('y2', pos.y.toString());
+    }
+    if (this.minuteHandDot) {
+      this.minuteHandDot.setAttribute('cx', pos.x.toString());
+      this.minuteHandDot.setAttribute('cy', pos.y.toString());
+    }
+  }
+
+  private onKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Escape' && this.isPickerOpen) {
+      this.ngZone.run(() => {
+        this.cancelSelection();
+      });
+    }
+  }
+
+  onOverlayClick(event: MouseEvent) {
+    if ((event.target as HTMLElement).classList.contains('picker-overlay')) {
+      this.cancelSelection();
+    }
   }
 
   cancelSelection(event?: MouseEvent) {
@@ -484,28 +777,22 @@ export class MuiTimePickerComponent implements OnInit, ControlValueAccessor {
       event.stopPropagation();
     }
     this.isPickerOpen = false;
-    this.backdropMouseDownPos = null;
+    this.isDragging = false;
     document.body.style.overflow = '';
+    this.removeClockListeners();
+    this.removeGlobalListeners();
+    this.clearDomCache();
+    this.cdr.markForCheck();
   }
 
   setView(view: 'hour' | 'minute') {
     this.currentView = view;
-  }
-
-  selectHour(hour: number) {
-    this.selectedHour = hour;
-    // Cambiar automáticamente a vista de minutos después de seleccionar hora
-    setTimeout(() => {
-      this.currentView = 'minute';
-    }, 200);
-  }
-
-  selectMinute(minute: number) {
-    this.selectedMinute = minute;
+    this.cdr.markForCheck();
   }
 
   setAMPM(period: 'AM' | 'PM') {
     this.ampm = period;
+    this.cdr.markForCheck();
   }
 
   confirmTime(event?: MouseEvent) {
@@ -521,60 +808,46 @@ export class MuiTimePickerComponent implements OnInit, ControlValueAccessor {
     this.onChange(timeString);
     this.timeChange.emit(timeString);
     
-    // Usar setTimeout para asegurar que el estado se actualice correctamente
-    setTimeout(() => {
-      this.isPickerOpen = false;
-      this.backdropMouseDownPos = null;
-      document.body.style.overflow = '';
-    }, 50);
+    this.isPickerOpen = false;
+    document.body.style.overflow = '';
+    this.removeClockListeners();
+    this.removeGlobalListeners();
+    this.clearDomCache();
+    this.cdr.markForCheck();
   }
 
-  formatHour(hour: number): string {
-    return hour.toString().padStart(2, '0');
+  private clearDomCache() {
+    this.hourCircles = [];
+    this.hourTexts = [];
+    this.minuteCircles = [];
+    this.minuteTexts = [];
+    this.hourHandLine = null;
+    this.hourHandDot = null;
+    this.minuteHandLine = null;
+    this.minuteHandDot = null;
   }
 
-  getHourPosition(index: number): { x: number, y: number } {
-    const angle = (index * 30 - 90) * Math.PI / 180; // -90 para empezar en 12
-    const radius = 80;
-    return {
-      x: 120 + radius * Math.cos(angle),
-      y: 120 + radius * Math.sin(angle)
-    };
+  // ========== HELPER METHODS ==========
+  private updateFormattedValues() {
+    this.formattedHour = this.selectedHour.toString().padStart(2, '0');
+    this.formattedMinute = this.selectedMinute.toString().padStart(2, '0');
   }
 
-  getMinutePosition(index: number): { x: number, y: number } {
-    const angle = (index * 30 - 90) * Math.PI / 180; // 12 posiciones para 60 minutos
-    const radius = 80;
-    return {
-      x: 120 + radius * Math.cos(angle),
-      y: 120 + radius * Math.sin(angle)
-    };
+  trackByIndex(index: number): number {
+    return index;
   }
 
-  get hourHandPosition(): { x: number, y: number } {
-    const hourIndex = this.hourNumbers.indexOf(this.selectedHour);
-    const angle = (hourIndex * 30 - 90) * Math.PI / 180;
-    const radius = 80;
-    return {
-      x: 120 + radius * Math.cos(angle),
-      y: 120 + radius * Math.sin(angle)
-    };
-  }
-
-  get minuteHandPosition(): { x: number, y: number } {
-    const minuteIndex = this.minuteOptions.indexOf(this.selectedMinute);
-    const angle = (minuteIndex * 30 - 90) * Math.PI / 180;
-    const radius = 80;
-    return {
-      x: 120 + radius * Math.cos(angle),
-      y: 120 + radius * Math.sin(angle)
-    };
+  trackByRefTime(index: number, ref: { time: string }): string {
+    return ref.time;
   }
 
   private parseTimeValue(timeString: string) {
     const [hours, minutes] = timeString.split(':').map(Number);
     this.selectedHour = hours > 12 ? hours - 12 : (hours === 0 ? 12 : hours);
-    this.selectedMinute = minutes;
+    
+    const roundedMinutes = Math.round(minutes / 5) * 5;
+    this.selectedMinute = roundedMinutes >= 60 ? 55 : roundedMinutes;
+    
     this.ampm = hours >= 12 ? 'PM' : 'AM';
   }
 
@@ -593,18 +866,22 @@ export class MuiTimePickerComponent implements OnInit, ControlValueAccessor {
     return `${hour12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
   }
 
-  // ControlValueAccessor implementation
+  // ControlValueAccessor
   writeValue(value: string): void {
     this.value = value || '';
     if (value && value.trim() !== '') {
       this.parseTimeValue(value);
     } else {
-      // Si no hay valor, usar valores por defecto
       const now = new Date();
       this.selectedHour = now.getHours() > 12 ? now.getHours() - 12 : (now.getHours() === 0 ? 12 : now.getHours());
       this.selectedMinute = Math.round(now.getMinutes() / 5) * 5;
+      if (this.selectedMinute >= 60) this.selectedMinute = 55;
       this.ampm = now.getHours() >= 12 ? 'PM' : 'AM';
     }
+    this.updateFormattedValues();
+    this.currentHourIndex = this.hourNumbers.indexOf(this.selectedHour);
+    this.currentMinuteIndex = this.minuteOptions.indexOf(this.selectedMinute);
+    this.cdr.markForCheck();
   }
 
   registerOnChange(fn: (value: string) => void): void {
@@ -615,30 +892,42 @@ export class MuiTimePickerComponent implements OnInit, ControlValueAccessor {
     this.onTouched = fn;
   }
 
-  setDisabledState?(isDisabled: boolean): void {
-    // Implementar si es necesario
-  }
+  setDisabledState?(isDisabled: boolean): void {}
 
-  formatReferenceTime(time: string): string {
+  private formatReferenceTime(time: string): string {
+    if (!time || !time.includes(':')) return '';
     const [hours, minutes] = time.split(':').map(Number);
+    if (isNaN(hours) || isNaN(minutes)) return '';
     const hour12 = hours > 12 ? hours - 12 : (hours === 0 ? 12 : hours);
     const ampm = hours >= 12 ? 'PM' : 'AM';
     return `${hour12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
   }
 
-  getAllReferences(): { time: string, label: string }[] {
-    const references: { time: string, label: string }[] = [];
+  private updateCachedReferences(): void {
+    const references: { time: string, label: string, formattedTime: string }[] = [];
     
-    // Agregar referencias múltiples si existen
     if (this.referenceTimes && this.referenceTimes.length > 0) {
-      references.push(...this.referenceTimes);
+      for (const ref of this.referenceTimes) {
+        if (ref.time && ref.label) {
+          const formatted = this.formatReferenceTime(ref.time);
+          if (formatted) {
+            references.push({ ...ref, formattedTime: formatted });
+          }
+        }
+      }
     }
     
-    // Agregar referencia única si existe (para compatibilidad hacia atrás)
     if (this.referenceTime && this.referenceLabel && !references.find(ref => ref.time === this.referenceTime)) {
-      references.push({ time: this.referenceTime, label: this.referenceLabel });
+      const formatted = this.formatReferenceTime(this.referenceTime);
+      if (formatted) {
+        references.push({ 
+          time: this.referenceTime, 
+          label: this.referenceLabel,
+          formattedTime: formatted
+        });
+      }
     }
     
-    return references;
+    this.cachedReferences = references;
   }
-} 
+}

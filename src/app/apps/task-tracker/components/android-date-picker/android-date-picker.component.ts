@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, forwardRef, HostListener, ElementRef, ViewChild, TemplateRef, ViewContainerRef } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, forwardRef, HostListener, ElementRef, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 
@@ -6,6 +6,7 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
   selector: 'app-android-date-picker',
   standalone: true,
   imports: [CommonModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [
     {
       provide: NG_VALUE_ACCESSOR,
@@ -43,7 +44,7 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
           <div class="bg-indigo-600 text-white p-6">
             <div class="text-sm font-medium opacity-90">{{ label }}</div>
             <div class="text-2xl font-bold mt-1">
-              {{ selectedDate ? formatHeaderDate(selectedDate) : 'Seleccionar fecha' }}
+              {{ tempSelectedDate ? formatHeaderDate(tempSelectedDate) : 'Seleccionar fecha' }}
             </div>
           </div>
 
@@ -59,7 +60,7 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
               </button>
               
               <div class="text-lg font-semibold text-gray-800">
-                {{ getMonthYearDisplay() }}
+                {{ monthYearDisplay }}
               </div>
               
               <button
@@ -72,7 +73,7 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 
             <!-- Días de la semana -->
             <div class="grid grid-cols-7 gap-1 mb-2">
-              <div *ngFor="let day of weekDays" class="text-xs font-medium text-gray-500 text-center py-2">
+              <div *ngFor="let day of weekDays; trackBy: trackByIndex" class="text-xs font-medium text-gray-500 text-center py-2">
                 {{ day }}
               </div>
             </div>
@@ -80,9 +81,9 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
             <!-- Calendario -->
             <div class="grid grid-cols-7 gap-1">
               <button
-                *ngFor="let day of calendarDays"
+                *ngFor="let day of calendarDays; let i = index; trackBy: trackByDayIndex"
                 type="button"
-                (click)="selectDate(day)"
+                (click)="selectDate(i)"
                 [disabled]="!day.isCurrentMonth"
                 class="w-10 h-10 flex items-center justify-center rounded-full text-sm transition-all duration-200"
                 [class.text-gray-400]="!day.isCurrentMonth"
@@ -135,16 +136,22 @@ export class AndroidDatePickerComponent implements OnInit, OnDestroy, ControlVal
   @Output() dateChange = new EventEmitter<string>();
 
   isOpen = false;
-  isModalReady = false;  // Flag para controlar visibilidad después de mover al body
+  isModalReady = false;
   selectedDate: Date | null = null;
   viewDate = new Date();
   calendarDays: CalendarDay[] = [];
   weekDays = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
   
-  private tempSelectedDate: Date | null = null;
+  // Valor pre-calculado para el header (evita llamar función en template)
+  monthYearDisplay = '';
+  
+  tempSelectedDate: Date | null = null;
   private originalDate: Date | null = null;
   private modalElement: HTMLElement | null = null;
   private modalContainer: HTMLElement | null = null;
+  
+  // Índice del día seleccionado actualmente para optimizar actualizaciones
+  private currentSelectedIndex: number = -1;
   
   // ControlValueAccessor
   private onChange = (value: string) => {};
@@ -152,13 +159,14 @@ export class AndroidDatePickerComponent implements OnInit, OnDestroy, ControlVal
   touched = false;
   isValid = true;
 
-  constructor(private elementRef: ElementRef) {}
+  constructor(
+    private elementRef: ElementRef,
+    private cdr: ChangeDetectorRef
+  ) {}
 
   ngOnInit() {
     this.generateCalendar();
   }
-
-  // Removed: Detectar clicks fuera del componente - Los modales ya no se cierran con click fuera
 
   // Detectar Escape key para cerrar
   @HostListener('document:keydown.escape')
@@ -168,10 +176,17 @@ export class AndroidDatePickerComponent implements OnInit, OnDestroy, ControlVal
     }
   }
 
-  // Removed: onBackdropMouseDown y onBackdropMouseUp - Los modales ya no se cierran con click fuera
+  // ===== TRACK BY FUNCTIONS =====
+  trackByIndex(index: number): number {
+    return index;
+  }
+
+  trackByDayIndex(index: number, day: CalendarDay): number {
+    // Usar el índice como key ya que las posiciones son fijas
+    return index;
+  }
 
   openPicker() {
-    // Resetear flag de visibilidad - el modal se creará oculto
     this.isModalReady = false;
     
     this.isOpen = true;
@@ -179,9 +194,8 @@ export class AndroidDatePickerComponent implements OnInit, OnDestroy, ControlVal
     this.tempSelectedDate = this.selectedDate ? new Date(this.selectedDate) : null;
     this.viewDate = this.selectedDate ? new Date(this.selectedDate) : new Date();
     this.generateCalendar();
+    this.cdr.markForCheck();
     
-    // Mover el modal al body INMEDIATAMENTE y luego hacerlo visible
-    // Usamos requestAnimationFrame para esperar un frame de renderizado
     requestAnimationFrame(() => {
       const modal = this.elementRef.nativeElement.querySelector('.fixed.inset-0');
       if (modal && document.body) {
@@ -189,12 +203,11 @@ export class AndroidDatePickerComponent implements OnInit, OnDestroy, ControlVal
         this.modalContainer = modal.parentElement;
         document.body.appendChild(modal);
         
-        // Ahora que está en el body, hacerlo visible
         this.isModalReady = true;
+        this.cdr.markForCheck();
       }
     });
     
-    // Bloquear scroll del body
     const scrollY = window.scrollY;
     document.body.style.overflow = 'hidden';
     document.body.style.position = 'fixed';
@@ -207,8 +220,8 @@ export class AndroidDatePickerComponent implements OnInit, OnDestroy, ControlVal
     this.isOpen = false;
     this.isModalReady = false;
     this.tempSelectedDate = this.originalDate;
+    this.currentSelectedIndex = -1;
     
-    // Devolver el modal al contenedor original si fue movido
     if (this.modalElement && this.modalContainer) {
       this.modalContainer.appendChild(this.modalElement);
       this.modalElement = null;
@@ -222,6 +235,7 @@ export class AndroidDatePickerComponent implements OnInit, OnDestroy, ControlVal
     document.body.style.width = '';
     window.scrollTo(0, scrollY);
     delete (document.body as any).__scrollY;
+    this.cdr.markForCheck();
   }
 
   confirm() {
@@ -233,8 +247,8 @@ export class AndroidDatePickerComponent implements OnInit, OnDestroy, ControlVal
     }
     this.isOpen = false;
     this.isModalReady = false;
+    this.currentSelectedIndex = -1;
     
-    // Devolver el modal al contenedor original si fue movido
     if (this.modalElement && this.modalContainer) {
       this.modalContainer.appendChild(this.modalElement);
       this.modalElement = null;
@@ -242,10 +256,10 @@ export class AndroidDatePickerComponent implements OnInit, OnDestroy, ControlVal
     }
     
     document.body.style.overflow = '';
+    this.cdr.markForCheck();
   }
   
   ngOnDestroy() {
-    // Limpiar el modal si está en el body
     if (this.modalElement && document.body.contains(this.modalElement)) {
       if (this.modalContainer) {
         this.modalContainer.appendChild(this.modalElement);
@@ -256,46 +270,67 @@ export class AndroidDatePickerComponent implements OnInit, OnDestroy, ControlVal
       this.modalContainer = null;
     }
     
-    // Asegurar que el scroll se desbloquee si el componente se destruye con el modal abierto
     if (this.isOpen) {
       document.body.style.overflow = '';
     }
   }
 
-  selectDate(day: CalendarDay) {
-    if (!day.isCurrentMonth) return;
+  // ===== OPTIMIZADO: Solo actualiza el día anterior y el nuevo =====
+  selectDate(dayIndex: number) {
+    const day = this.calendarDays[dayIndex];
+    if (!day || !day.isCurrentMonth) return;
     
-    const selectedDate = new Date(this.viewDate.getFullYear(), this.viewDate.getMonth(), day.date);
-    this.tempSelectedDate = selectedDate;
-    this.generateCalendar();
+    // Deseleccionar el día anterior (si existe)
+    if (this.currentSelectedIndex >= 0 && this.currentSelectedIndex < this.calendarDays.length) {
+      this.calendarDays[this.currentSelectedIndex].isSelected = false;
+    }
+    
+    // Seleccionar el nuevo día
+    day.isSelected = true;
+    this.currentSelectedIndex = dayIndex;
+    
+    // Actualizar la fecha temporal
+    this.tempSelectedDate = new Date(this.viewDate.getFullYear(), this.viewDate.getMonth(), day.date);
+    
+    this.cdr.markForCheck();
   }
 
   previousMonth() {
     this.viewDate = new Date(this.viewDate.getFullYear(), this.viewDate.getMonth() - 1, 1);
     this.generateCalendar();
+    this.cdr.markForCheck();
   }
 
   nextMonth() {
     this.viewDate = new Date(this.viewDate.getFullYear(), this.viewDate.getMonth() + 1, 1);
     this.generateCalendar();
+    this.cdr.markForCheck();
   }
 
   private generateCalendar() {
     const year = this.viewDate.getFullYear();
     const month = this.viewDate.getMonth();
     
-    // Primer día del mes
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
+    // Actualizar el display del mes/año
+    this.updateMonthYearDisplay();
     
-    // Días del mes anterior para completar la primera fila
+    const firstDay = new Date(year, month, 1);
+    
     const startDate = new Date(firstDay);
     startDate.setDate(startDate.getDate() - firstDay.getDay());
     
-    // Generar 42 días (6 semanas)
-    this.calendarDays = [];
     const today = new Date();
+    this.currentSelectedIndex = -1;
     
+    // Solo recrear el array si está vacío o si cambiamos de mes
+    if (this.calendarDays.length !== 42) {
+      this.calendarDays = new Array(42);
+      for (let i = 0; i < 42; i++) {
+        this.calendarDays[i] = { date: 0, isCurrentMonth: false, isToday: false, isSelected: false, fullDate: new Date() };
+      }
+    }
+    
+    // Actualizar los valores existentes en lugar de crear nuevos objetos
     for (let i = 0; i < 42; i++) {
       const currentDate = new Date(startDate);
       currentDate.setDate(startDate.getDate() + i);
@@ -304,28 +339,32 @@ export class AndroidDatePickerComponent implements OnInit, OnDestroy, ControlVal
       const isToday = this.isSameDate(currentDate, today);
       const isSelected = this.tempSelectedDate && this.isSameDate(currentDate, this.tempSelectedDate);
       
-      this.calendarDays.push({
-        date: currentDate.getDate(),
-        isCurrentMonth,
-        isToday,
-        isSelected: !!isSelected,
-        fullDate: new Date(currentDate)
-      });
+      // Reutilizar el objeto existente
+      const dayObj = this.calendarDays[i];
+      dayObj.date = currentDate.getDate();
+      dayObj.isCurrentMonth = isCurrentMonth;
+      dayObj.isToday = isToday;
+      dayObj.isSelected = !!isSelected;
+      dayObj.fullDate.setTime(currentDate.getTime());
+      
+      if (isSelected) {
+        this.currentSelectedIndex = i;
+      }
     }
+  }
+
+  private updateMonthYearDisplay() {
+    const months = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+    this.monthYearDisplay = `${months[this.viewDate.getMonth()]} ${this.viewDate.getFullYear()}`;
   }
 
   private isSameDate(date1: Date, date2: Date): boolean {
     return date1.getDate() === date2.getDate() &&
            date1.getMonth() === date2.getMonth() &&
            date1.getFullYear() === date2.getFullYear();
-  }
-
-  getMonthYearDisplay(): string {
-    const months = [
-      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-    ];
-    return `${months[this.viewDate.getMonth()]} ${this.viewDate.getFullYear()}`;
   }
 
   formatDisplayDate(date: Date): string {
@@ -361,6 +400,7 @@ export class AndroidDatePickerComponent implements OnInit, OnDestroy, ControlVal
     } else {
       this.selectedDate = null;
     }
+    this.cdr.markForCheck();
   }
 
   registerOnChange(fn: (value: string) => void): void {
@@ -382,4 +422,4 @@ interface CalendarDay {
   isToday: boolean;
   isSelected: boolean;
   fullDate: Date;
-} 
+}
