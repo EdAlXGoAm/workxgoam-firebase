@@ -32,6 +32,7 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   @Input() projects: Project[] = [];
   @Input() allTasks: Task[] = []; // Todas las tareas del usuario para busqueda local
   @Input() allTaskTypes: TaskType[] = []; // Todos los tipos de tarea para evitar carga de Firestore
+  @Input() allTaskGroups: TaskGroup[] = []; // Todos los grupos de tarea para evitar carga de Firestore
   
   @Output() closeModalEvent = new EventEmitter<void>();
   @Output() saveTaskEvent = new EventEmitter<Partial<Task>>();
@@ -783,6 +784,12 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
       return;
     }
     try {
+      // Si hay grupos desde el Input, filtrar localmente (instantáneo)
+      if (this.allTaskGroups && this.allTaskGroups.length > 0) {
+        this.taskGroups = this.allTaskGroups.filter(g => g.projectId === this.task.project);
+        return;
+      }
+      // Fallback: cargar desde Firestore
       this.taskGroups = await this.taskGroupService.getTaskGroupsByProject(this.task.project);
     } catch (error) {
       console.error('Error cargando grupos de tareas:', error);
