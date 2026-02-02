@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, OnChanges, ChangeDetectorRef, ViewChild, ElementRef, Renderer2, HostListener } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, OnChanges, AfterViewChecked, ChangeDetectorRef, ViewChild, ElementRef, Renderer2, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject } from 'rxjs';
@@ -24,7 +24,7 @@ import { TaskGroup } from '../../models/task-group.model';
   templateUrl: './task-modal.component.html',
   styleUrls: ['./task-modal.component.css']
 })
-export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
+export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterViewChecked {
   @Input() showModal = false;
   @Input() task: Partial<Task> = {};
   @Input() isEditing = false;
@@ -70,6 +70,8 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   
   // Referencia al selector de proyecto para abrirlo programáticamente
   @ViewChild('projectSelect', { static: false }) projectSelect!: CustomSelectComponent;
+  @ViewChild('environmentSelect', { static: false }) environmentSelect!: CustomSelectComponent;
+  @ViewChild('taskTypeSelect', { static: false }) taskTypeSelect!: CustomSelectComponent;
   private emojiPickerElement: HTMLElement | null = null;
   private emojiPickerClickListener?: () => void;
   private emojiGridElement: HTMLElement | null = null;
@@ -187,6 +189,11 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   emojiSearchQuery = '';
   filteredEmojis: string[] = [];
   private emojiSearchInputElement: HTMLElement | null = null;
+  
+  // Trackear estado de selectores para cerrar emoji picker
+  private previousProjectSelectIsOpen = false;
+  private previousEnvironmentSelectIsOpen = false;
+  private previousTaskTypeSelectIsOpen = false;
   
   // Diccionario de keywords bilingüe para búsqueda de emojis
   private emojiKeywords: { [emoji: string]: string[] } = {
@@ -1023,6 +1030,35 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     }
   }
   
+  ngAfterViewChecked() {
+    // Detectar cuando el selector de proyectos se abre y cerrar el emoji picker
+    if (this.projectSelect && this.showEmojiPicker) {
+      const currentIsOpen = this.projectSelect.isOpen;
+      if (currentIsOpen && !this.previousProjectSelectIsOpen) {
+        this.closeEmojiPicker();
+      }
+      this.previousProjectSelectIsOpen = currentIsOpen;
+    }
+    
+    // Detectar cuando el selector de environment se abre y cerrar el emoji picker
+    if (this.environmentSelect && this.showEmojiPicker) {
+      const currentIsOpen = this.environmentSelect.isOpen;
+      if (currentIsOpen && !this.previousEnvironmentSelectIsOpen) {
+        this.closeEmojiPicker();
+      }
+      this.previousEnvironmentSelectIsOpen = currentIsOpen;
+    }
+    
+    // Detectar cuando el selector de tipo de tarea se abre y cerrar el emoji picker
+    if (this.taskTypeSelect && this.showEmojiPicker) {
+      const currentIsOpen = this.taskTypeSelect.isOpen;
+      if (currentIsOpen && !this.previousTaskTypeSelectIsOpen) {
+        this.closeEmojiPicker();
+      }
+      this.previousTaskTypeSelectIsOpen = currentIsOpen;
+    }
+  }
+  
   async ngOnChanges(changes: any) {
     if (this.showModal) {
       this.disableBodyScroll();
@@ -1197,6 +1233,19 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
   }
   
   openEmojiPicker() {
+    // Cerrar todos los selectores si están abiertos
+    if (this.projectSelect && this.projectSelect.isOpen) {
+      this.projectSelect.isOpen = false;
+    }
+    
+    if (this.environmentSelect && this.environmentSelect.isOpen) {
+      this.environmentSelect.isOpen = false;
+    }
+    
+    if (this.taskTypeSelect && this.taskTypeSelect.isOpen) {
+      this.taskTypeSelect.isOpen = false;
+    }
+    
     this.showEmojiPicker = true;
     this.cdr.detectChanges();
     
@@ -1235,6 +1284,22 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     this.filteredEmojis = [];
   }
   
+  handleModalClick(event: MouseEvent) {
+    // Cerrar el emoji picker si está abierto y el clic no fue en el picker ni en el botón
+    if (this.showEmojiPicker && this.emojiPickerElement) {
+      const target = event.target as Node;
+      const pickerContains = this.emojiPickerElement.contains(target);
+      const buttonContains = this.emojiButton?.nativeElement?.contains(target);
+      
+      if (!pickerContains && !buttonContains) {
+        this.closeEmojiPicker();
+      }
+    }
+    
+    // Mantener el stopPropagation para evitar que el clic cierre el modal
+    event.stopPropagation();
+  }
+  
   private createEmojiPickerElement() {
     if (!this.emojiButton || !this.emojiButton.nativeElement) {
       return;
@@ -1246,6 +1311,11 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     // Crear el contenedor del picker
     const picker = this.renderer.createElement('div');
     this.renderer.addClass(picker, 'emoji-picker-portal');
+    
+    // Prevenir que los clics dentro del picker se propaguen y cierren el picker
+    this.renderer.listen(picker, 'click', (event: MouseEvent) => {
+      event.stopPropagation();
+    });
     
     // Crear el header con el nombre de la categoría
     const header = this.renderer.createElement('div');
@@ -1429,11 +1499,27 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges {
     this.emojiPickerElement = picker;
     
     // Agregar listener para cerrar al hacer clic fuera
+    // Usar setTimeout para asegurar que el elemento esté en el DOM antes de agregar el listener
     setTimeout(() => {
+      // Remover listener anterior si existe
+      if (this.emojiPickerClickListener) {
+        this.emojiPickerClickListener();
+      }
+      
+      // Estrategia: usar el backdrop del modal y el body del document
+      // El modal tiene stopPropagation, por lo que debemos escuchar en el backdrop específicamente
       this.emojiPickerClickListener = this.renderer.listen('document', 'click', (event: MouseEvent) => {
-        if (this.emojiPickerElement && 
-            !this.emojiPickerElement.contains(event.target as Node) && 
-            !button.contains(event.target as Node)) {
+        // Verificar que el picker esté abierto
+        if (!this.showEmojiPicker || !this.emojiPickerElement) {
+          return;
+        }
+        
+        const target = event.target as Node;
+        const pickerContains = this.emojiPickerElement.contains(target);
+        const buttonContains = button.contains(target);
+        
+        // Cerrar si el clic fue fuera del picker y fuera del botón que lo abre
+        if (!pickerContains && !buttonContains) {
           this.closeEmojiPicker();
         }
       });
