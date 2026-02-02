@@ -34,6 +34,7 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
       <!-- Popup del date picker estilo Android -->
       <div *ngIf="isOpen" 
            class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4"
+           [class.picker-hidden]="!isModalReady"
            style="overflow: hidden;">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
              (mousedown)="$event.stopPropagation()"
@@ -121,6 +122,10 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
     :host {
       display: block;
     }
+    .picker-hidden {
+      visibility: hidden !important;
+      opacity: 0 !important;
+    }
   `]
 })
 export class AndroidDatePickerComponent implements OnInit, OnDestroy, ControlValueAccessor {
@@ -130,6 +135,7 @@ export class AndroidDatePickerComponent implements OnInit, OnDestroy, ControlVal
   @Output() dateChange = new EventEmitter<string>();
 
   isOpen = false;
+  isModalReady = false;  // Flag para controlar visibilidad después de mover al body
   selectedDate: Date | null = null;
   viewDate = new Date();
   calendarDays: CalendarDay[] = [];
@@ -165,23 +171,28 @@ export class AndroidDatePickerComponent implements OnInit, OnDestroy, ControlVal
   // Removed: onBackdropMouseDown y onBackdropMouseUp - Los modales ya no se cierran con click fuera
 
   openPicker() {
+    // Resetear flag de visibilidad - el modal se creará oculto
+    this.isModalReady = false;
+    
     this.isOpen = true;
     this.originalDate = this.selectedDate ? new Date(this.selectedDate) : null;
     this.tempSelectedDate = this.selectedDate ? new Date(this.selectedDate) : null;
     this.viewDate = this.selectedDate ? new Date(this.selectedDate) : new Date();
     this.generateCalendar();
     
-    // Mover el modal al body después de que Angular lo renderice
-    setTimeout(() => {
+    // Mover el modal al body INMEDIATAMENTE y luego hacerlo visible
+    // Usamos requestAnimationFrame para esperar un frame de renderizado
+    requestAnimationFrame(() => {
       const modal = this.elementRef.nativeElement.querySelector('.fixed.inset-0');
       if (modal && document.body) {
         this.modalElement = modal;
-        // Guardar referencia al contenedor original
         this.modalContainer = modal.parentElement;
-        // Mover al body
         document.body.appendChild(modal);
+        
+        // Ahora que está en el body, hacerlo visible
+        this.isModalReady = true;
       }
-    }, 0);
+    });
     
     // Bloquear scroll del body
     const scrollY = window.scrollY;
@@ -194,6 +205,7 @@ export class AndroidDatePickerComponent implements OnInit, OnDestroy, ControlVal
 
   cancel() {
     this.isOpen = false;
+    this.isModalReady = false;
     this.tempSelectedDate = this.originalDate;
     
     // Devolver el modal al contenedor original si fue movido
@@ -220,6 +232,7 @@ export class AndroidDatePickerComponent implements OnInit, OnDestroy, ControlVal
       this.dateChange.emit(dateString);
     }
     this.isOpen = false;
+    this.isModalReady = false;
     
     // Devolver el modal al contenedor original si fue movido
     if (this.modalElement && this.modalContainer) {
