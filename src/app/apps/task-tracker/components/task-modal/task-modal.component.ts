@@ -117,6 +117,12 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
   previousFragmentStartDate = '';
   previousFragmentStartTime = '';
   
+  // Modal de confirmación para actualizar duración desde tarea reciente/autocompletado
+  showUpdateDurationFromTaskModal = false;
+  pendingTaskDuration: number | null = null;
+  pendingTaskData: any = null;
+  updateDurationSource: 'recent' | 'autocomplete' = 'recent';
+  
   // Flag para evitar recursión infinita en sincronización
   private isSyncingFragment = false;
   
@@ -1688,7 +1694,8 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
         !this.showEmojiPicker && 
         !this.showRecentTasksModal && 
         !this.showDurationConfirmModal && 
-        !this.showFragmentDurationConfirmModal) {
+        !this.showFragmentDurationConfirmModal &&
+        !this.showUpdateDurationFromTaskModal) {
       event.preventDefault();
       this.closeModal();
     }
@@ -1964,6 +1971,23 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
       return;
     }
     
+    // Si la tarea actual ya tiene duración y la tarea seleccionada tiene una duración diferente,
+    // preguntar si desea actualizarla
+    if (this.task.duration && selectedTask.duration && this.task.duration !== selectedTask.duration) {
+      // Guardar los datos para aplicarlos después de la confirmación
+      this.pendingTaskData = selectedTask;
+      this.pendingTaskDuration = selectedTask.duration;
+      this.updateDurationSource = 'recent';
+      this.showUpdateDurationFromTaskModal = true;
+      return;
+    }
+    
+    // Si no hay conflicto de duración, aplicar directamente
+    this.applyTaskDataWithoutConfirmation(selectedTask);
+  }
+  
+  // Método auxiliar para aplicar los datos sin confirmación
+  private applyTaskDataWithoutConfirmation(selectedTask: any) {
     // Autocompletar todos los campos desde la tarea seleccionada
     this.task.name = selectedTask.name;
     
@@ -2894,6 +2918,69 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
     this.cdr.detectChanges();
   }
   
+  // Métodos para el modal de confirmación de actualización de duración desde tarea reciente/autocompletado
+  confirmUpdateDurationFromTask() {
+    if (!this.pendingTaskData) {
+      return;
+    }
+    
+    // Aplicar la duración de la tarea pendiente
+    if (this.pendingTaskDuration) {
+      this.task.duration = this.pendingTaskDuration;
+      
+      // Si hay fecha/hora de inicio definidas, ajustar automáticamente la fecha/hora de fin
+      if (this.startDate && this.startTime) {
+        const newEndDateTime = this.calculateNewEndDateTime(this.startDate, this.startTime, this.pendingTaskDuration);
+        this.endDate = newEndDateTime.date;
+        this.endTime = newEndDateTime.time;
+        // Validar las fechas después del ajuste
+        this.validateDates();
+      }
+    }
+    
+    // Cerrar el modal
+    this.showUpdateDurationFromTaskModal = false;
+    
+    // Si la fuente es 'recent', aplicar el resto de los datos y cerrar modal de tareas recientes
+    if (this.updateDurationSource === 'recent') {
+      // Crear una copia de la tarea sin la duración (ya aplicada arriba) para evitar duplicación
+      const taskDataWithoutDuration = { ...this.pendingTaskData };
+      delete taskDataWithoutDuration.duration;
+      this.applyTaskDataWithoutConfirmation(taskDataWithoutDuration);
+    }
+    // Para autocompletado, los demás datos ya se aplicaron, solo necesitamos cerrar el modal
+    
+    // Limpiar valores pendientes
+    this.pendingTaskData = null;
+    this.pendingTaskDuration = null;
+    
+    // Forzar actualización de la vista
+    this.cdr.detectChanges();
+  }
+  
+  cancelUpdateDurationFromTask() {
+    // No actualizar la duración, mantener la actual
+    
+    // Si la fuente es 'recent', aplicar el resto de los datos pero sin actualizar duración
+    if (this.updateDurationSource === 'recent' && this.pendingTaskData) {
+      // Copiar todos los campos excepto la duración
+      const taskDataWithoutDuration = { ...this.pendingTaskData };
+      delete taskDataWithoutDuration.duration;
+      this.applyTaskDataWithoutConfirmation(taskDataWithoutDuration);
+    }
+    // Para autocompletado, los datos ya se aplicaron, así que solo necesitamos cerrar el modal
+    
+    // Cerrar el modal
+    this.showUpdateDurationFromTaskModal = false;
+    
+    // Limpiar valores pendientes
+    this.pendingTaskData = null;
+    this.pendingTaskDuration = null;
+    
+    // Forzar actualización de la vista
+    this.cdr.detectChanges();
+  }
+  
   private calculateNewEndDateTime(newStartDate: string, newStartTime: string, duration: number): { date: string, time: string } {
     if (!newStartDate || !newStartTime || !duration) {
       return { date: '', time: '' };
@@ -3063,6 +3150,17 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
         
         if (mostRecentTask.priority) {
           this.task.priority = mostRecentTask.priority;
+        }
+        
+        // Si la tarea actual ya tiene duración y la tarea encontrada tiene una duración diferente,
+        // preguntar si desea actualizarla
+        if (this.task.duration && mostRecentTask.duration && this.task.duration !== mostRecentTask.duration) {
+          // Guardar los datos para aplicarlos después de la confirmación
+          this.pendingTaskData = mostRecentTask;
+          this.pendingTaskDuration = mostRecentTask.duration;
+          this.updateDurationSource = 'autocomplete';
+          this.showUpdateDurationFromTaskModal = true;
+          return;
         }
         
         if (mostRecentTask.duration) {

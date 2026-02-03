@@ -761,6 +761,60 @@
   </div>
 </div>
 
+<!-- Modal de confirmación para actualizar duración desde tarea reciente/autocompletado -->
+<div *ngIf="showUpdateDurationFromTaskModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4" style="overflow: hidden;">
+  <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+    <div class="flex items-center mb-4">
+      <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mr-4">
+        <i class="fas fa-clock text-purple-600 text-xl"></i>
+      </div>
+      <h3 class="text-lg font-bold text-gray-900">¿Actualizar duración de la tarea?</h3>
+    </div>
+    
+    <div class="mb-6">
+      <p class="text-gray-600 mb-3">
+        <span *ngIf="updateDurationSource === 'recent'">La tarea seleccionada</span>
+        <span *ngIf="updateDurationSource === 'autocomplete'">La tarea autocompletada</span>
+        tiene una duración de 
+        <span class="font-semibold text-purple-600">{{ formatDuration(pendingTaskDuration || 0) }}</span>, 
+        pero tu tarea actual tiene una duración de 
+        <span class="font-semibold text-indigo-600">{{ formatDuration(task.duration || 0) }}</span>.
+      </p>
+      <p class="text-gray-600">
+        ¿Deseas actualizar la duración a la de la tarea 
+        <span *ngIf="updateDurationSource === 'recent'">seleccionada</span>
+        <span *ngIf="updateDurationSource === 'autocomplete'">autocompletada</span>?
+      </p>
+    </div>
+    
+    <div class="bg-gray-50 rounded-lg p-4 mb-6">
+      <div class="space-y-2 text-sm">
+        <div class="flex justify-between">
+          <span class="text-gray-600">Duración actual:</span>
+          <span class="font-medium text-indigo-600">{{ formatDuration(task.duration || 0) }}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-gray-600">Nueva duración:</span>
+          <span class="font-medium text-purple-600">{{ formatDuration(pendingTaskDuration || 0) }}</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="flex justify-end space-x-3">
+      <button type="button" 
+              (click)="cancelUpdateDurationFromTask()" 
+              class="px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+        No, mantener duración actual
+      </button>
+      <button type="button" 
+              (click)="confirmUpdateDurationFromTask()" 
+              class="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors">
+        Sí, actualizar duración
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal secundario para tareas recientes -->
 <div *ngIf="showRecentTasksModal && showRecentTasksSelector && recentTasks.length > 0 && !isEditing" 
      class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60] p-4"

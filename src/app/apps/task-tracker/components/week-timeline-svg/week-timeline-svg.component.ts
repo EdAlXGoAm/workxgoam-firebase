@@ -134,9 +134,18 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   // 🔄 FILTRO DE FINES DE SEMANA
   showWeekends: boolean = true;
   
+  // 🔄 FILTRO DE DÍAS ESPECÍFICOS (excluidos cuando showWeekends=false)
+  // Formato: índice del día (0=Dom, 1=Lun, 2=Mar, 3=Mié, 4=Jue, 5=Vie, 6=Sáb)
+  excludedWeekDays: number[] = [];
+  
+  // UI para mostrar selector de días
+  showDaySelector: boolean = false;
+  daySelectorPosition = { top: '0px', left: '0px' };
+  
   // 🔑 CLAVES PARA CACHÉ EN LOCALSTORAGE
   private readonly CACHE_KEY_ZOOM = 'week-timeline-zoom';
   private readonly CACHE_KEY_SHOW_WEEKENDS = 'week-timeline-show-weekends';
+  private readonly CACHE_KEY_EXCLUDED_DAYS = 'week-timeline-excluded-days';
   
   // 💡 SISTEMA DE TOOLTIP
   showTooltip: boolean = false;
@@ -375,52 +384,159 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   }
 
   /**
-   * Obtener los días visibles según el filtro de fines de semana
+   * Obtener los días visibles según el filtro de fines de semana y días excluidos
    */
   get visibleWeekDays(): WeekDay[] {
     if (this.showWeekends) {
       return this.weekDays;
     }
-    // Filtrar sábado (índice 6) y domingo (índice 0)
-    return this.weekDays.filter((day, index) => index !== 0 && index !== 6);
+    // Filtrar sábado (índice 6), domingo (índice 0), y días excluidos
+    return this.weekDays.filter((day, index) => {
+      // Siempre excluir sábado y domingo
+      if (index === 0 || index === 6) return false;
+      // Verificar si el día está en la lista de excluidos
+      return !this.excludedWeekDays.includes(index);
+    });
   }
 
   /**
-   * Convertir índice visual (0-4 cuando no hay fines de semana) a índice real del día (0-6)
+   * Obtener todos los días laborales para mostrar en el selector
+   * (Lun-Vie, índices 1-5)
+   */
+  get workWeekDays(): { index: number; name: string; shortName: string }[] {
+    return [
+      { index: 1, name: 'Lunes', shortName: 'L' },
+      { index: 2, name: 'Martes', shortName: 'M' },
+      { index: 3, name: 'Miércoles', shortName: 'X' },
+      { index: 4, name: 'Jueves', shortName: 'J' },
+      { index: 5, name: 'Viernes', shortName: 'V' }
+    ];
+  }
+
+  /**
+   * Verificar si un día específico está excluido
+   */
+  isDayExcluded(dayIndex: number): boolean {
+    return this.excludedWeekDays.includes(dayIndex);
+  }
+
+  /**
+   * Toggle para excluir/incluir un día específico
+   */
+  toggleDayExclusion(dayIndex: number): void {
+    // No permitir excluir si solo quedaría 1 día visible
+    const currentVisibleCount = this.visibleDaysCount;
+    const isCurrentlyExcluded = this.excludedWeekDays.includes(dayIndex);
+    
+    if (!isCurrentlyExcluded && currentVisibleCount <= 2) {
+      // No permitir excluir si solo quedarían menos de 2 días
+      return;
+    }
+    
+    if (isCurrentlyExcluded) {
+      // Incluir el día (quitar de la lista de excluidos)
+      this.excludedWeekDays = this.excludedWeekDays.filter(d => d !== dayIndex);
+    } else {
+      // Excluir el día (agregar a la lista de excluidos)
+      this.excludedWeekDays = [...this.excludedWeekDays, dayIndex];
+    }
+    
+    this.saveCachedExcludedDays();
+    this.updateSvgDimensions();
+    this.cdr.detectChanges();
+  }
+
+  /**
+   * Toggle para mostrar/ocultar el selector de días
+   * Calcula la posición del panel basándose en el botón (a la izquierda)
+   */
+  toggleDaySelector(event?: MouseEvent): void {
+    this.showDaySelector = !this.showDaySelector;
+    
+    if (this.showDaySelector && event) {
+      // Obtener la posición del botón que disparó el evento
+      const button = (event.target as HTMLElement).closest('button') as HTMLElement;
+      if (!button) return;
+      
+      const buttonRect = button.getBoundingClientRect();
+      
+      // Posicionar el panel a la izquierda del botón, centrado verticalmente
+      const panelWidth = 220; // min-w-[220px]
+      const left = buttonRect.left - panelWidth - 10; // 10px de espacio
+      const top = buttonRect.top + (buttonRect.height / 2);
+      
+      this.daySelectorPosition = {
+        top: `${top}px`,
+        left: `${left}px`
+      };
+    }
+  }
+
+  /**
+   * Convertir índice visual a índice real del día (0-6)
+   * Ahora considera tanto fines de semana como días excluidos
    */
   getRealDayIndex(visualIndex: number): number {
     if (this.showWeekends) {
       return visualIndex;
     }
-    // Mapear: 0->1(Lun), 1->2(Mar), 2->3(Mié), 3->4(Jue), 4->5(Vie)
-    return visualIndex + 1;
+    
+    // Obtener los días visibles y encontrar el día real correspondiente al índice visual
+    const visibleDays = this.visibleWeekDays;
+    if (visualIndex < 0 || visualIndex >= visibleDays.length) {
+      return -1;
+    }
+    
+    // Encontrar el índice real de este día en weekDays
+    const targetDay = visibleDays[visualIndex];
+    return this.weekDays.findIndex(day => day.date.getTime() === targetDay.date.getTime());
   }
 
   /**
-   * Convertir índice real del día (0-6) a índice visual (0-4 cuando no hay fines de semana)
+   * Convertir índice real del día (0-6) a índice visual
+   * Ahora considera tanto fines de semana como días excluidos
    */
   getVisualDayIndex(realIndex: number): number {
     if (this.showWeekends) {
       return realIndex;
     }
-    // Mapear: 1(Lun)->0, 2(Mar)->1, 3(Mié)->2, 4(Jue)->3, 5(Vie)->4
-    // Si es domingo (0) o sábado (6), retornar -1 (no visible)
-    if (realIndex === 0 || realIndex === 6) {
+    
+    // Si es fin de semana o está excluido, retornar -1
+    if (realIndex === 0 || realIndex === 6 || this.excludedWeekDays.includes(realIndex)) {
       return -1;
     }
-    return realIndex - 1;
+    
+    // Contar cuántos días visibles hay antes de este día
+    let visualIndex = 0;
+    for (let i = 1; i < realIndex; i++) {
+      if (!this.excludedWeekDays.includes(i)) {
+        visualIndex++;
+      }
+    }
+    return visualIndex;
   }
 
   /**
    * Obtener el número de días visibles
    */
   get visibleDaysCount(): number {
-    return this.showWeekends ? 7 : 5;
+    if (this.showWeekends) {
+      return 7;
+    }
+    // 5 días laborales menos los días excluidos
+    return 5 - this.excludedWeekDays.length;
   }
 
   toggleWeekends(): void {
     this.showWeekends = !this.showWeekends;
     this.saveCachedShowWeekends();
+    
+    // Si volvemos a mostrar fines de semana, cerrar el selector de días y limpiar excluidos
+    if (this.showWeekends) {
+      this.showDaySelector = false;
+      // No limpiar excludedWeekDays para recordar la configuración si se vuelve a activar
+    }
+    
     // updateSvgDimensions ya se encarga de actualizar el ancho del indicador de días
     this.updateSvgDimensions();
     this.cdr.detectChanges();
@@ -490,6 +606,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     // Cargar valores desde caché (localStorage)
     this.zoomScale = this.loadCachedZoom();
     this.showWeekends = this.loadCachedShowWeekends();
+    this.excludedWeekDays = this.loadCachedExcludedDays();
     
     try {
       this.loadedProjects = await this.projectService.getProjects();
@@ -2296,6 +2413,14 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     if (this.showTaskSelector) {
       this.closeTaskSelector();
     }
+    // Cerrar el selector de días si se hace clic fuera de él
+    if (this.showDaySelector) {
+      const daySelectorPanel = (event.target as HTMLElement).closest('.day-selector-panel');
+      const weekendToggle = (event.target as HTMLElement).closest('.weekend-toggle');
+      if (!daySelectorPanel && !weekendToggle) {
+        this.showDaySelector = false;
+      }
+    }
   }
 
   // Métodos para manejar selección de texto en tooltip
@@ -2645,6 +2770,36 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
       localStorage.setItem(this.CACHE_KEY_SHOW_WEEKENDS, this.showWeekends.toString());
     } catch (error) {
       console.warn('Error al guardar showWeekends en caché:', error);
+    }
+  }
+  
+  /**
+   * Cargar los días excluidos desde localStorage
+   */
+  private loadCachedExcludedDays(): number[] {
+    try {
+      const cached = localStorage.getItem(this.CACHE_KEY_EXCLUDED_DAYS);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          // Validar que solo contenga números válidos (1-5, días laborales)
+          return parsed.filter(d => typeof d === 'number' && d >= 1 && d <= 5);
+        }
+      }
+    } catch (error) {
+      console.warn('Error al cargar días excluidos desde caché:', error);
+    }
+    return []; // Valor por defecto (ningún día excluido)
+  }
+  
+  /**
+   * Guardar los días excluidos en localStorage
+   */
+  private saveCachedExcludedDays(): void {
+    try {
+      localStorage.setItem(this.CACHE_KEY_EXCLUDED_DAYS, JSON.stringify(this.excludedWeekDays));
+    } catch (error) {
+      console.warn('Error al guardar días excluidos en caché:', error);
     }
   }
 
