@@ -308,6 +308,20 @@
     (saveEnvironment)="onEnvironmentSaved($event)">
   </app-environment-modal>
 
+  <!-- Environment Tasks Modal -->
+  <app-environment-tasks-modal
+    *ngIf="showEnvironmentTasksModal"
+    [showModal]="showEnvironmentTasksModal"
+    [environmentId]="environmentTasksModalEnvironmentId"
+    [environmentName]="environmentTasksModalEnvironmentName"
+    [environmentEmoji]="environmentTasksModalEnvironmentEmoji"
+    [environmentColor]="environmentTasksModalEnvironmentColor"
+    [allTasks]="tasks"
+    [allProjects]="projects"
+    (closeModalEvent)="closeEnvironmentTasksModal()"
+    (taskQuickUpdated)="onEnvironmentTaskQuickUpdated($event)">
+  </app-environment-tasks-modal>
+
   <!-- New Task Type Modal -->
   <app-task-type-modal
     *ngIf="showNewTaskTypeModal"
@@ -470,6 +484,11 @@
            <i class="fas" [ngClass]="focusedEnvironment.id === selectedEnvironment!.id ? 'fa-crosshairs' : 'fa-bullseye'"></i>
            <span>{{ focusedEnvironment.id === selectedEnvironment!.id ? 'Desenfocar ambiente' : 'Enfocar ambiente' }}</span>
          </div>
+    <hr class="my-1 border-gray-200">
+    <div class="context-menu-item" (click)="openEnvironmentTasksModal(selectedEnvironment!)">
+      <i class="fas fa-tasks"></i>
+      <span>Ver tareas del ambiente</span>
+    </div>
     <hr class="my-1 border-gray-200">
     <div class="context-menu-item" (click)="editEnvironmentFromContextMenu(selectedEnvironment!)">
       <i class="fas fa-pencil-alt"></i>

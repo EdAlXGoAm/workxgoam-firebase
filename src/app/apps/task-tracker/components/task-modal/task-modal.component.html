@@ -842,25 +842,454 @@
     
     <!-- Contenido scrollable -->
     <div class="flex-1 overflow-y-auto p-4 md:p-6">
-      <!-- Lista de tareas recientes -->
-      <div class="space-y-2">
-        <div *ngFor="let task of recentTasks; let i = index" 
-             (click)="applyRecentTaskData(i)"
-             class="p-3 border border-gray-200 rounded-lg hover:bg-indigo-50 hover:border-indigo-300 cursor-pointer transition-colors">
-          <div class="flex items-start gap-3">
-            <span class="text-2xl flex-shrink-0">{{ task.emoji || '📝' }}</span>
-            <div class="flex-1 min-w-0">
-              <h4 class="font-medium text-gray-900 truncate">{{ task.name }}</h4>
-              <p class="text-xs text-gray-500 mt-1">
-                {{ formatReminderDateTime(task.updatedAt || task.createdAt) }}
-              </p>
-              <div *ngIf="task.description" class="text-xs text-gray-600 mt-1 line-clamp-2">
-                {{ task.description }}
+      <!-- Grupos de tareas (tareas con nombre repetido) -->
+      <div *ngIf="multipleTaskGroups.length > 0" class="mb-4">
+        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-2">
+          <i class="fas fa-layer-group"></i>
+          Tareas agrupadas ({{ multipleTaskGroups.length }})
+        </div>
+        <div class="space-y-2">
+          <div *ngFor="let group of multipleTaskGroups" class="border border-gray-200 rounded-lg overflow-hidden">
+            <!-- Header del grupo (clickeable para expandir/colapsar, click derecho para menú) -->
+            <div (click)="toggleTaskGroup(group.name)"
+                 (contextmenu)="onGroupContextMenu($event, group.name)"
+                 (touchstart)="onGroupTouchStart($event, group.name)"
+                 (touchend)="onGroupTouchEnd()"
+                 (touchmove)="onGroupTouchMove()"
+                 class="p-3 bg-gray-50 hover:bg-gray-100 cursor-pointer flex items-center gap-3 transition-colors">
+              <span class="text-2xl flex-shrink-0">{{ group.emoji }}</span>
+              <div class="flex-1 min-w-0">
+                <h4 class="font-medium text-gray-900 truncate">{{ group.name }}</h4>
+                <span class="text-xs text-gray-500">{{ group.tasks.length }} tareas</span>
+              </div>
+              <i class="fas fa-chevron-down text-gray-400 transition-transform duration-200"
+                 [class.rotate-180]="isTaskGroupExpanded(group.name)"></i>
+            </div>
+            
+            <!-- Tareas del grupo (expandibles) -->
+            <div *ngIf="isTaskGroupExpanded(group.name)" class="border-t border-gray-200 bg-white">
+              <div *ngFor="let item of group.tasks; let isLast = last"
+                   (click)="editingTaskIndex !== item.originalIndex && applyRecentTaskData(item.originalIndex); $event.stopPropagation()"
+                   (contextmenu)="onRecentTaskContextMenu($event, item.originalIndex)"
+                   (touchstart)="onRecentTaskTouchStart($event, item.originalIndex)"
+                   (touchend)="onRecentTaskTouchEnd()"
+                   (touchmove)="onRecentTaskTouchMove()"
+                   class="p-3 pl-6 hover:bg-indigo-50 cursor-pointer transition-colors"
+                   [class.border-b]="!isLast"
+                   [class.border-gray-100]="!isLast"
+                   [class.ring-2]="editingTaskIndex === item.originalIndex"
+                   [class.ring-indigo-500]="editingTaskIndex === item.originalIndex"
+                   [class.ring-inset]="editingTaskIndex === item.originalIndex">
+                <div class="flex items-start gap-3">
+                  <!-- Emoji - editable -->
+                  <ng-container *ngIf="editingTaskIndex === item.originalIndex && editingField === 'emoji'; else groupNormalEmoji">
+                    <button type="button" 
+                            (click)="showEmojiPickerForEdit = true; $event.stopPropagation()"
+                            class="text-xl flex-shrink-0 p-1 rounded hover:bg-indigo-100 border-2 border-indigo-400">
+                      {{ editingValue || '📝' }}
+                    </button>
+                  </ng-container>
+                  <ng-template #groupNormalEmoji>
+                    <span class="text-xl flex-shrink-0 opacity-50">{{ item.task.emoji || '📝' }}</span>
+                  </ng-template>
+                  
+                  <div class="flex-1 min-w-0">
+                    <!-- Nombre - editable -->
+                    <ng-container *ngIf="editingTaskIndex === item.originalIndex && editingField === 'name'; else groupNormalName">
+                      <div class="flex items-center gap-2">
+                        <input type="text"
+                               id="edit-task-name-input"
+                               [(ngModel)]="editingValue"
+                               (keydown)="onEditNameKeydown($event)"
+                               (blur)="saveQuickEdit()"
+                               (click)="$event.stopPropagation()"
+                               class="flex-1 px-2 py-1 text-sm border border-indigo-400 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                               placeholder="Nombre de la tarea">
+                        <button type="button" 
+                                (click)="saveQuickEdit(); $event.stopPropagation()"
+                                class="p-1 text-green-600 hover:bg-green-100 rounded"
+                                [disabled]="isSavingQuickEdit">
+                          <i class="fas fa-check"></i>
+                        </button>
+                        <button type="button" 
+                                (click)="cancelQuickEdit(); $event.stopPropagation()"
+                                class="p-1 text-gray-500 hover:bg-gray-100 rounded">
+                          <i class="fas fa-times"></i>
+                        </button>
+                      </div>
+                    </ng-container>
+                    <ng-template #groupNormalName>
+                      <!-- Mostrar solo la fecha como título ya que el nombre es el del grupo -->
+                      <div class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600">
+                        <span *ngIf="item.task.start" class="flex items-center">
+                          <i class="fas fa-play text-green-500 mr-1"></i>
+                          {{ formatRecentTaskDate(item.task.start) }}
+                        </span>
+                        <span *ngIf="item.task.end" class="flex items-center">
+                          <i class="fas fa-stop text-red-500 mr-1"></i>
+                          {{ formatRecentTaskDate(item.task.end) }}
+                        </span>
+                        <span *ngIf="item.task.duration" class="flex items-center font-medium text-indigo-600">
+                          <i class="fas fa-clock mr-1"></i>
+                          {{ formatDuration(item.task.duration) }}
+                        </span>
+                      </div>
+                    </ng-template>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
+      
+      <!-- Tareas unitarias (nombre único) -->
+      <div *ngIf="singleTasks.length > 0">
+        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-2">
+          <i class="fas fa-tasks"></i>
+          Tareas individuales ({{ singleTasks.length }})
+        </div>
+        <div class="space-y-2">
+          <div *ngFor="let item of singleTasks" 
+               (click)="editingTaskIndex !== item.originalIndex && applyRecentTaskData(item.originalIndex)"
+               (contextmenu)="onRecentTaskContextMenu($event, item.originalIndex)"
+               (touchstart)="onRecentTaskTouchStart($event, item.originalIndex)"
+               (touchend)="onRecentTaskTouchEnd()"
+               (touchmove)="onRecentTaskTouchMove()"
+               class="p-3 border border-gray-200 rounded-lg hover:bg-indigo-50 hover:border-indigo-300 cursor-pointer transition-colors"
+               [class.ring-2]="editingTaskIndex === item.originalIndex"
+               [class.ring-indigo-500]="editingTaskIndex === item.originalIndex">
+            <div class="flex items-start gap-3">
+              <!-- Emoji - editable -->
+              <ng-container *ngIf="editingTaskIndex === item.originalIndex && editingField === 'emoji'; else singleNormalEmoji">
+                <button type="button" 
+                        (click)="showEmojiPickerForEdit = true; $event.stopPropagation()"
+                        class="text-2xl flex-shrink-0 p-1 rounded hover:bg-indigo-100 border-2 border-indigo-400">
+                  {{ editingValue || '📝' }}
+                </button>
+              </ng-container>
+              <ng-template #singleNormalEmoji>
+                <span class="text-2xl flex-shrink-0">{{ item.task.emoji || '📝' }}</span>
+              </ng-template>
+              
+              <div class="flex-1 min-w-0">
+                <!-- Nombre - editable -->
+                <ng-container *ngIf="editingTaskIndex === item.originalIndex && editingField === 'name'; else singleNormalName">
+                  <div class="flex items-center gap-2">
+                    <input type="text"
+                           id="edit-task-name-input"
+                           [(ngModel)]="editingValue"
+                           (keydown)="onEditNameKeydown($event)"
+                           (blur)="saveQuickEdit()"
+                           (click)="$event.stopPropagation()"
+                           class="flex-1 px-2 py-1 text-sm border border-indigo-400 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                           placeholder="Nombre de la tarea">
+                    <button type="button" 
+                            (click)="saveQuickEdit(); $event.stopPropagation()"
+                            class="p-1 text-green-600 hover:bg-green-100 rounded"
+                            [disabled]="isSavingQuickEdit">
+                      <i class="fas fa-check"></i>
+                    </button>
+                    <button type="button" 
+                            (click)="cancelQuickEdit(); $event.stopPropagation()"
+                            class="p-1 text-gray-500 hover:bg-gray-100 rounded">
+                      <i class="fas fa-times"></i>
+                    </button>
+                  </div>
+                </ng-container>
+                <ng-template #singleNormalName>
+                  <h4 class="font-medium text-gray-900 truncate">{{ item.task.name }}</h4>
+                </ng-template>
+                
+                <!-- Fechas de inicio y fin -->
+                <div class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 mt-1">
+                  <span *ngIf="item.task.start" class="flex items-center">
+                    <i class="fas fa-play text-green-500 mr-1"></i>
+                    {{ formatRecentTaskDate(item.task.start) }}
+                  </span>
+                  <span *ngIf="item.task.end" class="flex items-center">
+                    <i class="fas fa-stop text-red-500 mr-1"></i>
+                    {{ formatRecentTaskDate(item.task.end) }}
+                  </span>
+                  <span *ngIf="item.task.duration" class="flex items-center font-medium text-indigo-600">
+                    <i class="fas fa-clock mr-1"></i>
+                    {{ formatDuration(item.task.duration) }}
+                  </span>
+                </div>
+                <div *ngIf="item.task.description" class="text-xs text-gray-600 mt-1 line-clamp-2">
+                  {{ item.task.description }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Mensaje cuando no hay tareas -->
+      <div *ngIf="recentTasks.length === 0" class="text-center text-gray-500 py-8">
+        <i class="fas fa-inbox text-3xl mb-2 text-gray-300"></i>
+        <p>No hay tareas recientes en este proyecto</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Menú contextual para tareas recientes -->
+<div *ngIf="showContextMenu" 
+     class="fixed z-[100] bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[160px]"
+     [style.left.px]="contextMenuX"
+     [style.top.px]="contextMenuY"
+     (click)="$event.stopPropagation()">
+  <button type="button"
+          (click)="startEditEmoji()"
+          class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-indigo-50 flex items-center gap-2">
+    <i class="fas fa-smile text-indigo-500"></i>
+    Editar emoji
+  </button>
+  <button type="button"
+          (click)="startEditName()"
+          class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-indigo-50 flex items-center gap-2">
+    <i class="fas fa-edit text-indigo-500"></i>
+    Editar nombre
+  </button>
+</div>
+
+<!-- Overlay para cerrar menú contextual -->
+<div *ngIf="showContextMenu" 
+     class="fixed inset-0 z-[99]"
+     (click)="closeContextMenu()">
+</div>
+
+<!-- Menú contextual para grupos de tareas -->
+<div *ngIf="showGroupContextMenu" 
+     class="fixed z-[100] bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[200px]"
+     [style.left.px]="groupContextMenuX"
+     [style.top.px]="groupContextMenuY"
+     (click)="$event.stopPropagation()">
+  <button type="button"
+          (click)="startEditGroupEmoji()"
+          class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-indigo-50 flex items-center gap-2">
+    <i class="fas fa-smile text-indigo-500"></i>
+    Cambiar emoji a todas
+  </button>
+</div>
+
+<!-- Overlay para cerrar menú contextual de grupo -->
+<div *ngIf="showGroupContextMenu" 
+     class="fixed inset-0 z-[99]"
+     (click)="closeGroupContextMenu()">
+</div>
+
+<!-- Modal de emoji picker para grupos -->
+<div *ngIf="showEmojiPickerForGroup" 
+     class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[110] p-4"
+     (click)="closeEmojiPickerForGroup()">
+  <div class="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden flex flex-col"
+       style="height: 500px;"
+       (click)="$event.stopPropagation()">
+    <!-- Header con búsqueda (altura fija) -->
+    <div class="p-4 border-b border-gray-200 flex-shrink-0">
+      <div class="flex justify-between items-center mb-3">
+        <h3 class="text-lg font-bold text-gray-900">
+          <i class="fas fa-layer-group mr-2 text-indigo-500"></i>
+          Emoji para el grupo
+        </h3>
+        <button type="button" 
+                (click)="closeEmojiPickerForGroup()"
+                class="text-gray-500 hover:text-gray-700 p-1">
+          <i class="fas fa-times text-lg"></i>
+        </button>
+      </div>
+      <p class="text-xs text-gray-500 mb-3">
+        <i class="fas fa-info-circle mr-1"></i>
+        Se aplicará a todas las tareas del grupo "{{ contextMenuGroupName }}"
+      </p>
+      <!-- Barra de búsqueda -->
+      <div class="relative">
+        <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+        <input type="text"
+               [ngModel]="editEmojiSearchQuery"
+               (ngModelChange)="onEditEmojiSearch($event)"
+               placeholder="Buscar emoji... (ej: enojado, angry, feliz, happy)"
+               class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+        <button *ngIf="editEmojiSearchQuery" 
+                type="button"
+                (click)="onEditEmojiSearch('')"
+                class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
+          <i class="fas fa-times-circle"></i>
+        </button>
+      </div>
+    </div>
+    
+    <!-- Barra de categorías (altura fija, siempre visible) -->
+    <div class="flex overflow-x-auto border-b border-gray-200 bg-gray-50 px-2 py-1 flex-shrink-0"
+         [class.opacity-50]="editEmojiSearchQuery"
+         [class.pointer-events-none]="editEmojiSearchQuery">
+      <button *ngFor="let category of emojiCategories; let i = index"
+              type="button"
+              (click)="selectEditEmojiCategory(i)"
+              [class.bg-indigo-100]="editSelectedEmojiCategory === i && !editEmojiSearchQuery"
+              [class.text-indigo-700]="editSelectedEmojiCategory === i && !editEmojiSearchQuery"
+              class="flex-shrink-0 px-3 py-2 text-lg rounded-lg hover:bg-gray-200 transition-colors"
+              [title]="category.name">
+        {{ category.icon }}
+      </button>
+    </div>
+    
+    <!-- Contenido de emojis (altura flexible) -->
+    <div class="flex-1 overflow-y-auto p-4">
+      <!-- Resultados de búsqueda -->
+      <ng-container *ngIf="editEmojiSearchQuery">
+        <div *ngIf="editFilteredEmojis.length === 0" class="text-center text-gray-500 py-8">
+          <i class="fas fa-search text-3xl mb-2 text-gray-300"></i>
+          <p>No se encontraron emojis para "{{ editEmojiSearchQuery }}"</p>
+          <p class="text-xs mt-1">Intenta con: enojado, angry, feliz, happy, triste, sad</p>
+        </div>
+        <div *ngIf="editFilteredEmojis.length > 0" class="grid grid-cols-8 gap-1">
+          <button *ngFor="let emoji of editFilteredEmojis"
+                  type="button"
+                  (click)="selectEmojiForGroup(emoji)"
+                  [class.ring-2]="editingValue === emoji"
+                  [class.ring-indigo-500]="editingValue === emoji"
+                  [disabled]="isSavingGroupEmoji"
+                  class="text-2xl p-2 hover:bg-indigo-100 rounded-lg transition-colors disabled:opacity-50">
+            {{ emoji }}
+          </button>
+        </div>
+      </ng-container>
+      
+      <!-- Grid de categoría seleccionada -->
+      <ng-container *ngIf="!editEmojiSearchQuery">
+        <div class="mb-2 text-sm font-medium text-gray-600">
+          {{ emojiCategories[editSelectedEmojiCategory].name }}
+        </div>
+        <div class="grid grid-cols-8 gap-1">
+          <button *ngFor="let emoji of emojiCategories[editSelectedEmojiCategory].emojis"
+                  type="button"
+                  (click)="selectEmojiForGroup(emoji)"
+                  [class.ring-2]="editingValue === emoji"
+                  [class.ring-indigo-500]="editingValue === emoji"
+                  [disabled]="isSavingGroupEmoji"
+                  class="text-2xl p-2 hover:bg-indigo-100 rounded-lg transition-colors disabled:opacity-50">
+            {{ emoji }}
+          </button>
+        </div>
+      </ng-container>
+    </div>
+    
+    <!-- Footer con indicador de guardado -->
+    <div class="p-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between flex-shrink-0">
+      <div class="flex items-center gap-2">
+        <span class="text-sm text-gray-600">Actual:</span>
+        <span class="text-3xl">{{ editingValue || '📝' }}</span>
+      </div>
+      <div *ngIf="isSavingGroupEmoji" class="flex items-center gap-2 text-indigo-600">
+        <i class="fas fa-spinner fa-spin"></i>
+        <span class="text-sm">Guardando...</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de emoji picker para edición rápida -->
+<div *ngIf="showEmojiPickerForEdit" 
+     class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[110] p-4"
+     (click)="closeEmojiPickerForEdit()">
+  <div class="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden flex flex-col"
+       style="height: 500px;"
+       (click)="$event.stopPropagation()">
+    <!-- Header con búsqueda (altura fija) -->
+    <div class="p-4 border-b border-gray-200 flex-shrink-0">
+      <div class="flex justify-between items-center mb-3">
+        <h3 class="text-lg font-bold text-gray-900">Seleccionar Emoji</h3>
+        <button type="button" 
+                (click)="closeEmojiPickerForEdit()"
+                class="text-gray-500 hover:text-gray-700 p-1">
+          <i class="fas fa-times text-lg"></i>
+        </button>
+      </div>
+      <!-- Barra de búsqueda -->
+      <div class="relative">
+        <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+        <input type="text"
+               [ngModel]="editEmojiSearchQuery"
+               (ngModelChange)="onEditEmojiSearch($event)"
+               placeholder="Buscar emoji... (ej: enojado, angry, feliz, happy)"
+               class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+        <button *ngIf="editEmojiSearchQuery" 
+                type="button"
+                (click)="onEditEmojiSearch('')"
+                class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
+          <i class="fas fa-times-circle"></i>
+        </button>
+      </div>
+    </div>
+    
+    <!-- Barra de categorías (altura fija, siempre visible) -->
+    <div class="flex overflow-x-auto border-b border-gray-200 bg-gray-50 px-2 py-1 flex-shrink-0"
+         [class.opacity-50]="editEmojiSearchQuery"
+         [class.pointer-events-none]="editEmojiSearchQuery">
+      <button *ngFor="let category of emojiCategories; let i = index"
+              type="button"
+              (click)="selectEditEmojiCategory(i)"
+              [class.bg-indigo-100]="editSelectedEmojiCategory === i && !editEmojiSearchQuery"
+              [class.text-indigo-700]="editSelectedEmojiCategory === i && !editEmojiSearchQuery"
+              class="flex-shrink-0 px-3 py-2 text-lg rounded-lg hover:bg-gray-200 transition-colors"
+              [title]="category.name">
+        {{ category.icon }}
+      </button>
+    </div>
+    
+    <!-- Contenido de emojis (altura flexible) -->
+    <div class="flex-1 overflow-y-auto p-4">
+      <!-- Resultados de búsqueda -->
+      <ng-container *ngIf="editEmojiSearchQuery">
+        <div *ngIf="editFilteredEmojis.length === 0" class="text-center text-gray-500 py-8">
+          <i class="fas fa-search text-3xl mb-2 text-gray-300"></i>
+          <p>No se encontraron emojis para "{{ editEmojiSearchQuery }}"</p>
+          <p class="text-xs mt-1">Intenta con: enojado, angry, feliz, happy, triste, sad</p>
+        </div>
+        <div *ngIf="editFilteredEmojis.length > 0" class="grid grid-cols-8 gap-1">
+          <button *ngFor="let emoji of editFilteredEmojis"
+                  type="button"
+                  (click)="selectEmojiForEdit(emoji)"
+                  [class.ring-2]="editingValue === emoji"
+                  [class.ring-indigo-500]="editingValue === emoji"
+                  class="text-2xl p-2 hover:bg-indigo-100 rounded-lg transition-colors">
+            {{ emoji }}
+          </button>
+        </div>
+      </ng-container>
+      
+      <!-- Grid de categoría seleccionada -->
+      <ng-container *ngIf="!editEmojiSearchQuery">
+        <div class="mb-2 text-sm font-medium text-gray-600">
+          {{ emojiCategories[editSelectedEmojiCategory].name }}
+        </div>
+        <div class="grid grid-cols-8 gap-1">
+          <button *ngFor="let emoji of emojiCategories[editSelectedEmojiCategory].emojis"
+                  type="button"
+                  (click)="selectEmojiForEdit(emoji)"
+                  [class.ring-2]="editingValue === emoji"
+                  [class.ring-indigo-500]="editingValue === emoji"
+                  class="text-2xl p-2 hover:bg-indigo-100 rounded-lg transition-colors">
+            {{ emoji }}
+          </button>
+        </div>
+      </ng-container>
+    </div>
+    
+    <!-- Footer con emoji seleccionado (altura fija) -->
+    <div class="p-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between flex-shrink-0">
+      <div class="flex items-center gap-2">
+        <span class="text-sm text-gray-600">Seleccionado:</span>
+        <span class="text-3xl">{{ editingValue || '📝' }}</span>
+      </div>
+      <button type="button"
+              (click)="selectEmojiForEdit(editingValue)"
+              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium">
+        Confirmar
+      </button>
     </div>
   </div>
 </div>

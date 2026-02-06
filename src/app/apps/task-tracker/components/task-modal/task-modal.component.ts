@@ -41,6 +41,7 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
   @Output() openTaskTypeModal = new EventEmitter<void>();
   @Output() openRemindersModal = new EventEmitter<void>();
   @Output() openCalculatorModal = new EventEmitter<{type: 'start' | 'end'}>();
+  @Output() taskQuickUpdated = new EventEmitter<{taskId: string, updates: Partial<Task>}>();
   
   // Date/time fields
   startDate = '';
@@ -92,6 +93,43 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
   showRecentTasksModal = false;
   selectedRecentTaskIndex: string = '';
   recentTasksOptions: SelectOption[] = [];
+  
+  // Menú contextual para tareas recientes
+  showContextMenu = false;
+  contextMenuX = 0;
+  contextMenuY = 0;
+  contextMenuTaskIndex: number | null = null;
+  contextMenuTask: Task | null = null;
+  
+  // Edición inline de tareas recientes
+  editingTaskIndex: number | null = null;
+  editingField: 'emoji' | 'name' | null = null;
+  editingValue = '';
+  showEmojiPickerForEdit = false;
+  isSavingQuickEdit = false;
+  
+  // Estado del emoji picker para edición rápida
+  editEmojiSearchQuery = '';
+  editFilteredEmojis: string[] = [];
+  editSelectedEmojiCategory = 0;
+  
+  // Menú contextual para grupos de tareas
+  showGroupContextMenu = false;
+  groupContextMenuX = 0;
+  groupContextMenuY = 0;
+  contextMenuGroupName: string | null = null;
+  showEmojiPickerForGroup = false;
+  isSavingGroupEmoji = false;
+  
+  // Long press para móviles (tareas individuales)
+  private longPressTimer: any = null;
+  private longPressThreshold = 500; // ms
+  
+  // Long press para grupos
+  private groupLongPressTimer: any = null;
+  
+  // Agrupación de tareas recientes por nombre
+  expandedTaskGroups: Set<string> = new Set();
   
   // Opciones para selectores personalizados
   environmentOptions: SelectOption[] = [];
@@ -148,17 +186,33 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
       emojis: ['📝', '⏰', '✅', '🛏️', '🍔', 
                '😀', '😊', '😎', '🤩', '😍', '🤔', '😴', '🥳', '😇', '🤯', 
                '📅', '📌', '🔑', '📚', '💻', '📱', '🔋',
-               '🏋️', '🚴', '🚗', '🍎', '🍕', '🛒', '☕', '🍷', '🎵', '🎮', '🎨', '✈️']
+               '🏋️', '🚴', '🚗', '🍎', '🍕', '🛒', '☕', '🍷', '🎵', '🎮', '🎨', '✈️',
+               '👍', '👎', '👏', '🙌', '🤝', '💪', '✋', '👋', '🖐️', '✌️', '🤞', '🙏']
     },
     {
       name: 'Sonrisas y Emociones',
       icon: '😀',
-      emojis: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '😶‍🌫️', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '😵‍💫', '🤐', '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕']
+      emojis: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '🥲', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '🫥', '😏', '😒', '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '🥴', '😵', '😵‍💫', '🤯', '🤠', '🥳', '🥸', '😎', '🤓', '🧐', '😕', '🫤', '😟', '🙁', '☹️', '😮', '😯', '😲', '😳', '🥺', '🥹', '😦', '😧', '😨', '😰', '😥', '😢', '😭', '😱', '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤', '😠', '😡', '🤬', '😈', '👿', '💀', '☠️', '💩', '🤡', '👹', '👺', '👻', '👽', '👾', '🤖', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', '😾']
     },
     {
-      name: 'Gestos y Personas',
+      name: 'Manos y Gestos',
       icon: '👋',
-      emojis: ['👋', '🤚', '🖐', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💪', '🦾', '🦿', '🦵', '🦶', '👂', '🦻', '👃', '👶', '👧', '🧒', '👦', '👩', '🧑', '👨', '👩‍🦱', '👨‍🦱', '👩‍🦰', '👨‍🦰', '👱‍♀️', '👱‍♂️', '👩‍🦳', '👨‍🦳', '👩‍🦲', '👨‍🦲', '🧓', '👴', '👵', '🙍', '🙎', '🙅', '🙆', '💁', '🙋', '🧏', '🙇', '🤦', '🤦‍♂️', '🤦‍♀️', '🤷', '🤷‍♂️', '🤷‍♀️', '👮', '👮‍♂️', '👮‍♀️', '🕵', '🕵‍♂️', '🕵‍♀️', '💂', '🥷', '👷', '👷‍♂️', '👷‍♀️', '🤴', '👸', '👳', '👳‍♂️', '👳‍♀️', '👲', '🧕', '🤵', '🤵‍♂️', '🤵‍♀️', '👰', '🤰', '🤱', '👼', '🎅', '🤶', '🦸', '🦸‍♂️', '🦸‍♀️', '🦹', '🦹‍♂️', '🦹‍♀️', '🧙', '🧙‍♂️', '🧙‍♀️', '🧚', '🧚‍♂️', '🧚‍♀️', '🧛', '🧛‍♂️', '🧛‍♀️', '🧜', '🧜‍♂️', '🧜‍♀️', '🧝', '🧝‍♂️', '🧝‍♀️', '🧞', '🧞‍♂️', '🧞‍♀️', '🧟', '🧟‍♂️', '🧟‍♀️', '💆', '💇', '🚶', '🚶‍♂️', '🚶‍♀️', '🧍', '🧍‍♂️', '🧍‍♀️', '🧎', '🧎‍♂️', '🧎‍♀️', '🏃', '🏃‍♂️', '🏃‍♀️', '💃', '🕺', '🕴', '👯', '👯‍♂️', '👯‍♀️', '🧖', '🧖‍♂️', '🧖‍♀️', '🧗', '🧗‍♂️', '🧗‍♀️', '🤺', '🏇', '⛷️', '🏂', '🏌️', '🏌️‍♂️', '🏌️‍♀️', '🏄', '🏄‍♂️', '🏄‍♀️', '🚣', '🚣‍♂️', '🚣‍♀️', '🏊', '🏊‍♂️', '🏊‍♀️', '⛹️', '⛹️‍♂️', '⛹️‍♀️', '🏋️', '🏋️‍♂️', '🏋️‍♀️', '🚴', '🚴‍♂️', '🚴‍♀️', '🚵', '🚵‍♂️', '🚵‍♀️', '🤸', '🤸‍♂️', '🤸‍♀️', '🤼', '🤼‍♂️', '🤼‍♀️', '🤽', '🤽‍♂️', '🤽‍♀️', '🤾', '🤾‍♂️', '🤾‍♀️', '🤹', '🤹‍♂️', '🤹‍♀️', '🧘', '🧘‍♂️', '🧘‍♀️']
+      emojis: ['👋', '🤚', '🖐️', '✋', '🖖', '🫱', '🫲', '🫳', '🫴', '👌', '🤌', '🤏', '✌️', '🤞', '🫰', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '🫵', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '🫶', '👐', '🤲', '🤝', '🙏', '✍️', '💅', '🤳', '💪', '🦾', '🦿', '🦵', '🦶', '👂', '🦻', '👃', '🧠', '🫀', '🫁', '🦷', '🦴', '👀', '👁️', '👅', '👄', '🫦', '👶', '🧒', '👦', '👧', '🧑', '👱', '👨', '🧔', '👩', '🧓', '👴', '👵', '🙍', '🙎', '🙅', '🙆', '💁', '🙋', '🧏', '🙇', '🤦', '🤷', '👮', '🕵️', '💂', '🥷', '👷', '🫅', '🤴', '👸', '👳', '👲', '🧕', '🤵', '👰', '🤰', '🫃', '🫄', '🤱', '👼', '🎅', '🤶', '🦸', '🦹', '🧙', '🧚', '🧛', '🧜', '🧝', '🧞', '🧟', '🧌', '💆', '💇', '🚶', '🧍', '🧎', '🏃', '💃', '🕺', '🕴️', '👯', '🧖', '🧗', '🤸', '🏌️', '🏇', '⛷️', '🏂', '🏋️', '🤼', '🤽', '🤾', '🤺', '⛹️', '🏊', '🚣', '🧘', '🛀', '🛌']
+    },
+    {
+      name: 'Objetos',
+      icon: '📦',
+      emojis: ['⌚', '📱', '📲', '💻', '⌨️', '🖥️', '🖨️', '🖱️', '🖲️', '🕹️', '🗜️', '💽', '💾', '💿', '📀', '📼', '📷', '📸', '📹', '🎥', '📽️', '🎞️', '📞', '☎️', '📟', '📠', '📺', '📻', '🎙️', '🎚️', '🎛️', '🧭', '⏱️', '⏲️', '⏰', '🕰️', '⌛', '⏳', '📡', '🔋', '🔌', '💡', '🔦', '🕯️', '🪔', '🧯', '🛢️', '💸', '💵', '💴', '💶', '💷', '🪙', '💰', '💳', '💎', '⚖️', '🪜', '🧰', '🪛', '🔧', '🔨', '⚒️', '🛠️', '⛏️', '🪚', '🔩', '⚙️', '🪤', '🧱', '⛓️', '🧲', '🔫', '💣', '🧨', '🪓', '🔪', '🗡️', '⚔️', '🛡️', '🚬', '⚰️', '🪦', '⚱️', '🏺', '🔮', '📿', '🧿', '💈', '⚗️', '🔭', '🔬', '🕳️', '🩹', '🩺', '💊', '💉', '🩸', '🧬', '🦠', '🧫', '🧪', '🌡️', '🧹', '🪠', '🧺', '🧻', '🚽', '🚰', '🚿', '🛁', '🛀', '🧼', '🪥', '🪒', '🧽', '🪣', '🧴', '🛎️', '🔑', '🗝️', '🚪', '🪑', '🛋️', '🛏️', '🛌', '🧸', '🪆', '🖼️', '🪞', '🪟', '🛍️', '🛒', '🎁', '🎈', '🎏', '🎀', '🪄', '🪅', '🎊', '🎉', '🎎', '🏮', '🎐', '🧧', '✉️', '📩', '📨', '📧', '💌', '📥', '📤', '📦', '🏷️', '🪧', '📪', '📫', '📬', '📭', '📮', '📯', '📜', '📃', '📄', '📑', '🧾', '📊', '📈', '📉', '🗒️', '🗓️', '📆', '📅', '🗑️', '📇', '🗃️', '🗳️', '🗄️', '📋', '📁', '📂', '🗂️', '🗞️', '📰', '📓', '📔', '📒', '📕', '📗', '📘', '📙', '📚', '📖', '🔖', '🧷', '🔗', '📎', '🖇️', '📐', '📏', '🧮', '📌', '📍', '✂️', '🖊️', '🖋️', '✒️', '🖌️', '🖍️', '📝', '✏️', '🔍', '🔎', '🔏', '🔐', '🔒', '🔓']
+    },
+    {
+      name: 'Comida',
+      icon: '🍔',
+      emojis: ['🍇', '🍈', '🍉', '🍊', '🍋', '🍌', '🍍', '🥭', '🍎', '🍏', '🍐', '🍑', '🍒', '🍓', '🫐', '🥝', '🍅', '🫒', '🥥', '🥑', '🍆', '🥔', '🥕', '🌽', '🌶️', '🫑', '🥒', '🥬', '🥦', '🧄', '🧅', '🍄', '🥜', '🫘', '🌰', '🍞', '🥐', '🥖', '🫓', '🥨', '🥯', '🥞', '🧇', '🧀', '🍖', '🍗', '🥩', '🥓', '🍔', '🍟', '🍕', '🌭', '🥪', '🌮', '🌯', '🫔', '🥙', '🧆', '🥚', '🍳', '🥘', '🍲', '🫕', '🥣', '🥗', '🍿', '🧈', '🧂', '🥫', '🍱', '🍘', '🍙', '🍚', '🍛', '🍜', '🍝', '🍠', '🍢', '🍣', '🍤', '🍥', '🥮', '🍡', '🥟', '🥠', '🥡', '🦀', '🦞', '🦐', '🦑', '🦪', '🍦', '🍧', '🍨', '🍩', '🍪', '🎂', '🍰', '🧁', '🥧', '🍫', '🍬', '🍭', '🍮', '🍯', '🍼', '🥛', '☕', '🫖', '🍵', '🍶', '🍾', '🍷', '🍸', '🍹', '🍺', '🍻', '🥂', '🥃', '🫗', '🥤', '🧋', '🧃', '🧉', '🧊', '🥢', '🍽️', '🍴', '🥄', '🔪', '🫙', '🏺']
+    },
+    {
+      name: 'Actividades',
+      icon: '⚽',
+      emojis: ['⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🥏', '🎱', '🪀', '🏓', '🏸', '🏒', '🏑', '🥍', '🏏', '🪃', '🥅', '⛳', '🪁', '🏹', '🎣', '🤿', '🥊', '🥋', '🎽', '🛹', '🛼', '🛷', '⛸️', '🥌', '🎿', '⛷️', '🏂', '🪂', '🏋️', '🏋️‍♂️', '🏋️‍♀️', '🤼', '🤼‍♂️', '🤼‍♀️', '🤸', '🤸‍♂️', '🤸‍♀️', '⛹️', '⛹️‍♂️', '⛹️‍♀️', '🤺', '🤾', '🤾‍♂️', '🤾‍♀️', '🏌️', '🏌️‍♂️', '🏌️‍♀️', '🏇', '🧘', '🧘‍♂️', '🧘‍♀️', '🏄', '🏄‍♂️', '🏄‍♀️', '🏊', '🏊‍♂️', '🏊‍♀️', '🤽', '🤽‍♂️', '🤽‍♀️', '🚣', '🚣‍♂️', '🚣‍♀️', '🧗', '🧗‍♂️', '🧗‍♀️', '🚵', '🚵‍♂️', '🚵‍♀️', '🚴', '🚴‍♂️', '🚴‍♀️', '🏆', '🥇', '🥈', '🥉', '🏅', '🎖️', '🏵️', '🎗️', '🎫', '🎟️', '🎪', '🤹', '🤹‍♂️', '🤹‍♀️', '🎭', '🩰', '🎨', '🎬', '🎤', '🎧', '🎼', '🎹', '🥁', '🪘', '🎷', '🎺', '🪗', '🎸', '🪕', '🎻', '🎲', '♟️', '🎯', '🎳', '🎮', '🎰', '🧩']
     },
     {
       name: 'Animales y Naturaleza',
@@ -297,6 +351,40 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
     '😰': ['anxious', 'sweat', 'ansioso', 'sudor'],
     '😥': ['sad', 'relieved', 'triste', 'aliviado'],
     '😓': ['sweat', 'sad', 'sudor', 'triste'],
+    '😠': ['angry', 'mad', 'enojado', 'molesto', 'enfadado', 'furioso'],
+    '😡': ['angry', 'rage', 'mad', 'enojado', 'furioso', 'rabia', 'enfadado', 'rojo'],
+    '😤': ['huffing', 'triumph', 'steam', 'resoplando', 'triunfo', 'humo', 'nariz'],
+    '🤬': ['cursing', 'swearing', 'angry', 'insultando', 'groserías', 'enojado', 'censurado'],
+    '😈': ['devil', 'smile', 'diablo', 'sonrisa', 'maldad', 'travieso'],
+    '👿': ['devil', 'angry', 'diablo', 'enojado', 'demonio'],
+    '💀': ['skull', 'dead', 'death', 'calavera', 'muerto', 'muerte'],
+    '☠️': ['skull', 'crossbones', 'danger', 'calavera', 'peligro', 'veneno'],
+    '💩': ['poop', 'poo', 'caca', 'excremento'],
+    '🤡': ['clown', 'payaso'],
+    '👹': ['ogre', 'monster', 'ogro', 'monstruo', 'demonio'],
+    '👺': ['goblin', 'tengu', 'duende', 'demonio', 'japonés'],
+    '👻': ['ghost', 'fantasma', 'boo'],
+    '👽': ['alien', 'extraterrestre', 'ovni'],
+    '👾': ['alien', 'monster', 'space', 'invader', 'extraterrestre', 'monstruo', 'videojuego'],
+    '🤖': ['robot', 'bot', 'android'],
+    '😺': ['cat', 'smile', 'gato', 'sonrisa'],
+    '😸': ['cat', 'grin', 'gato', 'sonrisa'],
+    '😹': ['cat', 'tears', 'gato', 'lagrimas', 'risa'],
+    '😻': ['cat', 'love', 'heart', 'gato', 'amor', 'corazon'],
+    '😼': ['cat', 'smirk', 'gato', 'sonrisa'],
+    '😽': ['cat', 'kiss', 'gato', 'beso'],
+    '🙀': ['cat', 'weary', 'gato', 'cansado', 'sorpresa'],
+    '😿': ['cat', 'cry', 'gato', 'llorar', 'triste'],
+    '😾': ['cat', 'angry', 'pout', 'gato', 'enojado'],
+    '😯': ['hushed', 'surprised', 'asombrado', 'sorprendido'],
+    '😦': ['frowning', 'sad', 'triste', 'preocupado'],
+    '😧': ['anguished', 'distressed', 'angustiado'],
+    '😮': ['open', 'mouth', 'surprised', 'boca', 'abierta', 'sorprendido'],
+    '😲': ['astonished', 'shocked', 'asombrado', 'sorprendido', 'shock'],
+    '🥱': ['yawning', 'tired', 'sleepy', 'bostezo', 'cansado', 'sueño'],
+    '😵': ['dizzy', 'dead', 'mareado', 'muerto', 'confundido'],
+    '😵‍💫': ['dizzy', 'spiral', 'confused', 'mareado', 'espiral', 'confundido'],
+    '🥴': ['woozy', 'drunk', 'dizzy', 'mareado', 'borracho', 'confundido'],
     
     // Gestos y Personas
     '👋': ['wave', 'hello', 'saludar', 'hola', 'mano'],
@@ -1852,6 +1940,9 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
   }
 
   async loadRecentTasks() {
+    // Limpiar grupos expandidos al cargar nuevas tareas
+    this.expandedTaskGroups.clear();
+    
     if (!this.task.project || this.isEditing) {
       this.recentTasks = [];
       this.showRecentTasksSelector = false;
@@ -1863,11 +1954,12 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
       this.recentTasks = this.allTasks
         .filter(t => t.project === this.task.project)
         .sort((a, b) => {
-          const dateA = new Date(a.updatedAt || a.createdAt).getTime();
-          const dateB = new Date(b.updatedAt || b.createdAt).getTime();
+          // Ordenar por fecha de inicio más reciente
+          const dateA = a.start ? new Date(a.start).getTime() : 0;
+          const dateB = b.start ? new Date(b.start).getTime() : 0;
           return dateB - dateA; // Mas reciente primero
         })
-        .slice(0, 20);
+        .slice(0, 40); // Incrementado de 20 a 40 (datos desde caché)
       
       this.showRecentTasksSelector = this.recentTasks.length > 0;
       this.recentTasksOptions = this.buildRecentTasksOptions();
@@ -1922,9 +2014,420 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
     return this.recentTasks.map((task, index) => ({
       value: index,
       label: `${task.emoji || '📝'} ${task.name}`,
-      subtitle: this.formatReminderDateTime(task.updatedAt || task.createdAt)
+      subtitle: task.start ? this.formatRecentTaskDate(task.start) : 'Sin fecha de inicio'
     }));
   }
+  
+  // Getter para agrupar tareas recientes por nombre
+  get groupedRecentTasks(): { name: string; emoji: string; tasks: { task: Task; originalIndex: number }[] }[] {
+    const groups = new Map<string, { task: Task; originalIndex: number }[]>();
+    
+    this.recentTasks.forEach((task, index) => {
+      const name = task.name || '';
+      if (!groups.has(name)) {
+        groups.set(name, []);
+      }
+      groups.get(name)!.push({ task, originalIndex: index });
+    });
+    
+    return Array.from(groups.entries()).map(([name, tasks]) => ({
+      name,
+      emoji: tasks[0].task.emoji || '📝',
+      tasks
+    }));
+  }
+  
+  // Getter para obtener solo los grupos (tareas con nombre repetido)
+  get multipleTaskGroups(): { name: string; emoji: string; tasks: { task: Task; originalIndex: number }[] }[] {
+    return this.groupedRecentTasks.filter(group => group.tasks.length > 1);
+  }
+  
+  // Getter para obtener solo las tareas unitarias (nombre único)
+  get singleTasks(): { task: Task; originalIndex: number }[] {
+    const singles: { task: Task; originalIndex: number }[] = [];
+    this.groupedRecentTasks.forEach(group => {
+      if (group.tasks.length === 1) {
+        singles.push(group.tasks[0]);
+      }
+    });
+    return singles;
+  }
+  
+  // Métodos para manejar la expansión de grupos
+  toggleTaskGroup(groupName: string): void {
+    if (this.expandedTaskGroups.has(groupName)) {
+      this.expandedTaskGroups.delete(groupName);
+    } else {
+      this.expandedTaskGroups.add(groupName);
+    }
+  }
+  
+  isTaskGroupExpanded(groupName: string): boolean {
+    return this.expandedTaskGroups.has(groupName);
+  }
+
+  // ==================== MENÚ CONTEXTUAL PARA TAREAS RECIENTES ====================
+  
+  // Mostrar menú contextual (click derecho desktop)
+  onRecentTaskContextMenu(event: MouseEvent, taskIndex: number): void {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    const task = this.recentTasks[taskIndex];
+    if (!task) return;
+    
+    this.contextMenuTask = task;
+    this.contextMenuTaskIndex = taskIndex;
+    this.contextMenuX = event.clientX;
+    this.contextMenuY = event.clientY;
+    this.showContextMenu = true;
+  }
+  
+  // Long press para móviles - inicio
+  onRecentTaskTouchStart(event: TouchEvent, taskIndex: number): void {
+    const task = this.recentTasks[taskIndex];
+    if (!task) return;
+    
+    this.longPressTimer = setTimeout(() => {
+      // Vibrar en dispositivos que lo soporten
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+      
+      const touch = event.touches[0];
+      this.contextMenuTask = task;
+      this.contextMenuTaskIndex = taskIndex;
+      this.contextMenuX = touch.clientX;
+      this.contextMenuY = touch.clientY;
+      this.showContextMenu = true;
+    }, this.longPressThreshold);
+  }
+  
+  // Long press para móviles - cancelar
+  onRecentTaskTouchEnd(): void {
+    if (this.longPressTimer) {
+      clearTimeout(this.longPressTimer);
+      this.longPressTimer = null;
+    }
+  }
+  
+  // Long press para móviles - cancelar por movimiento
+  onRecentTaskTouchMove(): void {
+    if (this.longPressTimer) {
+      clearTimeout(this.longPressTimer);
+      this.longPressTimer = null;
+    }
+  }
+  
+  // Cerrar menú contextual
+  closeContextMenu(): void {
+    this.showContextMenu = false;
+    this.contextMenuTask = null;
+    this.contextMenuTaskIndex = null;
+  }
+  
+  // Iniciar edición de emoji
+  startEditEmoji(): void {
+    if (this.contextMenuTaskIndex === null || !this.contextMenuTask) return;
+    
+    this.editingTaskIndex = this.contextMenuTaskIndex;
+    this.editingField = 'emoji';
+    this.editingValue = this.contextMenuTask.emoji || '📝';
+    this.showEmojiPickerForEdit = true;
+    this.closeContextMenu();
+  }
+  
+  // Iniciar edición de nombre
+  startEditName(): void {
+    if (this.contextMenuTaskIndex === null || !this.contextMenuTask) return;
+    
+    this.editingTaskIndex = this.contextMenuTaskIndex;
+    this.editingField = 'name';
+    this.editingValue = this.contextMenuTask.name || '';
+    this.closeContextMenu();
+    
+    // Dar foco al input después de que se renderice
+    setTimeout(() => {
+      const input = document.getElementById('edit-task-name-input');
+      if (input) {
+        (input as HTMLInputElement).focus();
+        (input as HTMLInputElement).select();
+      }
+    }, 50);
+  }
+  
+  // Seleccionar emoji para edición
+  selectEmojiForEdit(emoji: string): void {
+    this.editingValue = emoji;
+    this.showEmojiPickerForEdit = false;
+    this.editEmojiSearchQuery = '';
+    this.editFilteredEmojis = [];
+    this.editSelectedEmojiCategory = 0;
+    this.saveQuickEdit();
+  }
+  
+  // Cambiar categoría en el picker de edición
+  selectEditEmojiCategory(index: number): void {
+    this.editSelectedEmojiCategory = index;
+    this.editEmojiSearchQuery = '';
+    this.editFilteredEmojis = [];
+  }
+  
+  // Buscar emojis en el picker de edición
+  onEditEmojiSearch(query: string): void {
+    this.editEmojiSearchQuery = query;
+    if (query.trim() === '') {
+      this.editFilteredEmojis = [];
+    } else {
+      this.editFilteredEmojis = this.searchEmojisForEdit(query);
+    }
+  }
+  
+  // Buscar emojis por keywords (reutiliza emojiKeywords existente)
+  private searchEmojisForEdit(query: string): string[] {
+    if (!query || query.trim() === '') {
+      return [];
+    }
+    
+    const normalizedQuery = query.toLowerCase().trim();
+    const allEmojis = this.getAllUniqueEmojis();
+    
+    return allEmojis.filter(emoji => {
+      const keywords = this.emojiKeywords[emoji] || [];
+      return keywords.some(keyword => 
+        keyword.toLowerCase().includes(normalizedQuery)
+      );
+    });
+  }
+  
+  // Cerrar picker de emoji para edición
+  closeEmojiPickerForEdit(): void {
+    this.showEmojiPickerForEdit = false;
+    this.editEmojiSearchQuery = '';
+    this.editFilteredEmojis = [];
+    this.editSelectedEmojiCategory = 0;
+    this.cancelQuickEdit();
+  }
+  
+  // Guardar edición rápida
+  async saveQuickEdit(): Promise<void> {
+    if (this.editingTaskIndex === null || !this.editingField || this.isSavingQuickEdit) return;
+    
+    const task = this.recentTasks[this.editingTaskIndex];
+    if (!task || !task.id) {
+      this.cancelQuickEdit();
+      return;
+    }
+    
+    const newValue = this.editingValue.trim();
+    const fieldToUpdate = this.editingField;
+    
+    // Validar nombre no vacío
+    if (fieldToUpdate === 'name' && !newValue) {
+      this.cancelQuickEdit();
+      return;
+    }
+    
+    // Verificar si el valor cambió
+    const currentValue = fieldToUpdate === 'emoji' ? (task.emoji || '📝') : (task.name || '');
+    if (newValue === currentValue) {
+      this.cancelQuickEdit();
+      return;
+    }
+    
+    this.isSavingQuickEdit = true;
+    
+    try {
+      const updates: Partial<Task> = { [fieldToUpdate]: newValue };
+      
+      // Actualizar en Firebase
+      await this.taskService.updateTask(task.id, updates);
+      
+      // Actualizar en la caché local (recentTasks)
+      this.recentTasks[this.editingTaskIndex] = {
+        ...task,
+        [fieldToUpdate]: newValue
+      };
+      
+      // Actualizar en allTasks si existe
+      const allTaskIndex = this.allTasks.findIndex(t => t.id === task.id);
+      if (allTaskIndex !== -1) {
+        this.allTasks[allTaskIndex] = {
+          ...this.allTasks[allTaskIndex],
+          [fieldToUpdate]: newValue
+        };
+      }
+      
+      // Reconstruir opciones del selector
+      this.recentTasksOptions = this.buildRecentTasksOptions();
+      
+      // Emitir evento para que el componente padre también actualice
+      this.taskQuickUpdated.emit({ taskId: task.id, updates });
+      
+      this.cdr.detectChanges();
+    } catch (error) {
+      console.error('Error al guardar edición rápida:', error);
+    } finally {
+      this.isSavingQuickEdit = false;
+      this.cancelQuickEdit();
+    }
+  }
+  
+  // Cancelar edición
+  cancelQuickEdit(): void {
+    this.editingTaskIndex = null;
+    this.editingField = null;
+    this.editingValue = '';
+    this.showEmojiPickerForEdit = false;
+    this.editEmojiSearchQuery = '';
+    this.editFilteredEmojis = [];
+    this.editSelectedEmojiCategory = 0;
+  }
+  
+  // Manejar Enter en input de nombre
+  onEditNameKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      this.saveQuickEdit();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      this.cancelQuickEdit();
+    }
+  }
+  
+  // ==================== MENÚ CONTEXTUAL PARA GRUPOS ====================
+  
+  // Mostrar menú contextual del grupo (click derecho desktop)
+  onGroupContextMenu(event: MouseEvent, groupName: string): void {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    this.contextMenuGroupName = groupName;
+    this.groupContextMenuX = event.clientX;
+    this.groupContextMenuY = event.clientY;
+    this.showGroupContextMenu = true;
+  }
+  
+  // Long press para grupos en móviles - inicio
+  onGroupTouchStart(event: TouchEvent, groupName: string): void {
+    this.groupLongPressTimer = setTimeout(() => {
+      // Vibrar en dispositivos que lo soporten
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+      
+      const touch = event.touches[0];
+      this.contextMenuGroupName = groupName;
+      this.groupContextMenuX = touch.clientX;
+      this.groupContextMenuY = touch.clientY;
+      this.showGroupContextMenu = true;
+    }, this.longPressThreshold);
+  }
+  
+  // Long press para grupos - cancelar
+  onGroupTouchEnd(): void {
+    if (this.groupLongPressTimer) {
+      clearTimeout(this.groupLongPressTimer);
+      this.groupLongPressTimer = null;
+    }
+  }
+  
+  // Long press para grupos - cancelar por movimiento
+  onGroupTouchMove(): void {
+    if (this.groupLongPressTimer) {
+      clearTimeout(this.groupLongPressTimer);
+      this.groupLongPressTimer = null;
+    }
+  }
+  
+  // Cerrar menú contextual del grupo
+  closeGroupContextMenu(): void {
+    this.showGroupContextMenu = false;
+    this.contextMenuGroupName = null;
+  }
+  
+  // Iniciar edición de emoji para todo el grupo
+  startEditGroupEmoji(): void {
+    if (!this.contextMenuGroupName) return;
+    
+    // Obtener el emoji actual del grupo
+    const group = this.multipleTaskGroups.find(g => g.name === this.contextMenuGroupName);
+    if (group) {
+      this.editingValue = group.emoji || '📝';
+    }
+    
+    this.showEmojiPickerForGroup = true;
+    this.closeGroupContextMenu();
+  }
+  
+  // Seleccionar emoji para todo el grupo
+  async selectEmojiForGroup(emoji: string): Promise<void> {
+    if (!this.contextMenuGroupName || this.isSavingGroupEmoji) return;
+    
+    const groupName = this.contextMenuGroupName;
+    const group = this.multipleTaskGroups.find(g => g.name === groupName);
+    if (!group) {
+      this.closeEmojiPickerForGroup();
+      return;
+    }
+    
+    this.isSavingGroupEmoji = true;
+    
+    try {
+      // Actualizar todas las tareas del grupo en paralelo
+      const updatePromises = group.tasks.map(async (item) => {
+        if (item.task.id) {
+          await this.taskService.updateTask(item.task.id, { emoji });
+          
+          // Actualizar en la caché local (recentTasks)
+          this.recentTasks[item.originalIndex] = {
+            ...this.recentTasks[item.originalIndex],
+            emoji
+          };
+          
+          // Actualizar en allTasks si existe
+          const allTaskIndex = this.allTasks.findIndex(t => t.id === item.task.id);
+          if (allTaskIndex !== -1) {
+            this.allTasks[allTaskIndex] = {
+              ...this.allTasks[allTaskIndex],
+              emoji
+            };
+          }
+        }
+      });
+      
+      await Promise.all(updatePromises);
+      
+      // Reconstruir opciones del selector
+      this.recentTasksOptions = this.buildRecentTasksOptions();
+      
+      // Emitir evento para cada tarea actualizada
+      group.tasks.forEach(item => {
+        if (item.task.id) {
+          this.taskQuickUpdated.emit({ taskId: item.task.id, updates: { emoji } });
+        }
+      });
+      
+      this.cdr.detectChanges();
+    } catch (error) {
+      console.error('Error al actualizar emoji del grupo:', error);
+    } finally {
+      this.isSavingGroupEmoji = false;
+      this.closeEmojiPickerForGroup();
+    }
+  }
+  
+  // Cerrar picker de emoji para grupos
+  closeEmojiPickerForGroup(): void {
+    this.showEmojiPickerForGroup = false;
+    this.contextMenuGroupName = null;
+    this.editingValue = '';
+    this.editEmojiSearchQuery = '';
+    this.editFilteredEmojis = [];
+    this.editSelectedEmojiCategory = 0;
+  }
+  
+  // ==================== FIN MENÚ CONTEXTUAL ====================
   
   // Métodos para manejar selecciones desde selectores personalizados (móvil)
   onEnvironmentSelectCustom(option: SelectOption): void {
@@ -2689,6 +3192,38 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
       hour12: true,
       timeZone: 'America/Mexico_City'
     });
+  }
+
+  // Formato de fecha para tareas recientes con día de la semana abreviado
+  formatRecentTaskDate(dateTimeString: string): string {
+    const utcString = dateTimeString.includes('Z') || dateTimeString.includes('+') 
+      ? dateTimeString 
+      : dateTimeString + 'Z';
+    
+    const date = new Date(utcString);
+    
+    if (isNaN(date.getTime())) {
+      return 'Fecha inválida';
+    }
+
+    // Días de la semana abreviados en español
+    const diasSemana = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    
+    // Obtener día de la semana en hora local de México
+    const dateInMexico = new Date(date.toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+    const diaSemana = diasSemana[dateInMexico.getDay()];
+    
+    const fechaFormateada = date.toLocaleString('es-MX', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'America/Mexico_City'
+    });
+    
+    return `${diaSemana}, ${fechaFormateada}`;
   }
   
   toggleDeadlineSection() {

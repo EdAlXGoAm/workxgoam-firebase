@@ -1,0 +1,122 @@
+<div *ngIf="showModal" 
+     class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[110] p-4"
+     (click)="onBackdropClick()">
+  <div class="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden flex flex-col"
+       style="height: 500px;"
+       (click)="onModalClick($event)">
+    <!-- Header con búsqueda (altura fija) -->
+    <div class="p-4 border-b border-gray-200 flex-shrink-0">
+      <div class="flex justify-between items-center mb-3">
+        <h3 class="text-lg font-bold text-gray-900">
+          {{ title }}
+        </h3>
+        <button type="button" 
+                (click)="close()"
+                class="text-gray-500 hover:text-gray-700 p-1">
+          <i class="fas fa-times text-lg"></i>
+        </button>
+      </div>
+      <p *ngIf="subtitle" class="text-xs text-gray-500 mb-3">
+        <i class="fas fa-info-circle mr-1"></i>
+        {{ subtitle }}
+      </p>
+      <!-- Barra de búsqueda -->
+      <div class="relative">
+        <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+        <input type="text"
+               [ngModel]="searchQuery"
+               (ngModelChange)="onSearch($event)"
+               placeholder="Buscar emoji... (ej: enojado, angry, feliz, happy, mano, hand)"
+               class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+        <button *ngIf="searchQuery" 
+                type="button"
+                (click)="onSearch('')"
+                class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
+          <i class="fas fa-times-circle"></i>
+        </button>
+      </div>
+    </div>
+    
+    <!-- Barra de categorías (altura fija, siempre visible) -->
+    <div class="flex overflow-x-auto border-b border-gray-200 bg-gray-50 px-2 py-1 flex-shrink-0"
+         [class.opacity-50]="searchQuery"
+         [class.pointer-events-none]="searchQuery">
+      <button *ngFor="let category of emojiCategories; let i = index"
+              type="button"
+              (click)="selectCategory(i)"
+              [class.bg-indigo-100]="selectedCategoryIndex === i && !searchQuery"
+              [class.text-indigo-700]="selectedCategoryIndex === i && !searchQuery"
+              class="flex-shrink-0 px-3 py-2 text-lg rounded-lg hover:bg-gray-200 transition-colors"
+              [title]="category.name">
+        {{ category.icon }}
+      </button>
+    </div>
+    
+    <!-- Contenido de emojis (altura flexible) -->
+    <div class="flex-1 overflow-y-auto p-4">
+      <!-- Emojis sugeridos (solo si hay y no hay búsqueda activa) -->
+      <ng-container *ngIf="suggestedEmojis.length > 0 && !searchQuery">
+        <div class="mb-4 pb-3 border-b border-gray-200">
+          <div class="mb-2 text-sm font-medium text-indigo-600 flex items-center gap-2">
+            <i class="fas fa-lightbulb"></i>
+            Emojis sugeridos (para unificar)
+          </div>
+          <div class="grid grid-cols-8 gap-1">
+            <button *ngFor="let emoji of suggestedEmojis"
+                    type="button"
+                    (click)="selectEmoji(emoji)"
+                    [class.ring-2]="currentEmoji === emoji"
+                    [class.ring-indigo-500]="currentEmoji === emoji"
+                    class="text-2xl p-2 hover:bg-indigo-100 rounded-lg transition-colors bg-indigo-50">
+              {{ emoji }}
+            </button>
+          </div>
+        </div>
+      </ng-container>
+      
+      <!-- Resultados de búsqueda -->
+      <ng-container *ngIf="searchQuery">
+        <div *ngIf="filteredEmojis.length === 0" class="text-center text-gray-500 py-8">
+          <i class="fas fa-search text-3xl mb-2 text-gray-300"></i>
+          <p>No se encontraron emojis para "{{ searchQuery }}"</p>
+          <p class="text-xs mt-1">Intenta con: enojado, angry, feliz, happy, mano, hand</p>
+        </div>
+        <div *ngIf="filteredEmojis.length > 0" class="grid grid-cols-8 gap-1">
+          <button *ngFor="let emoji of filteredEmojis"
+                  type="button"
+                  (click)="selectEmoji(emoji)"
+                  [class.ring-2]="currentEmoji === emoji"
+                  [class.ring-indigo-500]="currentEmoji === emoji"
+                  class="text-2xl p-2 hover:bg-indigo-100 rounded-lg transition-colors">
+            {{ emoji }}
+          </button>
+        </div>
+      </ng-container>
+      
+      <!-- Grid de categoría seleccionada -->
+      <ng-container *ngIf="!searchQuery">
+        <div class="mb-2 text-sm font-medium text-gray-600">
+          {{ emojiCategories[selectedCategoryIndex].name }}
+        </div>
+        <div class="grid grid-cols-8 gap-1">
+          <button *ngFor="let emoji of emojiCategories[selectedCategoryIndex].emojis"
+                  type="button"
+                  (click)="selectEmoji(emoji)"
+                  [class.ring-2]="currentEmoji === emoji"
+                  [class.ring-indigo-500]="currentEmoji === emoji"
+                  class="text-2xl p-2 hover:bg-indigo-100 rounded-lg transition-colors">
+            {{ emoji }}
+          </button>
+        </div>
+      </ng-container>
+    </div>
+    
+    <!-- Footer con emoji actual -->
+    <div class="p-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between flex-shrink-0">
+      <div class="flex items-center gap-2">
+        <span class="text-sm text-gray-600">Actual:</span>
+        <span class="text-3xl">{{ currentEmoji || '📝' }}</span>
+      </div>
+    </div>
+  </div>
+</div>

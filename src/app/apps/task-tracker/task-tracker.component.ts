@@ -35,11 +35,12 @@ import { TaskGroupService } from './services/task-group.service';
 import { TaskGroup } from './models/task-group.model';
 import { ProjectTasksModalComponent } from './modals/project-tasks-modal/project-tasks-modal.component';
 import { SyncService } from './services/sync.service';
+import { EnvironmentTasksModalComponent } from './components/environment-tasks-modal/environment-tasks-modal.component';
 
 @Component({
   selector: 'app-task-tracker',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, CurrentTaskInfoComponent, PendingTasksBubbleComponent, TaskModalComponent, RemindersModalComponent, TaskTrackerHeaderComponent, EnvironmentModalComponent, BoardViewComponent, WeekViewComponent, ChangeStatusModalComponent, DateRangeModalComponent, TaskTypeModalComponent, CustomSelectComponent, SumsBubbleComponent, ProjectModalComponent, ProjectTasksModalComponent],
+  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, CurrentTaskInfoComponent, PendingTasksBubbleComponent, TaskModalComponent, RemindersModalComponent, TaskTrackerHeaderComponent, EnvironmentModalComponent, BoardViewComponent, WeekViewComponent, ChangeStatusModalComponent, DateRangeModalComponent, TaskTypeModalComponent, CustomSelectComponent, SumsBubbleComponent, ProjectModalComponent, ProjectTasksModalComponent, EnvironmentTasksModalComponent],
   templateUrl: './task-tracker.component.html',
   styleUrls: ['./task-tracker.component.css']
 })
@@ -158,6 +159,13 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
   // Modal de rango de fechas
   showDateRangeModal = false;
   dateRangeModalEnvironmentId: string = '';
+
+  // Modal de tareas del ambiente
+  showEnvironmentTasksModal = false;
+  environmentTasksModalEnvironmentId: string = '';
+  environmentTasksModalEnvironmentName: string = '';
+  environmentTasksModalEnvironmentEmoji: string = '';
+  environmentTasksModalEnvironmentColor: string = '';
 
   // Variables para menú contextual de proyectos
   showProjectContextMenu = false;
@@ -2855,6 +2863,37 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
   closeEditEnvironmentModal(): void {
     this.showEditEnvironmentModal = false;
     this.environmentToEdit = null;
+  }
+
+  // ===== MODAL DE TAREAS DEL AMBIENTE =====
+  
+  openEnvironmentTasksModal(environment: Environment): void {
+    this.environmentTasksModalEnvironmentId = environment.id || '';
+    this.environmentTasksModalEnvironmentName = environment.name || 'Ambiente';
+    this.environmentTasksModalEnvironmentEmoji = environment.emoji || '';
+    this.environmentTasksModalEnvironmentColor = environment.color || '';
+    this.showEnvironmentTasksModal = true;
+    this.closeEnvironmentContextMenu();
+  }
+
+  closeEnvironmentTasksModal(): void {
+    this.showEnvironmentTasksModal = false;
+    this.environmentTasksModalEnvironmentId = '';
+    this.environmentTasksModalEnvironmentName = '';
+    this.environmentTasksModalEnvironmentEmoji = '';
+    this.environmentTasksModalEnvironmentColor = '';
+  }
+
+  onEnvironmentTaskQuickUpdated(event: { taskId: string; updates: Partial<Task> }): void {
+    // Actualizar la tarea en la lista local
+    const taskIndex = this.tasks.findIndex(t => t.id === event.taskId);
+    if (taskIndex !== -1) {
+      this.tasks[taskIndex] = {
+        ...this.tasks[taskIndex],
+        ...event.updates
+      };
+      this.filterTasks();
+    }
   }
 
   async onEnvironmentSaved(environmentData: { id?: string; name: string; color: string; emoji?: string }): Promise<void> {

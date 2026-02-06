@@ -1,0 +1,46 @@
+/* Estilos para el modal de tareas del ambiente */
+
+/* Limitar descripción a 2 líneas */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Animación suave para los grupos expandibles */
+.rotate-180 {
+  transform: rotate(180deg);
+}
+
+/* Scrollbar personalizada */
+.overflow-y-auto::-webkit-scrollbar {
+  width: 6px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: #c4b5fd;
+  border-radius: 3px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: #a78bfa;
+}
+
+/* Responsive para móviles */
+@media (max-width: 640px) {
+  .grid-cols-8 {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
+@media (max-width: 360px) {
+  .grid-cols-8 {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
