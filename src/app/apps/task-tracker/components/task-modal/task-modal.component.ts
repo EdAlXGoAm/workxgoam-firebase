@@ -16,11 +16,12 @@ import { TaskService } from '../../services/task.service';
 import { TaskGroupSelectComponent } from '../task-group-select/task-group-select.component';
 import { TaskGroupService } from '../../services/task-group.service';
 import { TaskGroup } from '../../models/task-group.model';
+import { RecentTasksModalComponent } from '../recent-tasks-modal/recent-tasks-modal.component';
 
 @Component({
   selector: 'app-task-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule, MuiTimePickerComponent, PrioritySelectorComponent, AndroidDatePickerComponent, CustomSelectComponent, TaskGroupSelectComponent],
+  imports: [CommonModule, FormsModule, MuiTimePickerComponent, PrioritySelectorComponent, AndroidDatePickerComponent, CustomSelectComponent, TaskGroupSelectComponent, RecentTasksModalComponent],
   templateUrl: './task-modal.component.html',
   styleUrls: ['./task-modal.component.css']
 })
@@ -130,6 +131,8 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
   
   // Agrupación de tareas recientes por nombre
   expandedTaskGroups: Set<string> = new Set();
+  /** Array estable para el hijo; se actualiza solo al expandir/colapsar para evitar re-renders y clics perdidos */
+  expandedGroupNamesArray: string[] = [];
   
   // Opciones para selectores personalizados
   environmentOptions: SelectOption[] = [];
@@ -160,7 +163,10 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
   pendingTaskDuration: number | null = null;
   pendingTaskData: any = null;
   updateDurationSource: 'recent' | 'autocomplete' = 'recent';
-  
+
+  // Modal: crear tarea con fecha de fin pasada como completada y oculta
+  showCreateCompletedHiddenConfirm = false;
+
   // Flag para evitar recursión infinita en sincronización
   private isSyncingFragment = false;
   
@@ -1313,21 +1319,58 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
   closeRecentTasksModal() {
     this.showRecentTasksModal = false;
   }
-  
+
+  /** True si la fecha/hora de fin ya pasó (antes de "ahora"). Compara en hora local para evitar desfases por zona horaria. */
+  private isEndDateInPast(): boolean {
+    if (!this.endDate || !this.endTime) return false;
+    const [h, m] = this.endTime.split(':');
+    const year = parseInt(this.endDate.substring(0, 4), 10);
+    const month = parseInt(this.endDate.substring(5, 7), 10) - 1;
+    const day = parseInt(this.endDate.substring(8, 10), 10);
+    const endAsLocal = new Date(year, month, day, parseInt(h || '0', 10), parseInt(m || '0', 10), 0, 0);
+    return endAsLocal.getTime() < Date.now();
+  }
+
   saveTask() {
     if (!this.isFormValid()) return;
-    
+
     // Activar el estado de guardado
     this.isSaving = true;
-    
+
     // Update task with combined date/time values
     this.task.start = this.combineDateTime(this.startDate, this.startTime);
     this.task.end = this.combineDateTime(this.endDate, this.endTime);
-    this.task.deadline = this.deadlineDate && this.deadlineTime 
-      ? this.combineDateTime(this.deadlineDate, this.deadlineTime) 
+    this.task.deadline = this.deadlineDate && this.deadlineTime
+      ? this.combineDateTime(this.deadlineDate, this.deadlineTime)
       : null;
-    
+
+    // Nueva tarea con fecha de fin pasada: preguntar si crear como completada y oculta
+    if (!this.isEditing && this.isEndDateInPast()) {
+      this.showCreateCompletedHiddenConfirm = true;
+      return;
+    }
+
     this.saveTaskEvent.emit(this.task);
+  }
+
+  /** Confirmar crear la tarea como completada y oculta (fin pasado). */
+  confirmCreateAsCompletedHidden() {
+    this.task.status = 'completed';
+    this.task.completed = true;
+    this.task.hidden = true;
+    this.task.completedAt = new Date().toISOString();
+    this.saveTaskEvent.emit(this.task);
+    this.showCreateCompletedHiddenConfirm = false;
+    this.isSaving = false;
+    this.closeModalEvent.emit();
+  }
+
+  /** Confirmar crear la tarea normal (sin completar/ocultar). */
+  confirmCreateAsNormal() {
+    this.saveTaskEvent.emit(this.task);
+    this.showCreateCompletedHiddenConfirm = false;
+    this.isSaving = false;
+    this.closeModalEvent.emit();
   }
   
   toggleEmojiPicker() {
@@ -1778,12 +1821,13 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
   @HostListener('document:keydown.escape', ['$event'])
   onEscapeKey(event: KeyboardEvent) {
     // Solo cerrar el modal si está abierto y no hay otros modales abiertos
-    if (this.showModal && 
-        !this.showEmojiPicker && 
-        !this.showRecentTasksModal && 
-        !this.showDurationConfirmModal && 
+    if (this.showModal &&
+        !this.showEmojiPicker &&
+        !this.showRecentTasksModal &&
+        !this.showDurationConfirmModal &&
         !this.showFragmentDurationConfirmModal &&
-        !this.showUpdateDurationFromTaskModal) {
+        !this.showUpdateDurationFromTaskModal &&
+        !this.showCreateCompletedHiddenConfirm) {
       event.preventDefault();
       this.closeModal();
     }
@@ -1897,15 +1941,29 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
   }
 
   async onTaskGroupCreated(group: TaskGroup) {
+    console.log('[TaskModal] onTaskGroupCreated entrada', { groupId: group.id, name: group.name });
     // Recargar grupos para incluir el nuevo
     await this.loadTaskGroups();
+    const foundInList = this.taskGroups.some(g => g.id === group.id);
+    console.log('[TaskModal] después loadTaskGroups', { taskGroupsLength: this.taskGroups.length, groupIdInList: foundInList, taskGroupIds: this.taskGroups.map(g => g.id) });
+    // Si el padre usa allTaskGroups y no lo refrescó, el nuevo grupo no está en taskGroups: añadirlo para que el selector lo muestre y lo seleccione
+    if (!foundInList) {
+      this.taskGroups = [...this.taskGroups, group];
+      console.log('[TaskModal] grupo añadido a taskGroups (no estaba tras loadTaskGroups)', { taskGroupsLength: this.taskGroups.length });
+    }
     // Seleccionar el grupo recién creado
     this.task.taskGroupId = group.id;
+    console.log('[TaskModal] task.taskGroupId asignado', this.task.taskGroupId);
   }
 
   async onTaskGroupDeleted(groupId: string) {
     // Recargar grupos después de eliminar
     await this.loadTaskGroups();
+    // Si el padre pasa allTaskGroups y no lo refresca, el eliminado sigue en la lista: quitarlo localmente
+    this.taskGroups = this.taskGroups.filter(g => g.id !== groupId);
+    if (this.task.taskGroupId === groupId) {
+      this.task.taskGroupId = undefined;
+    }
   }
 
   async refreshTaskTypes() {
@@ -1942,7 +2000,8 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
   async loadRecentTasks() {
     // Limpiar grupos expandidos al cargar nuevas tareas
     this.expandedTaskGroups.clear();
-    
+    this.expandedGroupNamesArray = [];
+
     if (!this.task.project || this.isEditing) {
       this.recentTasks = [];
       this.showRecentTasksSelector = false;
@@ -2060,10 +2119,15 @@ export class TaskModalComponent implements OnInit, OnDestroy, OnChanges, AfterVi
     } else {
       this.expandedTaskGroups.add(groupName);
     }
+    this.syncExpandedGroupNamesArray();
   }
   
   isTaskGroupExpanded(groupName: string): boolean {
     return this.expandedTaskGroups.has(groupName);
+  }
+
+  private syncExpandedGroupNamesArray(): void {
+    this.expandedGroupNamesArray = Array.from(this.expandedTaskGroups);
   }
 
   // ==================== MENÚ CONTEXTUAL PARA TAREAS RECIENTES ====================

@@ -146,19 +146,54 @@ export class TaskGroupSelectComponent implements OnInit, OnChanges {
   }
 
   handleSelect(group: TaskGroup) {
+    const prevId = this.value;
     this.value = group.id;
     this.valueChange.emit(group.id);
     this.isOpen = false;
+    // Actualizar contadores en la lista: una tarea menos en el grupo anterior, una más en el nuevo
+    this.updateUsageCountsOptimistic(prevId, group.id);
+  }
+
+  handleClearSelection(e?: Event) {
+    if (e) {
+      e.stopPropagation();
+    }
+    const prevId = this.value;
+    this.value = undefined;
+    this.valueChange.emit(undefined);
+    this.isOpen = false;
+    // Actualizar contador: una tarea menos en el grupo que se deseleccionó
+    if (prevId) {
+      this.updateUsageCountsOptimistic(prevId, undefined);
+    }
+  }
+
+  /** Actualiza los contadores mostrados en la lista sin recargar desde el servidor (optimista). */
+  private updateUsageCountsOptimistic(leftGroupId: string | undefined, addedToGroupId: string | undefined) {
+    const next = new Map(this.taskUsageCounts);
+    if (leftGroupId) {
+      const c = next.get(leftGroupId) ?? 0;
+      next.set(leftGroupId, Math.max(0, c - 1));
+    }
+    if (addedToGroupId) {
+      next.set(addedToGroupId, (next.get(addedToGroupId) ?? 0) + 1);
+    }
+    this.taskUsageCounts = next;
   }
 
   async handleCreateCustom() {
-    if (!this.searchQuery.trim() || !this.projectId) return;
+    if (!this.searchQuery.trim() || !this.projectId) {
+      console.log('[TaskGroupSelect] handleCreateCustom salida temprana', { searchQuery: this.searchQuery?.trim(), projectId: this.projectId });
+      return;
+    }
+    console.log('[TaskGroupSelect] handleCreateCustom inicio', { name: this.searchQuery.trim(), projectId: this.projectId });
 
     try {
       const newGroupId = await this.taskGroupService.createTaskGroup({
         projectId: this.projectId,
         name: this.searchQuery.trim()
       });
+      console.log('[TaskGroupSelect] createTaskGroup OK', { newGroupId });
 
       // Recargar grupos (el padre debería hacer esto, pero por ahora lo hacemos aquí)
       const newGroup: TaskGroup = {
@@ -171,9 +206,11 @@ export class TaskGroupSelectComponent implements OnInit, OnChanges {
       };
 
       this.groupCreated.emit(newGroup);
+      console.log('[TaskGroupSelect] groupCreated emitido', { groupId: newGroup.id, name: newGroup.name });
       this.handleSelect(newGroup);
+      console.log('[TaskGroupSelect] handleSelect llamado, value=', this.value);
     } catch (error) {
-      console.error('Error al crear grupo:', error);
+      console.error('[TaskGroupSelect] Error al crear grupo:', error);
       alert('Error al crear el grupo. Por favor intenta nuevamente.');
     }
   }

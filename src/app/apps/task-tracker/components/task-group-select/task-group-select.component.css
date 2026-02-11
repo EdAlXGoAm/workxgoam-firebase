@@ -57,6 +57,26 @@
   text-overflow: ellipsis;
 }
 
+.task-group-select-clear-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 4px;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  color: #6b7280;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.task-group-select-clear-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
 .task-group-select-chevron {
   margin-left: 8px;
   color: #9ca3af;
@@ -254,6 +274,15 @@
 
 .task-group-select-create-option:hover {
   background-color: #eff6ff;
+}
+
+.task-group-select-clear-option {
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.task-group-select-clear-option .task-group-select-option-name {
+  color: #6b7280;
+  font-style: italic;
 }
 
 @media (max-width: 640px) {

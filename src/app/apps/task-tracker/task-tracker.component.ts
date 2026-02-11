@@ -36,6 +36,7 @@ import { TaskGroup } from './models/task-group.model';
 import { ProjectTasksModalComponent } from './modals/project-tasks-modal/project-tasks-modal.component';
 import { SyncService } from './services/sync.service';
 import { EnvironmentTasksModalComponent } from './components/environment-tasks-modal/environment-tasks-modal.component';
+import { MinuteNotificationsService } from './services/minute-notifications.service';
 
 @Component({
   selector: 'app-task-tracker',
@@ -102,6 +103,8 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
   isSyncing = false;
   lastSyncTime: string | null = null;
   dataLoadedFromCache = false;
+  /** Mensaje explícito del paso actual durante la sincronización (ej. "Sincronizando tareas...") */
+  syncStatusMessage = '';
 
   newTask: Partial<Task> = {
     name: '',
@@ -316,6 +319,7 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
     private timelineFocusService: TimelineFocusService,
     private taskTimeService: TaskTimeService,
     private syncService: SyncService,
+    private minuteNotifications: MinuteNotificationsService,
     private elementRef: ElementRef,
     private cdr: ChangeDetectorRef
   ) {}
@@ -323,7 +327,8 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
   async ngOnInit() {
     // Cargar la vista guardada desde localStorage
     this.currentView = this.loadSavedView();
-    
+    this.minuteNotifications.initFromStorage();
+
     // Iniciar carga del orden
     this.isLoadingEnvironmentOrder = true;
     
@@ -344,15 +349,23 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
         this.updateOrderedEnvironmentsCache();
         this.processTasks();
         
-        // Sincronizar en background
+        // Sincronizar en background y mantener isSyncing hasta que todo termine (incluido refresh)
         this.isSyncing = true;
-        this.syncService.syncInBackground().then(() => {
-          // Actualizar datos si hay cambios después de sincronización
-          this.isSyncing = false;
-          this.lastSyncTime = this.syncService.getLastSyncTime();
-          this.refreshDataFromSync();
+        this.syncStatusMessage = 'Obteniendo datos del servidor...';
+        this.cdr.detectChanges();
+        this.syncService.syncInBackground().then(async () => {
+          try {
+            await this.refreshDataFromSync();
+          } finally {
+            this.isSyncing = false;
+            this.syncStatusMessage = '';
+            this.lastSyncTime = this.syncService.getLastSyncTime();
+            this.cdr.detectChanges();
+          }
         }).catch(() => {
           this.isSyncing = false;
+          this.syncStatusMessage = '';
+          this.cdr.detectChanges();
         });
       } else {
         // Sin caché - cargar normal (primera vez)
@@ -409,33 +422,62 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
     if (this.orderSyncMessageTimeout) {
       clearTimeout(this.orderSyncMessageTimeout);
     }
+    this.minuteNotifications.destroy();
   }
 
+  get notificationsSupported(): boolean {
+    return this.minuteNotifications.supported;
+  }
 
-  async loadInitialData(): Promise<void> {
+  get notificationsEnabled(): boolean {
+    return this.minuteNotifications.enabled;
+  }
+
+  async toggleMinuteNotifications(): Promise<void> {
+    await this.minuteNotifications.toggle();
+    this.cdr.markForCheck();
+  }
+
+  /**
+   * Carga todos los datos iniciales. Si se pasa onSyncStep, se invoca con el mensaje de cada paso
+   * (útil para mostrar "Sincronizando entornos...", "Sincronizando tareas...", etc.).
+   */
+  async loadInitialData(onSyncStep?: (message: string) => void): Promise<void> {
     try {
+      onSyncStep?.('Datos de usuario...');
       await this.loadUserData();
-      await Promise.all([
-        this.loadEnvironments(),
-        this.loadProjects(),
-        this.loadTaskTypes(),
-        this.loadTaskSumTemplates(),
-        this.loadAllTaskGroups()
-      ]);
+      onSyncStep?.('Entornos...');
+      await this.loadEnvironments();
+      onSyncStep?.('Proyectos...');
+      await this.loadProjects();
+      onSyncStep?.('Tipos de tarea...');
+      await this.loadTaskTypes();
+      onSyncStep?.('Plantillas de suma...');
+      await this.loadTaskSumTemplates();
+      onSyncStep?.('Grupos de tareas...');
+      await this.loadAllTaskGroups();
+      onSyncStep?.('Tareas...');
       await this.loadTasks();
+      onSyncStep?.('');
       // Nota: initializeEnvironmentOrder se llama en ngOnInit después de cargar el orden desde localStorage
     } catch (error) {
       console.error("Error loading initial data for TaskTrackerComponent:", error);
+      onSyncStep?.('');
     }
   }
 
   /**
-   * Refresca los datos después de una sincronización en background
+   * Refresca los datos después de una sincronización en background.
+   * Muestra mensajes por paso (syncStatusMessage) para que el usuario vea qué se está actualizando.
    */
   private async refreshDataFromSync(): Promise<void> {
     try {
-      // Recargar datos desde Firestore para obtener los más recientes
-      await this.loadInitialData();
+      const onStep = (msg: string) => {
+        if (msg) this.syncStatusMessage = 'Actualizando ' + msg;
+        else this.syncStatusMessage = '';
+        this.cdr.detectChanges();
+      };
+      await this.loadInitialData(onStep);
       this.processTasks();
       this.cdr.detectChanges();
     } catch (error) {

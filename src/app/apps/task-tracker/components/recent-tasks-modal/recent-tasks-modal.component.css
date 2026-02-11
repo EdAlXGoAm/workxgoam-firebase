@@ -1,0 +1,7 @@
+/* Mejora respuesta al primer tap/clic: evita retraso 300ms y que el primer toque se interprete como selección */
+.recent-tasks-clickable {
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}

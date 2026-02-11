@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Firestore, collection, setDoc, updateDoc, deleteDoc, doc, query, where, getDocs } from '@angular/fire/firestore';
+import { Firestore, collection, setDoc, updateDoc, deleteDoc, doc, query, where, getDocs, deleteField } from '@angular/fire/firestore';
 import { AuthService } from '../../../services/auth.service';
 import { Task } from '../models/task.model';
 import { EnvironmentService } from './environment.service';
@@ -13,7 +13,7 @@ export class TaskService {
     private authService: AuthService
   ) {}
 
-  async createTask(task: Omit<Task, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'completed' | 'completedAt'>): Promise<string> {
+  async createTask(task: Omit<Task, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'completed' | 'completedAt' | 'status' | 'hidden'> & Partial<Pick<Task, 'completed' | 'completedAt' | 'status' | 'hidden'>>): Promise<string> {
     const user = this.authService.getCurrentUser();
     if (!user) throw new Error('Usuario no autenticado');
 
@@ -26,10 +26,10 @@ export class TaskService {
       userId: user.uid,
       createdAt: now,
       updatedAt: now,
-      completed: false,
-      completedAt: null,
-      status: 'pending',
-      hidden: false
+      completed: task.completed ?? false,
+      completedAt: task.completedAt ?? null,
+      status: task.status ?? 'pending',
+      hidden: task.hidden ?? false
     };
 
     // Eliminar campos con valor undefined (Firebase no los acepta)
@@ -58,11 +58,20 @@ export class TaskService {
     const taskRef = doc(this.firestore, `${EnvironmentService.COLLECTION_PREFIX}tasks`, taskId);
     const now = new Date().toISOString();
 
-    // Eliminar campos con valor undefined (Firebase no los acepta)
-    const cleanedUpdates = this.removeUndefinedFields({
+    const payload: Record<string, any> = {
       ...updates,
       updatedAt: now
-    });
+    };
+    // Si se quiere dejar sin tarea compleja, hay que borrar el campo en Firestore (undefined se filtra y no se envía)
+    if (updates && 'taskGroupId' in updates && updates.taskGroupId === undefined) {
+      payload['taskGroupId'] = deleteField();
+    }
+    // Si se quiere dejar sin tipo, borrar el campo en Firestore
+    if (updates && 'type' in updates && updates.type === undefined) {
+      payload['type'] = deleteField();
+    }
+
+    const cleanedUpdates = this.removeUndefinedFields(payload);
 
     await updateDoc(taskRef, cleanedUpdates);
   }
