@@ -106,6 +106,13 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
   /** Mensaje explícito del paso actual durante la sincronización (ej. "Sincronizando tareas...") */
   syncStatusMessage = '';
 
+  /** Modal que recomienda sincronizar tras 15 min desde la última sincronización */
+  showSyncRecommendationModal = false;
+  private lastDismissedSyncRecommendationAt: number | null = null;
+  private syncRecommendationCheckInterval: ReturnType<typeof setInterval> | null = null;
+  private static readonly SYNC_RECOMMENDATION_AFTER_MS = 15 * 60 * 1000; // 15 minutos
+  private static readonly SYNC_RECOMMENDATION_CHECK_INTERVAL_MS = 60 * 1000; // comprobar cada minuto
+
   newTask: Partial<Task> = {
     name: '',
     emoji: '',
@@ -396,6 +403,54 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
       this.isLoadingEnvironmentOrder = false;
       this.cdr.detectChanges();
     });
+
+    // Comprobar cada minuto si han pasado 15 min desde la última sincronización para mostrar el modal de recomendación
+    this.syncRecommendationCheckInterval = setInterval(() => this.checkSyncRecommendation(), TaskTrackerComponent.SYNC_RECOMMENDATION_CHECK_INTERVAL_MS);
+  }
+
+  private checkSyncRecommendation(): void {
+    if (!this.lastSyncTime || this.isSyncing || this.showSyncRecommendationModal) return;
+    const lastSyncMs = new Date(this.lastSyncTime).getTime();
+    const now = Date.now();
+    const dismissed = this.lastDismissedSyncRecommendationAt ?? 0;
+    if (now - lastSyncMs >= TaskTrackerComponent.SYNC_RECOMMENDATION_AFTER_MS &&
+        (now - dismissed >= TaskTrackerComponent.SYNC_RECOMMENDATION_AFTER_MS || this.lastDismissedSyncRecommendationAt === null)) {
+      this.showSyncRecommendationModal = true;
+      this.cdr.detectChanges();
+    }
+  }
+
+  closeSyncRecommendationModal(): void {
+    this.showSyncRecommendationModal = false;
+    this.lastDismissedSyncRecommendationAt = Date.now();
+    this.cdr.detectChanges();
+  }
+
+  async syncFromRecommendationModal(): Promise<void> {
+    this.showSyncRecommendationModal = false;
+    this.lastDismissedSyncRecommendationAt = null;
+    this.isSyncing = true;
+    this.syncStatusMessage = 'Obteniendo datos del servidor...';
+    this.cdr.detectChanges();
+    try {
+      const result = await this.syncService.forceFullSync();
+      this.tasks = result.tasks;
+      this.environments = result.environments;
+      this.projects = result.projects;
+      this.taskTypes = result.taskTypes;
+      this.allTaskGroups = result.taskGroups;
+      this.taskSumTemplates = result.taskSumTemplates;
+      this.filteredProjects = [...this.projects];
+      this.updateOrderedEnvironmentsCache();
+      this.processTasks();
+      this.lastSyncTime = this.syncService.getLastSyncTime();
+    } catch (error) {
+      console.error('Error al sincronizar desde el modal de recomendación:', error);
+    } finally {
+      this.isSyncing = false;
+      this.syncStatusMessage = '';
+      this.cdr.detectChanges();
+    }
   }
 
   ngAfterViewChecked() {
@@ -421,6 +476,10 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
   ngOnDestroy(): void {
     if (this.orderSyncMessageTimeout) {
       clearTimeout(this.orderSyncMessageTimeout);
+    }
+    if (this.syncRecommendationCheckInterval) {
+      clearInterval(this.syncRecommendationCheckInterval);
+      this.syncRecommendationCheckInterval = null;
     }
     this.minuteNotifications.destroy();
   }

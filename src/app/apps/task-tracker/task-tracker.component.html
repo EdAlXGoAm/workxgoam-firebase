@@ -1,4 +1,44 @@
 <div class="bg-gray-50 w-full">
+  <!-- Overlay que bloquea la página hasta que termine la sincronización -->
+  <div *ngIf="dataLoadedFromCache && isSyncing"
+       class="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm"
+       style="pointer-events: auto;">
+    <div class="bg-white rounded-xl shadow-2xl px-8 py-6 flex flex-col items-center gap-4 max-w-sm mx-4">
+      <i class="fas fa-sync fa-spin text-4xl text-indigo-500"></i>
+      <p class="text-lg font-medium text-gray-800">Sincronizando datos</p>
+      <p class="text-sm text-gray-500 text-center">{{ syncStatusMessage || 'Conectando con el servidor...' }}</p>
+      <p class="text-xs text-gray-400">El sitio estará disponible en unos segundos</p>
+    </div>
+  </div>
+
+  <!-- Modal: recomendar sincronización tras 15 min -->
+  <div *ngIf="showSyncRecommendationModal" class="fixed inset-0 z-[99] flex items-center justify-center bg-black/50 p-4" (click)="$event.stopPropagation()">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6" (click)="$event.stopPropagation()">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="flex-shrink-0 w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
+          <i class="fas fa-sync-alt text-amber-600 text-xl"></i>
+        </div>
+        <div>
+          <h3 class="text-lg font-bold text-gray-900">¿Sincronizar ahora?</h3>
+          <p class="text-sm text-gray-500">Han pasado más de 15 minutos desde la última sincronización.</p>
+        </div>
+      </div>
+      <p class="text-sm text-gray-600 mb-6">
+        Te recomendamos sincronizar para tener tus tareas y proyectos actualizados con el servidor.
+      </p>
+      <div class="flex justify-end gap-3">
+        <button type="button" (click)="closeSyncRecommendationModal()"
+                class="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200">
+          Más tarde
+        </button>
+        <button type="button" (click)="syncFromRecommendationModal()"
+                class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
+          <i class="fas fa-sync-alt mr-2"></i>Sincronizar ahora
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Header -->
   <app-task-tracker-header
     [userName]="userName"
