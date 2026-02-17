@@ -11,7 +11,7 @@ const FIVE_MIN_SEC = 5 * 60;
 export class MinuteNotificationsService {
   enabled = false;
   permission: NotificationPermission = 'default';
-  private timeoutId: ReturnType<typeof setTimeout> | null = null;
+  private timeoutId: number | null = null;
 
   get supported(): boolean {
     return typeof window !== 'undefined' && 'Notification' in window;
