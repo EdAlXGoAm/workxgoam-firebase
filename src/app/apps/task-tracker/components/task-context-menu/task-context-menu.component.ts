@@ -5,7 +5,7 @@ import { TaskGroup } from '../../models/task-group.model';
 
 export interface TaskContextMenuEvent {
   action: 'edit' | 'delete' | 'toggleHidden' | 'changeStatus' | 'copyTitle' | 'copyComplexTitle' | 'copyComplexTitleWithTitle'
-        | 'shiftForward' | 'shiftBackward' | 'extend' | 'shrink';
+        | 'shiftForward' | 'shiftBackward' | 'extend' | 'shrink' | 'completeAndHide';
   task: Task;
   status?: 'pending' | 'in-progress' | 'completed';
   minutes?: number;
@@ -111,6 +111,11 @@ export class TaskContextMenuComponent implements OnDestroy {
 
   onShrink(): void {
     this.menuAction.emit({ action: 'shrink', task: this.task, minutes: 15 });
+    this.close.emit();
+  }
+
+  onCompleteAndHide(): void {
+    this.menuAction.emit({ action: 'completeAndHide', task: this.task });
     this.close.emit();
   }
 

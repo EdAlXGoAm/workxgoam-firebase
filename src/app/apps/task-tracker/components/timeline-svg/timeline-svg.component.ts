@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges, HostListener, ViewChild, ElementRef, AfterViewInit, OnDestroy, ChangeDetectorRef, QueryList, ViewChildren } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges, HostListener, ViewChild, ElementRef, AfterViewInit, OnDestroy, ChangeDetectorRef, QueryList, ViewChildren, TemplateRef, ViewContainerRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Task } from '../../models/task.model';
@@ -14,6 +14,8 @@ import { AndroidDatePickerComponent } from '../android-date-picker/android-date-
 import { TimeShiftModalComponent, TimeShiftResult } from '../../modals/time-shift-modal/time-shift-modal.component';
 import { DurationEditModalComponent, DurationEditResult } from '../../modals/duration-edit-modal/duration-edit-modal.component';
 import { Subscription } from 'rxjs';
+import { Overlay, OverlayRef, OverlayConfig } from '@angular/cdk/overlay';
+import { TemplatePortal } from '@angular/cdk/portal';
 
 // Interfaz para elementos renderizables (tareas o fragmentos)
 interface RenderableItem {
@@ -95,7 +97,9 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
     private timelineFocusService: TimelineFocusService,
     private projectService: ProjectService,
     private gestureService: GestureService,
-    private taskTimeService: TaskTimeService
+    private taskTimeService: TaskTimeService,
+    private overlay: Overlay,
+    private viewContainerRef: ViewContainerRef
   ) {}
 
   @Output() editTask = new EventEmitter<Task>();
@@ -106,6 +110,7 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
   @Output() createTaskWithRange = new EventEmitter<{ startTime: Date; endTime: Date }>();
 
   @ViewChild('containerRef') containerRef!: ElementRef<HTMLDivElement>;
+  @ViewChild('contextMenuTemplate') contextMenuTemplate!: TemplateRef<any>;
   @ViewChildren('taskRect') taskRects!: QueryList<ElementRef<SVGRectElement>>;
   @ViewChildren('resizeHandleStart') resizeHandlesStart!: QueryList<ElementRef<SVGRectElement>>;
   @ViewChildren('resizeHandleEnd') resizeHandlesEnd!: QueryList<ElementRef<SVGRectElement>>;
@@ -126,6 +131,7 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
   contextMenuTask: Task | null = null;
   contextMenuX: number = 0;
   contextMenuY: number = 0;
+  private overlayRef: OverlayRef | null = null;
   private submenuElement: HTMLElement | null = null;
   private submenuCloseTimeout: any = null;
 
@@ -1483,11 +1489,34 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
   showTaskContextMenu(task: Task, x: number, y: number): void {
     this.hideTooltip();
     this.closeTaskSelector();
+    this.closeContextMenu();
     
     this.contextMenuTask = task;
-    this.contextMenuX = x;
-    this.contextMenuY = y;
+    
+    const config = new OverlayConfig({
+      hasBackdrop: true,
+      backdropClass: 'cdk-overlay-transparent-backdrop',
+      positionStrategy: this.overlay.position()
+        .flexibleConnectedTo({ x, y })
+        .withPositions([
+          { originX: 'start', originY: 'bottom', overlayX: 'start', overlayY: 'top' },
+          { originX: 'start', originY: 'top', overlayX: 'start', overlayY: 'bottom' },
+          { originX: 'end', originY: 'bottom', overlayX: 'end', overlayY: 'top' },
+          { originX: 'end', originY: 'top', overlayX: 'end', overlayY: 'bottom' }
+        ]),
+      scrollStrategy: this.overlay.scrollStrategies.reposition()
+    });
+    
+    this.overlayRef = this.overlay.create(config);
+    const portal = new TemplatePortal(this.contextMenuTemplate, this.viewContainerRef);
+    this.overlayRef.attach(portal);
+    
+    this.overlayRef.backdropClick().subscribe(() => {
+      this.closeContextMenu();
+    });
+    
     this.showContextMenu = true;
+    this.cdr.detectChanges();
   }
 
   /**
@@ -1656,6 +1685,11 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
   }
 
   closeContextMenu(): void {
+    this.closeActionsSubmenu();
+    if (this.overlayRef) {
+      this.overlayRef.dispose();
+      this.overlayRef = null;
+    }
     this.showContextMenu = false;
     this.contextMenuTask = null;
   }
@@ -1685,6 +1719,17 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
   changeStatusFromContextMenu(status: 'pending' | 'in-progress' | 'completed'): void {
     if (this.contextMenuTask) {
       this.changeStatus.emit({ task: this.contextMenuTask, status });
+      this.closeContextMenu();
+    }
+  }
+
+  /**
+   * Completa la tarea y la oculta automáticamente
+   */
+  public completeAndHideFromContextMenu(): void {
+    if (this.contextMenuTask) {
+      this.changeStatus.emit({ task: this.contextMenuTask, status: 'completed' });
+      this.toggleHidden.emit(this.contextMenuTask);
       this.closeContextMenu();
     }
   }
@@ -2002,6 +2047,7 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
                           target.closest('.resize-handle') !== null ||
                           target.closest('.resize-handle-line') !== null ||
                           target.closest('.context-menu') !== null ||
+                          target.closest('.context-submenu-overlay') !== null ||
                           target.closest('.task-selector-menu') !== null ||
                           target.closest('.tooltip-container') !== null ||
                           target.closest('.date-navigation') !== null ||

@@ -1975,6 +1975,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
     componentRef.instance.taskGroups = this.taskGroups;
     componentRef.instance.isOverdue = this.isTaskOverdue(task);
     componentRef.instance.isRunning = this.isTaskRunning(task);
+    componentRef.changeDetectorRef.detectChanges();
     
     // Escuchar eventos
     componentRef.instance.menuAction.subscribe((event: TaskContextMenuEvent) => {
@@ -2044,6 +2045,11 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
         const currentDurationShrink = this.taskTimeService.getTaskDurationMinutes(event.task);
         this.suggestedDurationMinutes = Math.max(15, currentDurationShrink - 15);
         this.showDurationModal = true;
+        this.closeContextMenu();
+        break;
+      case 'completeAndHide':
+        this.changeStatus.emit({ task: event.task, status: 'completed' });
+        this.toggleHidden.emit(event.task);
         this.closeContextMenu();
         break;
     }

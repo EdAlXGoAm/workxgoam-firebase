@@ -21,6 +21,12 @@
     <i class="fas fa-edit mr-2"></i>
     Editar tarea
   </button>
+  <button *ngIf="!task.hidden && task.status !== 'completed' && !task.completed" 
+          class="context-menu-item context-menu-item-completed" 
+          (click)="onCompleteAndHide()">
+    <i class="fas fa-check-circle mr-2"></i>
+    Completar y Ocultar
+  </button>
   <div class="context-menu-divider"></div>
   <button *ngIf="task.hidden" class="context-menu-item" (click)="onToggleHidden()">
     <i class="fas fa-eye mr-2"></i>

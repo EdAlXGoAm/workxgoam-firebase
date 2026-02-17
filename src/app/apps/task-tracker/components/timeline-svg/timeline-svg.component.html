@@ -430,12 +430,9 @@
     </svg>
   </div>
 
-  <!-- Menú contextual -->
-  <div *ngIf="showContextMenu && contextMenuTask" 
-       class="context-menu"
-       [style.left.px]="contextMenuX"
-       [style.top.px]="contextMenuY"
-       (click)="$event.stopPropagation()">
+  <!-- Menú contextual (renderizado via CDK Overlay para posicionamiento visible garantizado) -->
+  <ng-template #contextMenuTemplate>
+  <div *ngIf="contextMenuTask" class="context-menu" (click)="$event.stopPropagation()">
     <div class="context-menu-header">
       <span class="text-lg mr-2">{{ contextMenuTask.emoji }}</span>
       <span class="font-semibold text-sm truncate">{{ contextMenuTask.name }}</span>
@@ -457,6 +454,12 @@
     <button class="context-menu-item context-menu-item-edit" (click)="editTaskFromContextMenu()">
       <i class="fas fa-edit mr-2"></i>
       Editar tarea
+    </button>
+    <button *ngIf="!contextMenuTask.hidden && contextMenuTask.status !== 'completed' && !contextMenuTask.completed" 
+            class="context-menu-item context-menu-item-completed" 
+            (click)="completeAndHideFromContextMenu()">
+      <i class="fas fa-check-circle mr-2"></i>
+      Completar y Ocultar
     </button>
     <div class="context-menu-divider"></div>
     <button *ngIf="contextMenuTask.hidden" class="context-menu-item" (click)="toggleHiddenFromContextMenu()">
@@ -502,6 +505,7 @@
       Eliminar tarea
     </button>
   </div>
+  </ng-template>
 
   <!-- Menú de selección de tareas superpuestas -->
   <div *ngIf="showTaskSelector && taskSelectorItems.length > 1" 
