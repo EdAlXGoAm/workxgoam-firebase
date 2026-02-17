@@ -271,7 +271,7 @@ import { TaskGroup } from '../../models/task-group.model';
                                    [class.progress-completed]="task.status === 'completed'">
                               </div>
                             </div>
-                            <button (click)="taskContextMenu.emit({ mouseEvent: $event, task })" (contextmenu)="taskQuickContextMenu.emit({ mouseEvent: $event, task })" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
+                            <button (click)="taskContextMenu.emit({ mouseEvent: $event, task })" (contextmenu)="$event.preventDefault(); taskContextMenu.emit({ mouseEvent: $event, task })" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
                               <i class="fas fa-ellipsis-v"></i>
                             </button>
                             <div class="flex items-center justify-between mb-2">
@@ -404,7 +404,7 @@ import { TaskGroup } from '../../models/task-group.model';
                                    [class.progress-completed]="task.status === 'completed'">
                               </div>
                             </div>
-                            <button (click)="taskContextMenu.emit({ mouseEvent: $event, task })" (contextmenu)="taskQuickContextMenu.emit({ mouseEvent: $event, task })" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
+                            <button (click)="taskContextMenu.emit({ mouseEvent: $event, task })" (contextmenu)="$event.preventDefault(); taskContextMenu.emit({ mouseEvent: $event, task })" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
                               <i class="fas fa-ellipsis-v"></i>
                             </button>
                             <div class="flex items-center justify-between mb-2">
@@ -537,7 +537,7 @@ import { TaskGroup } from '../../models/task-group.model';
                                    [class.progress-completed]="task.status === 'completed'">
                               </div>
                             </div>
-                            <button (click)="taskContextMenu.emit({ mouseEvent: $event, task })" (contextmenu)="taskQuickContextMenu.emit({ mouseEvent: $event, task })" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
+                            <button (click)="taskContextMenu.emit({ mouseEvent: $event, task })" (contextmenu)="$event.preventDefault(); taskContextMenu.emit({ mouseEvent: $event, task })" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
                               <i class="fas fa-ellipsis-v"></i>
                             </button>
                             <div class="flex items-center justify-between mb-2">
@@ -623,7 +623,7 @@ import { TaskGroup } from '../../models/task-group.model';
                              [class.progress-completed]="task.status === 'completed'">
                         </div>
                       </div>
-                      <button (click)="taskContextMenu.emit({ mouseEvent: $event, task })" (contextmenu)="taskQuickContextMenu.emit({ mouseEvent: $event, task })" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
+                      <button (click)="taskContextMenu.emit({ mouseEvent: $event, task })" (contextmenu)="$event.preventDefault(); taskContextMenu.emit({ mouseEvent: $event, task })" class="absolute top-2 right-2 p-1 text-gray-500 hover:text-gray-700">
                         <i class="fas fa-ellipsis-v"></i>
                       </button>
                       <div class="flex items-center justify-between mb-2">
