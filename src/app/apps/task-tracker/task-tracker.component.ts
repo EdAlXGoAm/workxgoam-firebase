@@ -334,6 +334,7 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
   async ngOnInit() {
     // Cargar la vista guardada desde localStorage
     this.currentView = this.loadSavedView();
+    this.minuteNotifications.setHasRunningTaskGetter(() => this.hasAnyRunningTask());
     this.minuteNotifications.initFromStorage();
 
     // Iniciar carga del orden
@@ -2572,8 +2573,37 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
     }
   }
 
+  /** Indica si alguna tarea está en curso (start <= now <= end, no completada). */
+  hasAnyRunningTask(): boolean {
+    const now = new Date();
+    return this.tasks.some((t) => {
+      if (t.status === 'completed' || (t as any).completed) return false;
+      const startDate = new Date(t.start + (t.start.includes('Z') ? '' : 'Z'));
+      const endDate = new Date(t.end + (t.end.includes('Z') ? '' : 'Z'));
+      return startDate <= now && now <= endDate;
+    });
+  }
+
+  private isTaskRunningByTimes(start: string, end: string, completed: boolean): boolean {
+    if (completed) return false;
+    const now = new Date();
+    const startDate = new Date(start + (start.includes('Z') ? '' : 'Z'));
+    const endDate = new Date(end + (end.includes('Z') ? '' : 'Z'));
+    return startDate <= now && now <= endDate;
+  }
+
   // Método para refrescar cuando se actualiza tiempo/duración desde el timeline
   async onTaskTimeUpdated(task: Task) {
+    const prev = this.tasks.find((t) => t.id === task.id);
+    const wasRunning = prev ? this.isTaskRunningByTimes(prev.start, prev.end, !!prev.completed || prev.status === 'completed') : false;
+    const nowRunning = this.isTaskRunningByTimes(task.start, task.end, !!task.completed || task.status === 'completed');
+
+    if (wasRunning && !nowRunning) {
+      this.minuteNotifications.notifyTaskEnded(prev!.name);
+    } else if (!wasRunning && nowRunning) {
+      this.minuteNotifications.notifyTaskStarted(task.name);
+    }
+
     console.log('🔄 Tarea actualizada desde timeline:', task.name);
     await this.loadTasks();
     // Actualizar caché después de actualizar tiempo
