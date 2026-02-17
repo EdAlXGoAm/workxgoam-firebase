@@ -117,6 +117,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
   @Output() deleteTask = new EventEmitter<Task>();
   @Output() toggleHidden = new EventEmitter<Task>();
   @Output() changeStatus = new EventEmitter<{ task: Task; status: 'pending' | 'in-progress' | 'completed' }>();
+  @Output() completeAndHide = new EventEmitter<Task>();
   @Output() taskUpdated = new EventEmitter<Task>();
   @Output() createTaskWithRange = new EventEmitter<{ startTime: Date; endTime: Date }>();
 
@@ -2048,8 +2049,7 @@ export class WeekTimelineSvgComponent implements OnInit, OnChanges, AfterViewIni
         this.closeContextMenu();
         break;
       case 'completeAndHide':
-        this.changeStatus.emit({ task: event.task, status: 'completed' });
-        this.toggleHidden.emit(event.task);
+        this.completeAndHide.emit(event.task);
         this.closeContextMenu();
         break;
     }

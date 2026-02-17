@@ -16,6 +16,13 @@ import { TaskGroup } from '../../models/task-group.model';
     <div class="w-full bg-white rounded-lg shadow-md p-3 md:p-4 lg:p-6 week-view-container" [class.wide-layout]="isWideLayout">
       <div class="flex flex-wrap justify-between items-center gap-2 mb-3 md:mb-4">
         <h2 class="text-lg md:text-xl font-bold">Vista Semanal</h2>
+        <button *ngIf="isWideLayout"
+                (click)="toggleTimelineWidth()"
+                type="button"
+                class="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg border border-gray-200 hover:border-indigo-300 transition-colors"
+                [title]="timelineWidthExpanded ? 'Restaurar ancho de la semana' : 'Expandir ancho de la semana'">
+          <i class="fas text-sm" [ngClass]="timelineWidthExpanded ? 'fa-compress-arrows-alt' : 'fa-expand-arrows-alt'"></i>
+        </button>
         <div *ngIf="emptyEnvironmentsCount > 0" class="flex items-center gap-1.5 md:gap-2">
           <span class="text-xs md:text-sm text-gray-600">
             <span class="hidden sm:inline">{{emptyEnvironmentsCount}} ambiente(s) vacío(s)</span>
@@ -29,9 +36,8 @@ import { TaskGroup } from '../../models/task-group.model';
         </div>
       </div>
 
-      <div #weekLayoutWrapper class="week-layout-wrapper">
+      <div #weekLayoutWrapper class="week-layout-wrapper" [class.timeline-expanded]="isWideLayout && timelineWidthExpanded">
         <div class="timeline-section">
-          <h3 class="text-base md:text-lg font-semibold mb-2 text-center w-full">Vista Semanal</h3>
           <app-week-timeline-svg 
             [tasks]="tasks" 
             [environments]="environments" 
@@ -42,6 +48,7 @@ import { TaskGroup } from '../../models/task-group.model';
             (deleteTask)="deleteTask.emit($event)"
             (toggleHidden)="toggleHidden.emit($event)"
             (changeStatus)="changeStatus.emit($event)"
+            (completeAndHide)="completeAndHide.emit($event)"
             (taskUpdated)="taskUpdated.emit($event)"
             (createTaskWithRange)="createTaskWithRange.emit($event)">
           </app-week-timeline-svg>
@@ -736,9 +743,20 @@ import { TaskGroup } from '../../models/task-group.model';
       overflow: hidden;
       display: flex;
       flex-direction: column;
+      transition: width 0.25s ease;
+    }
+    
+    /* Expandir ancho de la semana (solo en wide layout) */
+    .wide-layout .week-layout-wrapper.timeline-expanded .timeline-section {
+      width: 70%;
+      min-width: 600px;
     }
     
     .wide-layout .timeline-section h3 {
+      flex-shrink: 0;
+    }
+    
+    .timeline-section-header {
       flex-shrink: 0;
     }
     
@@ -950,6 +968,9 @@ export class WeekViewComponent implements OnChanges, AfterViewInit, AfterViewChe
   // Flag para saber si estamos en layout ancho (2 columnas)
   isWideLayout = false;
   
+  /** En wide layout: true = semana ocupa ~70%, false = ancho por defecto (600px) */
+  timelineWidthExpanded = false;
+  
   @Input() tasks: Task[] = [];
   @Input() projects: Project[] = [];
   @Input() environments: Environment[] = [];
@@ -972,6 +993,7 @@ export class WeekViewComponent implements OnChanges, AfterViewInit, AfterViewChe
   @Output() deleteTask = new EventEmitter<Task>();
   @Output() toggleHidden = new EventEmitter<Task>();
   @Output() changeStatus = new EventEmitter<{ task: Task; status: 'pending' | 'in-progress' | 'completed' }>();
+  @Output() completeAndHide = new EventEmitter<Task>();
   @Output() taskUpdated = new EventEmitter<Task>();
   @Output() taskContextMenu = new EventEmitter<{ mouseEvent: MouseEvent; task: Task }>();
   @Output() taskQuickContextMenu = new EventEmitter<{ mouseEvent: MouseEvent; task: Task }>();
@@ -1011,13 +1033,22 @@ export class WeekViewComponent implements OnChanges, AfterViewInit, AfterViewChe
     this.isWideLayout = window.innerWidth >= this.WIDE_LAYOUT_BREAKPOINT;
   }
 
+  toggleTimelineWidth(): void {
+    if (!this.isWideLayout) return;
+    this.timelineWidthExpanded = !this.timelineWidthExpanded;
+    this.cdr.detectChanges();
+  }
+
   // Handler para resize (guardado como arrow function para mantener el contexto)
   private onWindowResize = (): void => {
     const wasWideLayout = this.isWideLayout;
     this.checkWideLayout();
     
-    // Si cambió el estado del layout, recalcular altura
+    // Si cambió el estado del layout, recalcular altura y resetear expandido
     if (wasWideLayout !== this.isWideLayout) {
+      if (!this.isWideLayout) {
+        this.timelineWidthExpanded = false;
+      }
       this.heightCalculated = false;
       if (this.isWideLayout) {
         this.calculateAndSetHeight();

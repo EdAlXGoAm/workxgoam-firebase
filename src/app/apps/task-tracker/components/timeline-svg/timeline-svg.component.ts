@@ -106,6 +106,7 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
   @Output() deleteTask = new EventEmitter<Task>();
   @Output() toggleHidden = new EventEmitter<Task>();
   @Output() changeStatus = new EventEmitter<{ task: Task; status: 'pending' | 'in-progress' | 'completed' }>();
+  @Output() completeAndHide = new EventEmitter<Task>();
   @Output() taskUpdated = new EventEmitter<Task>();
   @Output() createTaskWithRange = new EventEmitter<{ startTime: Date; endTime: Date }>();
 
@@ -1728,8 +1729,7 @@ export class TimelineSvgComponent implements OnInit, OnChanges, AfterViewInit, O
    */
   public completeAndHideFromContextMenu(): void {
     if (this.contextMenuTask) {
-      this.changeStatus.emit({ task: this.contextMenuTask, status: 'completed' });
-      this.toggleHidden.emit(this.contextMenuTask);
+      this.completeAndHide.emit(this.contextMenuTask);
       this.closeContextMenu();
     }
   }

@@ -32,7 +32,7 @@ import { TaskGroup } from '../../models/task-group.model';
       <div #boardLayoutWrapper class="board-layout-wrapper">
         <div class="timeline-section">
           <h3 class="text-base md:text-lg font-semibold mb-2 text-center w-full">Línea del Tiempo</h3>
-          <app-timeline-svg [tasks]="tasks" [environments]="environments" [taskTypes]="taskTypes" [taskGroups]="taskGroups" (editTask)="editTask.emit($event)" (deleteTask)="deleteTask.emit($event)" (toggleHidden)="toggleHidden.emit($event)" (changeStatus)="changeStatus.emit($event)" (taskUpdated)="taskUpdated.emit($event)" (createTaskWithRange)="createTaskWithRange.emit($event)"></app-timeline-svg>
+          <app-timeline-svg [tasks]="tasks" [environments]="environments" [taskTypes]="taskTypes" [taskGroups]="taskGroups" (editTask)="editTask.emit($event)" (deleteTask)="deleteTask.emit($event)" (toggleHidden)="toggleHidden.emit($event)" (changeStatus)="changeStatus.emit($event)" (completeAndHide)="completeAndHide.emit($event)" (taskUpdated)="taskUpdated.emit($event)" (createTaskWithRange)="createTaskWithRange.emit($event)"></app-timeline-svg>
         </div>
 
         <div class="environments-section">
@@ -931,6 +931,7 @@ export class BoardViewComponent implements OnChanges, AfterViewInit, AfterViewCh
   @Output() deleteTask = new EventEmitter<Task>();
   @Output() toggleHidden = new EventEmitter<Task>();
   @Output() changeStatus = new EventEmitter<{ task: Task; status: 'pending' | 'in-progress' | 'completed' }>();
+  @Output() completeAndHide = new EventEmitter<Task>();
   @Output() taskUpdated = new EventEmitter<Task>();
   @Output() taskContextMenu = new EventEmitter<{ mouseEvent: MouseEvent; task: Task }>();
   @Output() taskQuickContextMenu = new EventEmitter<{ mouseEvent: MouseEvent; task: Task }>();
