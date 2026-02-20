@@ -11,6 +11,14 @@
     </div>
   </div>
 
+  <!-- Modal: fallback cuando no se pueden activar notificaciones (Brave, etc.) -->
+  <app-notification-fallback-modal
+    [visible]="showNotificationFallbackModal"
+    [localLoading]="notificationLocalOnlyLoading"
+    (close)="closeNotificationFallbackModal()"
+    (enableLocalOnly)="enableNotificationLocalOnly()">
+  </app-notification-fallback-modal>
+
   <!-- Modal: recomendar sincronización tras 15 min -->
   <div *ngIf="showSyncRecommendationModal" class="fixed inset-0 z-[99] flex items-center justify-center bg-black/50 p-4" (click)="$event.stopPropagation()">
     <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6" (click)="$event.stopPropagation()">
@@ -101,7 +109,7 @@
           <button (click)="toggleShowHidden()" class="p-1.5 md:p-2 hover:text-indigo-600" [class.text-indigo-600]="showHidden">
             <i class="fas fa-filter text-sm md:text-base"></i>
           </button>
-          <button *ngIf="notificationsSupported" (click)="toggleMinuteNotifications()" [class.text-indigo-600]="notificationsEnabled" class="p-1.5 md:p-2 hover:text-indigo-600" title="Notificación cada minuto con la hora. En Brave: permite Notificaciones (y Push) en Ajustes del sitio.">
+          <button *ngIf="notificationsSupported" (click)="toggleMinuteNotifications()" [class.text-indigo-600]="notificationsEnabled" class="p-1.5 md:p-2 hover:text-indigo-600" [title]="notificationsEnabled && notificationsLocalOnly ? 'Notificaciones locales (solo con sitio abierto) - Clic para desactivar' : 'Recordatorios cada 5 min. En Brave: permite Notificaciones (y Push) en Ajustes del sitio.'">
             <i class="fas text-sm md:text-base" [class.fa-bell]="notificationsEnabled" [class.fa-bell-slash]="!notificationsEnabled"></i>
           </button>
           <!-- Indicador de sincronización a la derecha de la campanita -->

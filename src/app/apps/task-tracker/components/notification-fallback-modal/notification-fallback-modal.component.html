@@ -1,0 +1,53 @@
+<div *ngIf="visible"
+     class="notification-fallback-backdrop"
+     (click)="onClose()">
+  <div class="notification-fallback-modal"
+       (click)="$event.stopPropagation()">
+    <div class="notification-fallback-icon">
+      <i class="fas fa-bell text-indigo-500 text-2xl"></i>
+    </div>
+
+    <h3 class="notification-fallback-title">Activar notificaciones</h3>
+
+    <div class="notification-fallback-instructions">
+      <p class="notification-fallback-intro">
+        Para permitir las notificaciones en Brave, configura tu navegador:
+      </p>
+      <ol class="notification-fallback-steps">
+        <li>
+          Ve a <strong>brave://settings/privacy</strong> y activa la opción <strong>«Usar servicios de Google para mensajes de inserción»</strong>.
+        </li>
+        <li>
+          En los ajustes del sitio (icono de candado o información en la barra de direcciones), permite <strong>Notificaciones</strong> y <strong>Push</strong>.
+        </li>
+      </ol>
+      <p class="notification-fallback-then">
+        Luego vuelve aquí y vuelve a activar las notificaciones.
+      </p>
+    </div>
+
+    <div class="notification-fallback-divider">
+      <span>o</span>
+    </div>
+
+    <div class="notification-fallback-local">
+      <p class="notification-fallback-local-warning">
+        Si no puedes habilitar push, puedes usar notificaciones solo cuando el sitio esté abierto:
+      </p>
+      <button type="button"
+              class="notification-fallback-local-btn"
+              (click)="onEnableLocalOnly()"
+              [disabled]="localLoading">
+        <span *ngIf="localLoading" class="notification-fallback-spinner"></span>
+        <span *ngIf="!localLoading">Usar solo notificaciones cuando el sitio esté abierto</span>
+      </button>
+      <p class="notification-fallback-local-note">
+        Solo recibirás recordatorios cada 5 min si tienes Task Tracker abierto en alguna pestaña.
+      </p>
+    </div>
+
+    <button type="button" class="notification-fallback-close" (click)="onClose()">
+      Cerrar
+    </button>
+  </div>
+</div>

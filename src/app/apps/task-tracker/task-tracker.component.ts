@@ -36,12 +36,13 @@ import { TaskGroup } from './models/task-group.model';
 import { ProjectTasksModalComponent } from './modals/project-tasks-modal/project-tasks-modal.component';
 import { SyncService } from './services/sync.service';
 import { EnvironmentTasksModalComponent } from './components/environment-tasks-modal/environment-tasks-modal.component';
-import { MinuteNotificationsService } from './services/minute-notifications.service';
+import { MinuteNotificationsService, BoundaryEvaluation } from './services/minute-notifications.service';
+import { NotificationFallbackModalComponent } from './components/notification-fallback-modal/notification-fallback-modal.component';
 
 @Component({
   selector: 'app-task-tracker',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, CurrentTaskInfoComponent, PendingTasksBubbleComponent, TaskModalComponent, RemindersModalComponent, TaskTrackerHeaderComponent, EnvironmentModalComponent, BoardViewComponent, WeekViewComponent, ChangeStatusModalComponent, DateRangeModalComponent, TaskTypeModalComponent, CustomSelectComponent, SumsBubbleComponent, ProjectModalComponent, ProjectTasksModalComponent, EnvironmentTasksModalComponent],
+  imports: [CommonModule, FormsModule, RouterModule, ManagementModalComponent, CurrentTaskInfoComponent, PendingTasksBubbleComponent, TaskModalComponent, RemindersModalComponent, TaskTrackerHeaderComponent, EnvironmentModalComponent, BoardViewComponent, WeekViewComponent, ChangeStatusModalComponent, DateRangeModalComponent, TaskTypeModalComponent, CustomSelectComponent, SumsBubbleComponent, ProjectModalComponent, ProjectTasksModalComponent, EnvironmentTasksModalComponent, NotificationFallbackModalComponent],
   templateUrl: './task-tracker.component.html',
   styleUrls: ['./task-tracker.component.css']
 })
@@ -109,6 +110,9 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
   /** Modal que recomienda sincronizar tras 15 min desde la última sincronización */
   showSyncRecommendationModal = false;
   private lastDismissedSyncRecommendationAt: number | null = null;
+  /** Modal de fallback cuando las notificaciones no se pueden activar (Brave, permisos, etc.) */
+  showNotificationFallbackModal = false;
+  notificationLocalOnlyLoading = false;
   private syncRecommendationCheckInterval: ReturnType<typeof setInterval> | null = null;
   private static readonly SYNC_RECOMMENDATION_AFTER_MS = 15 * 60 * 1000; // 15 minutos
   private static readonly SYNC_RECOMMENDATION_CHECK_INTERVAL_MS = 60 * 1000; // comprobar cada minuto
@@ -334,7 +338,7 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
   async ngOnInit() {
     // Cargar la vista guardada desde localStorage
     this.currentView = this.loadSavedView();
-    this.minuteNotifications.setHasRunningTaskGetter(() => this.hasAnyRunningTask());
+    this.minuteNotifications.setBoundaryEvaluator((boundaryDate) => this.evaluateNotificationsAtBoundary(boundaryDate));
     this.minuteNotifications.initFromStorage();
 
     // Iniciar carga del orden
@@ -493,9 +497,35 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
     return this.minuteNotifications.enabled;
   }
 
+  get notificationsLocalOnly(): boolean {
+    return this.minuteNotifications.isLocalOnly;
+  }
+
   async toggleMinuteNotifications(): Promise<void> {
-    await this.minuteNotifications.toggle();
+    const result = await this.minuteNotifications.toggle();
+    if (result.showFallbackModal) {
+      this.showNotificationFallbackModal = true;
+    }
     this.cdr.markForCheck();
+  }
+
+  closeNotificationFallbackModal(): void {
+    this.showNotificationFallbackModal = false;
+    this.cdr.markForCheck();
+  }
+
+  async enableNotificationLocalOnly(): Promise<void> {
+    this.notificationLocalOnlyLoading = true;
+    this.cdr.markForCheck();
+    try {
+      const result = await this.minuteNotifications.tryEnableLocalOnly();
+      if (result.ok) {
+        this.showNotificationFallbackModal = false;
+      }
+    } finally {
+      this.notificationLocalOnlyLoading = false;
+      this.cdr.markForCheck();
+    }
   }
 
   /**
@@ -2584,6 +2614,36 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
     });
   }
 
+  /**
+   * Evalúa qué notificación mostrar en un boundary de 5 min (solo depende de la hora del trigger).
+   * - Si hay tareas que empiezan o terminan en ese minuto → resumen.
+   * - Si no hay tarea en curso en ese minuto → recordatorio.
+   * - Si hay tarea en curso pero ninguna empieza/termina en ese minuto → no notificar.
+   */
+  evaluateNotificationsAtBoundary(boundaryDate: Date): BoundaryEvaluation {
+    const completed = (t: Task) => t.status === 'completed' || !!(t as any).completed;
+    const toDate = (iso: string) => new Date(iso + (iso.includes('Z') ? '' : 'Z'));
+    const sameMinute = (d: Date, iso: string) => {
+      const a = toDate(iso);
+      return d.getFullYear() === a.getFullYear() && d.getMonth() === a.getMonth() && d.getDate() === a.getDate() && d.getHours() === a.getHours() && d.getMinutes() === a.getMinutes();
+    };
+
+    let hasRunningTask = false;
+    const startingNames: string[] = [];
+    const endingNames: string[] = [];
+
+    for (const t of this.tasks) {
+      const startDate = toDate(t.start);
+      const endDate = toDate(t.end);
+      const isRunning = !completed(t) && startDate <= boundaryDate && boundaryDate <= endDate;
+      if (isRunning) hasRunningTask = true;
+      if (!completed(t) && sameMinute(boundaryDate, t.start)) startingNames.push(t.name);
+      if (sameMinute(boundaryDate, t.end)) endingNames.push(t.name);
+    }
+
+    return { hasRunningTask, startingNames, endingNames };
+  }
+
   private isTaskRunningByTimes(start: string, end: string, completed: boolean): boolean {
     if (completed) return false;
     const now = new Date();
@@ -2592,18 +2652,9 @@ export class TaskTrackerComponent implements OnInit, OnDestroy, AfterViewChecked
     return startDate <= now && now <= endDate;
   }
 
-  // Método para refrescar cuando se actualiza tiempo/duración desde el timeline
+  // Método para refrescar cuando se actualiza tiempo/duración desde el timeline.
+  // Las notificaciones de inicio/fin se envían cada 5 min desde MinuteNotificationsService.
   async onTaskTimeUpdated(task: Task) {
-    const prev = this.tasks.find((t) => t.id === task.id);
-    const wasRunning = prev ? this.isTaskRunningByTimes(prev.start, prev.end, !!prev.completed || prev.status === 'completed') : false;
-    const nowRunning = this.isTaskRunningByTimes(task.start, task.end, !!task.completed || task.status === 'completed');
-
-    if (wasRunning && !nowRunning) {
-      this.minuteNotifications.notifyTaskEnded(prev!.name);
-    } else if (!wasRunning && nowRunning) {
-      this.minuteNotifications.notifyTaskStarted(task.name);
-    }
-
     console.log('🔄 Tarea actualizada desde timeline:', task.name);
     await this.loadTasks();
     // Actualizar caché después de actualizar tiempo

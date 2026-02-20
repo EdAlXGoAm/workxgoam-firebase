@@ -1,10 +1,26 @@
 import { Injectable } from '@angular/core';
 
 const STORAGE_KEY = 'task-tracker-minute-notifications';
+const STORAGE_LOCAL_ONLY_KEY = 'task-tracker-minute-notifications-local-only';
 const NOTIFICATION_TITLE = 'Task Tracker';
 const FIVE_MIN_MS = 5 * 60 * 1000;
 const FIVE_MIN_SEC = 5 * 60;
-const PENDING_ENDED_MS = 1500;
+
+export interface ToggleResult {
+  ok: boolean;
+  /** Mostrar modal de fallback (Brave, permisos bloqueados, etc.) */
+  showFallbackModal?: boolean;
+}
+
+/** Resultado de evaluar qué notificación mostrar en un boundary de 5 min (hora del trigger). */
+export interface BoundaryEvaluation {
+  /** Si en ese momento hay al menos una tarea en curso (start <= now <= end, no completada). */
+  hasRunningTask: boolean;
+  /** Nombres de tareas cuyo inicio (start) cae en el mismo minuto que el boundary. */
+  startingNames: string[];
+  /** Nombres de tareas cuyo fin (end) cae en el mismo minuto que el boundary. */
+  endingNames: string[];
+}
 
 @Injectable({
   providedIn: 'root'
@@ -12,58 +28,84 @@ const PENDING_ENDED_MS = 1500;
 export class MinuteNotificationsService {
   enabled = false;
   permission: NotificationPermission = 'default';
+  /** true = solo locales (Notification API, sitio abierto); false = push completo si está disponible */
+  localOnly = true;
   private timeoutId: number | null = null;
-  /** Callback para saber si hay alguna tarea en curso (en múltiplos de 5 min) */
-  private getHasRunningTask: (() => boolean) | null = null;
-  /** Si una tarea acaba de terminar, guardamos el nombre para combinar con la siguiente que empiece */
-  private pendingEndedTaskName: string | null = null;
-  private pendingEndedTimeoutId: number | null = null;
+  /** Evaluador llamado cada 5 min con la fecha del trigger; decide qué notificación enviar. */
+  private evaluateAtBoundary: ((boundaryDate: Date) => BoundaryEvaluation) | null = null;
 
   get supported(): boolean {
     return typeof window !== 'undefined' && 'Notification' in window;
   }
 
-  /**
-   * El componente debe llamar esto (p. ej. en ngOnInit) para que en cada múltiplo de 5 min
-   * se decida si mostrar el recordatorio "¿Qué estás haciendo? Regístralo en la app".
-   */
-  setHasRunningTaskGetter(getter: () => boolean): void {
-    this.getHasRunningTask = getter;
+  /** Indica si está en modo solo local (Notification API, solo cuando el sitio está abierto) */
+  get isLocalOnly(): boolean {
+    return this.localOnly || localStorage.getItem(STORAGE_LOCAL_ONLY_KEY) === 'true';
   }
 
-  async toggle(): Promise<void> {
+  /**
+   * El componente debe llamar esto (p. ej. en ngOnInit). En cada múltiplo de 5 min se invoca
+   * con la fecha del trigger; el resultado decide si enviar recordatorio, resumen de inicio/fin, o nada.
+   */
+  setBoundaryEvaluator(evaluator: (boundaryDate: Date) => BoundaryEvaluation): void {
+    this.evaluateAtBoundary = evaluator;
+  }
+
+  async toggle(): Promise<ToggleResult> {
     if (!this.supported) {
-      alert('Tu navegador no soporta notificaciones.');
-      return;
+      return { ok: false, showFallbackModal: true };
     }
     if (this.permission === 'granted' && this.enabled) {
       this.stop();
       this.enabled = false;
+      this.localOnly = true;
       localStorage.removeItem(STORAGE_KEY);
-      return;
+      localStorage.removeItem(STORAGE_LOCAL_ONLY_KEY);
+      return { ok: true };
     }
     if (this.permission === 'denied') {
-      alert('Las notificaciones están bloqueadas. Actívalas en los ajustes del sitio (icono de candado o información en la barra de direcciones). En Brave: Notificaciones y, si aplica, Push.');
-      return;
+      return { ok: false, showFallbackModal: true };
     }
     const result = await Notification.requestPermission();
     this.permission = result;
     if (result === 'granted') {
       this.start();
       this.enabled = true;
+      this.localOnly = true;
       localStorage.setItem(STORAGE_KEY, 'true');
-    } else {
-      this.enabled = false;
-      if (result === 'denied') {
-        alert('Has bloqueado las notificaciones. Para activarlas más tarde, permite Notificaciones (y en Brave también Push si hace falta) en la configuración del sitio.');
-      }
+      return { ok: true };
     }
+    this.enabled = false;
+    return { ok: false, showFallbackModal: result === 'denied' };
+  }
+
+  /**
+   * Intenta habilitar notificaciones solo locales (Notification API).
+   * Solo funcionan cuando el sitio está abierto.
+   */
+  async tryEnableLocalOnly(): Promise<ToggleResult> {
+    if (!this.supported) return { ok: false };
+    if (this.permission === 'denied') {
+      return { ok: false, showFallbackModal: true };
+    }
+    const result = await Notification.requestPermission();
+    this.permission = result;
+    if (result === 'granted') {
+      this.start();
+      this.enabled = true;
+      this.localOnly = true;
+      localStorage.setItem(STORAGE_KEY, 'true');
+      localStorage.setItem(STORAGE_LOCAL_ONLY_KEY, 'true');
+      return { ok: true };
+    }
+    return { ok: false, showFallbackModal: result === 'denied' };
   }
 
   initFromStorage(): void {
     if (!this.supported) return;
     this.permission = Notification.permission;
     const stored = localStorage.getItem(STORAGE_KEY) === 'true';
+    this.localOnly = true;
     if (stored && this.permission === 'granted') {
       this.enabled = true;
       this.start();
@@ -74,46 +116,6 @@ export class MinuteNotificationsService {
 
   destroy(): void {
     this.stop();
-    this.clearPendingEnded();
-  }
-
-  /**
-   * Llamar cuando una tarea comienza (el usuario la inicia).
-   * Si justo antes otra terminó, se muestra una sola notificación combinada.
-   */
-  notifyTaskStarted(taskName: string): void {
-    if (this.permission !== 'granted' || !this.enabled) return;
-    const ended = this.pendingEndedTaskName;
-    this.clearPendingEnded();
-    const displayName = this.escapeTaskName(taskName);
-    if (ended) {
-      this.showNotification(`${this.escapeTaskName(ended)} terminó, ${displayName} comenzó`);
-    } else {
-      this.showNotification(`${displayName} comenzó`);
-    }
-  }
-
-  /**
-   * Llamar cuando una tarea termina (el usuario la finaliza).
-   * Si en los próximos segundos otra tarea comienza, se combinará en una sola notificación.
-   */
-  notifyTaskEnded(taskName: string): void {
-    if (this.permission !== 'granted' || !this.enabled) return;
-    this.clearPendingEnded();
-    this.pendingEndedTaskName = taskName;
-    this.pendingEndedTimeoutId = window.setTimeout(() => {
-      this.showNotification(`${this.escapeTaskName(taskName)} terminó`);
-      this.pendingEndedTaskName = null;
-      this.pendingEndedTimeoutId = null;
-    }, PENDING_ENDED_MS);
-  }
-
-  private clearPendingEnded(): void {
-    if (this.pendingEndedTimeoutId !== null) {
-      clearTimeout(this.pendingEndedTimeoutId);
-      this.pendingEndedTimeoutId = null;
-    }
-    this.pendingEndedTaskName = null;
   }
 
   private escapeTaskName(name: string): string {
@@ -141,10 +143,22 @@ export class MinuteNotificationsService {
     };
 
     const onBoundary = () => {
-      const hasRunning = this.getHasRunningTask?.() ?? false;
-      if (!hasRunning) {
+      const boundaryDate = new Date();
+      const evaluation = this.evaluateAtBoundary?.(boundaryDate);
+      if (!evaluation) return;
+
+      const { hasRunningTask, startingNames, endingNames } = evaluation;
+      const hasStartsOrEnds = startingNames.length > 0 || endingNames.length > 0;
+
+      if (hasStartsOrEnds) {
+        const parts: string[] = [];
+        endingNames.forEach((name) => parts.push(`${this.escapeTaskName(name)} terminó`));
+        startingNames.forEach((name) => parts.push(`${this.escapeTaskName(name)} comenzó`));
+        this.showNotification(parts.join('. '));
+      } else if (!hasRunningTask) {
         this.showNotification('¿Qué estás haciendo? Regístralo en la app.');
       }
+      // Si hay tarea en curso pero ninguna empieza/termina en este minuto: no notificar
     };
 
     const scheduleNext = () => {

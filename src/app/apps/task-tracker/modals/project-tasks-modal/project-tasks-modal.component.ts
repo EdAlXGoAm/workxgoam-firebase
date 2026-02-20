@@ -360,26 +360,21 @@ export class ProjectTasksModalComponent implements OnInit, OnDestroy, OnChanges 
 
   // ============ AGRUPACIÓN DE TAREAS ============
 
+  private getTaskStartDateKey(task: Task): string {
+    if (!task.start) return 'sin-fecha';
+    const dateStr = task.start.includes('Z') ? task.start : task.start + 'Z';
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return 'sin-fecha';
+    return date.toISOString().split('T')[0];
+  }
+
   getGroupedProjectTasks(): { [dateKey: string]: Task[] } {
     const grouped: { [dateKey: string]: Task[] } = {};
     
     this.projectTasksForModal.forEach(task => {
-      if (task.start) {
-        const dateStr = task.start.includes('Z') ? task.start : task.start + 'Z';
-        const date = new Date(dateStr);
-        const dateKey = date.toISOString().split('T')[0];
-        
-        if (!grouped[dateKey]) {
-          grouped[dateKey] = [];
-        }
-        grouped[dateKey].push(task);
-      } else {
-        const noDateKey = 'sin-fecha';
-        if (!grouped[noDateKey]) {
-          grouped[noDateKey] = [];
-        }
-        grouped[noDateKey].push(task);
-      }
+      const dateKey = this.getTaskStartDateKey(task);
+      if (!grouped[dateKey]) grouped[dateKey] = [];
+      grouped[dateKey].push(task);
     });
     
     return grouped;
@@ -389,15 +384,7 @@ export class ProjectTasksModalComponent implements OnInit, OnDestroy, OnChanges 
     const grouped: { [dateKey: string]: { groups: { [groupId: string]: Task[] }, individual: Task[] } } = {};
     
     this.projectTasksForModal.forEach(task => {
-      let dateKey: string;
-      
-      if (task.start) {
-        const dateStr = task.start.includes('Z') ? task.start : task.start + 'Z';
-        const date = new Date(dateStr);
-        dateKey = date.toISOString().split('T')[0];
-      } else {
-        dateKey = 'sin-fecha';
-      }
+      const dateKey = this.getTaskStartDateKey(task);
       
       if (!grouped[dateKey]) {
         grouped[dateKey] = { groups: {}, individual: [] };
@@ -434,28 +421,42 @@ export class ProjectTasksModalComponent implements OnInit, OnDestroy, OnChanges 
     return this.projectTasksForModal.filter(t => t.taskGroupId === groupId);
   }
 
-  isGroupSelected(groupId: string): boolean {
-    const groupTasks = this.getGroupTasks(groupId);
+  getGroupKeysForDate(dateKey: string): string[] {
+    const dayData = this.getGroupedProjectTasksByGroup()[dateKey];
+    if (!dayData) return [];
+    return Object.keys(dayData.groups);
+  }
+
+  getGroupTasksForDate(dateKey: string, groupId: string): Task[] {
+    const dayData = this.getGroupedProjectTasksByGroup()[dateKey];
+    if (!dayData) return [];
+    return dayData.groups[groupId] || [];
+  }
+
+  isGroupSelectedForDate(dateKey: string, groupId: string): boolean {
+    const groupTasks = this.getGroupTasksForDate(dateKey, groupId);
     if (groupTasks.length === 0) return false;
     return groupTasks.every(task => this.projectTaskIncluded[task.id] !== false);
   }
 
-  toggleGroupSelection(groupId: string): void {
-    const groupTasks = this.getGroupTasks(groupId);
-    const isCurrentlySelected = this.isGroupSelected(groupId);
+  isGroupIndeterminateForDate(dateKey: string, groupId: string): boolean {
+    const groupTasks = this.getGroupTasksForDate(dateKey, groupId);
+    if (groupTasks.length === 0) return false;
+    const selectedCount = groupTasks.filter(task => this.projectTaskIncluded[task.id] !== false).length;
+    return selectedCount > 0 && selectedCount < groupTasks.length;
+  }
+
+  toggleGroupSelectionForDate(dateKey: string, groupId: string): void {
+    const groupTasks = this.getGroupTasksForDate(dateKey, groupId);
+    const isCurrentlySelected = this.isGroupSelectedForDate(dateKey, groupId);
     const newState = !isCurrentlySelected;
-    
     groupTasks.forEach(task => {
       this.projectTaskIncluded[task.id] = newState;
     });
-    
-    setTimeout(() => {
-      this.updateGroupCheckboxesIndeterminate();
-    }, 0);
   }
 
-  getGroupTotalDuration(groupId: string): string {
-    const groupTasks = this.getGroupTasks(groupId);
+  getGroupTotalDurationForDate(dateKey: string, groupId: string): string {
+    const groupTasks = this.getGroupTasksForDate(dateKey, groupId);
     let totalHours = 0;
     
     groupTasks.forEach(task => {
@@ -466,61 +467,6 @@ export class ProjectTasksModalComponent implements OnInit, OnDestroy, OnChanges 
     });
     
     return this.formatTaskDuration(totalHours);
-  }
-
-  getGroupUniqueDates(groupId: string): number {
-    const groupTasks = this.getGroupTasks(groupId);
-    const uniqueDates = new Set<string>();
-    
-    groupTasks.forEach(task => {
-      if (task.start) {
-        const dateStr = task.start.includes('Z') ? task.start : task.start + 'Z';
-        const date = new Date(dateStr);
-        if (!isNaN(date.getTime())) {
-          uniqueDates.add(date.toISOString().split('T')[0]);
-        }
-      }
-    });
-    
-    return uniqueDates.size;
-  }
-
-  getGroupMostRecentDateKey(groupId: string): string {
-    const groupTasks = this.getGroupTasks(groupId);
-    if (groupTasks.length === 0) return 'sin-fecha';
-    
-    let mostRecentDate: Date | null = null;
-    let mostRecentDateKey = 'sin-fecha';
-    
-    groupTasks.forEach(task => {
-      const dateString = task.end || task.start;
-      if (dateString) {
-        const dateStr = dateString.includes('Z') ? dateString : dateString + 'Z';
-        const date = new Date(dateStr);
-        if (!isNaN(date.getTime())) {
-          if (!mostRecentDate || date > mostRecentDate) {
-            mostRecentDate = date;
-            mostRecentDateKey = date.toISOString().split('T')[0];
-          }
-        }
-      }
-    });
-    
-    return mostRecentDateKey;
-  }
-
-  getGroupKeysForDate(dateKey: string): string[] {
-    const dayData = this.getGroupedProjectTasksByGroup()[dateKey];
-    if (!dayData) return [];
-    
-    return Object.keys(dayData.groups).filter(groupId => {
-      const mostRecentDateKey = this.getGroupMostRecentDateKey(groupId);
-      return mostRecentDateKey === dateKey;
-    });
-  }
-
-  getGroupTasksForDate(dateKey: string, groupId: string): Task[] {
-    return this.getGroupTasks(groupId);
   }
 
   getIndividualTasksForDate(dateKey: string): Task[] {
@@ -699,9 +645,7 @@ export class ProjectTasksModalComponent implements OnInit, OnDestroy, OnChanges 
     const currentState = this.projectTaskIncluded[task.id];
     const newState = !currentState;
     
-    if (task.taskGroupId && !isShiftPressed) {
-      this.toggleGroupSelection(task.taskGroupId);
-    } else if (isShiftPressed && this.lastSelectedTaskIndex !== null) {
+    if (isShiftPressed && this.lastSelectedTaskIndex !== null) {
       const startIndex = Math.min(this.lastSelectedTaskIndex, index);
       const endIndex = Math.max(this.lastSelectedTaskIndex, index);
       
@@ -711,39 +655,11 @@ export class ProjectTasksModalComponent implements OnInit, OnDestroy, OnChanges 
           this.projectTaskIncluded[rangeTask.id] = newState;
         }
       }
-      
-      setTimeout(() => {
-        this.updateGroupCheckboxesIndeterminate();
-      }, 0);
     } else {
       this.projectTaskIncluded[task.id] = newState;
-      
-      if (task.taskGroupId) {
-        setTimeout(() => {
-          this.updateGroupCheckboxesIndeterminate();
-        }, 0);
-      }
     }
     
     this.lastSelectedTaskIndex = index;
-  }
-
-  updateGroupCheckboxesIndeterminate(): void {
-    const uniqueGroupIds = new Set<string>();
-    this.projectTasksForModal.forEach(task => {
-      if (task.taskGroupId) {
-        uniqueGroupIds.add(task.taskGroupId);
-      }
-    });
-    
-    uniqueGroupIds.forEach(groupId => {
-      const checkbox = document.querySelector(`input[data-group-id="${groupId}"]`) as HTMLInputElement;
-      if (checkbox) {
-        const groupTasks = this.getGroupTasks(groupId);
-        const selectedCount = groupTasks.filter(task => this.projectTaskIncluded[task.id] !== false).length;
-        checkbox.indeterminate = selectedCount > 0 && selectedCount < groupTasks.length;
-      }
-    });
   }
 
   // ============ GUARDAR SUMA ============

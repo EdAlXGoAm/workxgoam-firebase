@@ -234,7 +234,7 @@
             
             <!-- Tarjetas del día -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <!-- Grupos de tareas (solo se muestran en la fecha más reciente) -->
+              <!-- Grupos de tareas -->
               <ng-container *ngFor="let groupId of getGroupKeysForDate(dateKey)">
                 <div class="bg-white border-2 border-indigo-300 rounded-lg shadow-sm hover:shadow-md transition-shadow">
                   <!-- Header del grupo -->
@@ -242,9 +242,9 @@
                     <div class="flex items-center justify-between">
                       <div class="flex items-center space-x-3 flex-1 min-w-0">
                         <input type="checkbox" 
-                               [checked]="isGroupSelected(groupId)"
-                               [attr.data-group-id]="groupId"
-                               (click)="toggleGroupSelection(groupId); $event.preventDefault()"
+                               [checked]="isGroupSelectedForDate(dateKey, groupId)"
+                               [indeterminate]="isGroupIndeterminateForDate(dateKey, groupId)"
+                               (click)="toggleGroupSelectionForDate(dateKey, groupId); $event.preventDefault()"
                                class="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer flex-shrink-0">
                         <div class="flex-1 min-w-0">
                           <h5 class="text-base font-semibold text-indigo-800 truncate">
@@ -252,15 +252,12 @@
                           </h5>
                           <p class="text-xs text-indigo-600 mt-1">
                             {{ getGroupTasksForDate(dateKey, groupId).length }} {{ getGroupTasksForDate(dateKey, groupId).length === 1 ? 'tarea' : 'tareas' }}
-                            <span *ngIf="getGroupUniqueDates(groupId) > 1" class="text-indigo-400 ml-1">
-                              ({{ getGroupUniqueDates(groupId) }} días)
-                            </span>
                           </p>
                         </div>
                       </div>
                       <div class="flex items-center text-sm font-semibold text-indigo-600 ml-2">
                         <i class="fas fa-hourglass-half mr-1"></i>
-                        <span>{{ getGroupTotalDuration(groupId) }}</span>
+                        <span>{{ getGroupTotalDurationForDate(dateKey, groupId) }}</span>
                       </div>
                     </div>
                   </div>

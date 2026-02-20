@@ -1,0 +1,196 @@
+.notification-fallback-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 110;
+  animation: nfFadeIn 0.2s ease;
+}
+
+@keyframes nfFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.notification-fallback-modal {
+  background: linear-gradient(180deg, #1e1b4b 0%, #312e81 100%);
+  border-radius: 20px;
+  padding: 32px;
+  max-width: 440px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  animation: nfSlideUp 0.3s ease;
+}
+
+@keyframes nfSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.notification-fallback-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 20px;
+  background: rgba(129, 140, 248, 0.2);
+  border-radius: 50%;
+}
+
+.notification-fallback-title {
+  margin: 0 0 20px;
+  font-size: 22px;
+  font-weight: 600;
+  color: #fff;
+  text-align: center;
+}
+
+.notification-fallback-instructions {
+  margin-bottom: 24px;
+}
+
+.notification-fallback-intro {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.5;
+}
+
+.notification-fallback-steps {
+  margin: 0 0 12px;
+  padding-left: 20px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.6;
+}
+
+.notification-fallback-steps li {
+  margin-bottom: 8px;
+}
+
+.notification-fallback-steps li:last-child {
+  margin-bottom: 0;
+}
+
+.notification-fallback-steps strong {
+  color: #a5b4fc;
+}
+
+.notification-fallback-then {
+  margin: 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  font-style: italic;
+}
+
+.notification-fallback-divider {
+  display: flex;
+  align-items: center;
+  margin: 20px 0;
+  gap: 16px;
+}
+
+.notification-fallback-divider::before,
+.notification-fallback-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.notification-fallback-divider span {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.notification-fallback-local {
+  margin-bottom: 24px;
+}
+
+.notification-fallback-local-warning {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.5;
+}
+
+.notification-fallback-local-btn {
+  width: 100%;
+  padding: 14px 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.notification-fallback-local-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.notification-fallback-local-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.notification-fallback-local-note {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.4;
+}
+
+.notification-fallback-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: nfSpin 0.8s linear infinite;
+}
+
+@keyframes nfSpin {
+  to { transform: rotate(360deg); }
+}
+
+.notification-fallback-close {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.notification-fallback-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
