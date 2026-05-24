@@ -57,19 +57,19 @@ export class ZonayummyAuthService {
   }
 
   async loginWithEmail(email: string, password: string): Promise<ZonayummyLoginResult> {
-    return this.postLogin('/auth/email/login', { email, password });
+    return this.postLogin('/zonayummy/auth/email/login', { email, password });
   }
 
   async loginWithPhone(phone: string, password: string): Promise<ZonayummyLoginResult> {
-    return this.postLogin('/auth/phone/login', { phone, password });
+    return this.postLogin('/zonayummy/auth/phone/login', { phone, password });
   }
 
   async loginWithUsername(username: string, password: string): Promise<ZonayummyLoginResult> {
-    return this.postLogin('/auth/username/login', { username, password });
+    return this.postLogin('/zonayummy/auth/username/login', { username: username.toLowerCase().trim(), password });
   }
 
   async loginWithGoogle(idToken: string): Promise<ZonayummyLoginResult> {
-    return this.postLogin('/auth/google/login', { idToken });
+    return this.postLogin('/zonayummy/auth/google/login', { idToken });
   }
 
   private async postLogin(path: string, payload: Record<string, any>): Promise<ZonayummyLoginResult> {

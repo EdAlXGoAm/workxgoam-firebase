@@ -7,11 +7,12 @@ import { ZonayummyAuthService } from './zonayummy-auth.service';
 import { ZonayummyReelHistoryItem, ZonayummyReelHistoryService, ZonayummyFolder, ZonayummyLabel } from './zonayummy-reel-history.service';
 import { ZonayummyLoginModalComponent } from './zonayummy-login-modal.component';
 import { ReelItemEditModalComponent } from './reel-item-edit-modal.component';
+import { PlatformIconComponent } from './platform-icon.component';
+import { ReelHistoryGridModalComponent } from './reel-history-grid-modal.component';
 
 interface Platform {
   id: string;
   name: string;
-  icon: string;
   gradient: string;
   placeholder: string;
   urlPattern: RegExp;
@@ -22,7 +23,7 @@ interface Platform {
 @Component({
   selector: 'app-reel-downloader',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, ZonayummyLoginModalComponent, ReelItemEditModalComponent],
+  imports: [CommonModule, FormsModule, RouterModule, ZonayummyLoginModalComponent, ReelItemEditModalComponent, PlatformIconComponent, ReelHistoryGridModalComponent],
   template: `
     <div 
       class="min-h-screen relative overflow-hidden transition-all duration-500"
@@ -48,7 +49,7 @@ interface Platform {
           <div class="text-center">
             <!-- Logo dinámico -->
             <div class="inline-flex items-center justify-center w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-white/20 backdrop-blur-xl mb-3 shadow-2xl border border-white/30 transition-all duration-300">
-              <div [innerHTML]="currentPlatform.icon" class="w-8 h-8 md:w-10 md:h-10 text-white"></div>
+              <app-platform-icon [platform]="selectedPlatform" class="w-8 h-8 md:w-10 md:h-10"></app-platform-icon>
             </div>
             
             <h1 class="text-3xl md:text-4xl font-black text-white mb-1 tracking-tight">
@@ -109,11 +110,11 @@ interface Platform {
               }"
               class="flex-1 min-w-[80px] flex flex-col items-center gap-1 py-2.5 px-3 rounded-xl transition-all duration-300 relative"
             >
-              <div 
-                [innerHTML]="platform.icon" 
+              <app-platform-icon
+                [platform]="platform.id"
                 class="w-5 h-5 md:w-6 md:h-6 transition-transform duration-300"
                 [class.scale-110]="selectedPlatform === platform.id"
-              ></div>
+              ></app-platform-icon>
               <span class="text-xs font-medium whitespace-nowrap">{{ platform.name }}</span>
               <!-- Indicador activo -->
               <div 
@@ -272,7 +273,7 @@ interface Platform {
                     class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
                     [style.background]="getPlatformGradient(item.platform)"
                   >
-                    <div [innerHTML]="getPlatformIcon(item.platform)" class="w-4 h-4 text-white"></div>
+                    <app-platform-icon [platform]="item.platform" class="w-4 h-4"></app-platform-icon>
                   </div>
                   <div class="min-w-0 flex-1">
                     <p class="text-white text-sm truncate">{{ item.url }}</p>
@@ -314,6 +315,18 @@ interface Platform {
             <div class="text-xs text-gray-500">Links + videos guardados</div>
           </div>
           <div class="flex items-center gap-2">
+            <button
+              type="button"
+              class="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 disabled:opacity-40"
+              (click)="openGridModal()"
+              [disabled]="zyHistoryLoading || zyHistory.length === 0"
+              title="Ver galería de videos"
+              aria-label="Ver galería de videos"
+            >
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5"/>
+              </svg>
+            </button>
             <button
               class="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-xs font-bold"
               (click)="refreshZyHistory()"
@@ -371,7 +384,7 @@ interface Platform {
                 <!-- Thumbnail o ícono de plataforma -->
                 <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden" [style.background]="getPlatformGradient(it.platform)">
                   <img *ngIf="it.thumbnailUrlWithSas" [src]="it.thumbnailUrlWithSas" class="w-full h-full object-cover" alt="Thumbnail" />
-                  <div *ngIf="!it.thumbnailUrlWithSas" class="w-5 h-5 text-white" [innerHTML]="getPlatformIcon(it.platform)"></div>
+                  <app-platform-icon *ngIf="!it.thumbnailUrlWithSas" [platform]="it.platform" class="w-5 h-5"></app-platform-icon>
                 </div>
                 <div class="min-w-0 flex-1">
                   <!-- Título o URL -->
@@ -400,6 +413,18 @@ interface Platform {
 
                   <!-- Acciones -->
                   <div class="mt-2 flex items-center gap-1.5 flex-wrap">
+                    <button
+                      class="px-2 py-1.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-100 text-xs font-medium flex items-center gap-1"
+                      (click)="openInNewTab(it.url)"
+                      title="Abrir link original"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                        <polyline points="15 3 21 3 21 9"></polyline>
+                        <line x1="10" y1="14" x2="21" y2="3"></line>
+                      </svg>
+                      Abrir
+                    </button>
                     <button
                       class="px-2 py-1.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-100 text-xs font-medium flex items-center gap-1"
                       (click)="copyToClipboard(it.url)"
@@ -527,6 +552,13 @@ interface Platform {
         (folderCreated)="onFolderCreated($event)"
         (labelsCreated)="onLabelsCreated($event)"
       />
+
+      <!-- Modal galería de videos en la nube -->
+      <app-reel-history-grid-modal
+        [isOpen]="isGridModalOpen"
+        [items]="zyHistory"
+        (closed)="isGridModalOpen = false"
+      />
     </div>
   `,
   styles: [`
@@ -605,6 +637,7 @@ export class ReelDownloaderComponent {
   // Modal de edición
   editingItem: ZonayummyReelHistoryItem | null = null;
   isEditModalOpen = false;
+  isGridModalOpen = false;
   
   private bumpLabelUsage(labelId: string, delta: number) {
     if (!labelId) return;
@@ -635,7 +668,6 @@ export class ReelDownloaderComponent {
     {
       id: 'instagram',
       name: 'Instagram',
-      icon: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>`,
       gradient: 'linear-gradient(135deg, #833ab4 0%, #fd1d1d 50%, #fcb045 100%)',
       placeholder: 'https://www.instagram.com/reel/ABC123...',
       urlPattern: /^https?:\/\/(www\.)?instagram\.com\/(reel|reels|p)\/[\w-]+/i,
@@ -645,7 +677,6 @@ export class ReelDownloaderComponent {
     {
       id: 'tiktok',
       name: 'TikTok',
-      icon: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-5.2 1.74 2.89 2.89 0 012.31-4.64 2.93 2.93 0 01.88.13V9.4a6.84 6.84 0 00-1-.05A6.33 6.33 0 005 20.1a6.34 6.34 0 0010.86-4.43v-7a8.16 8.16 0 004.77 1.52v-3.4a4.85 4.85 0 01-1-.1z"/></svg>`,
       gradient: 'linear-gradient(135deg, #000000 0%, #25F4EE 50%, #FE2C55 100%)',
       placeholder: 'https://vt.tiktok.com/ABC123 o @user/video/123...',
       urlPattern: /^https?:\/\/([a-z]+\.)?(tiktok\.com|tiktokcdn\.com)\/.+/i,
@@ -655,7 +686,6 @@ export class ReelDownloaderComponent {
     {
       id: 'youtube',
       name: 'YouTube',
-      icon: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>`,
       gradient: 'linear-gradient(135deg, #FF0000 0%, #282828 100%)',
       placeholder: 'https://youtube.com/shorts/ABC123...',
       urlPattern: /^https?:\/\/(www\.|m\.)?(youtube\.com\/(shorts\/|watch\?v=)|youtu\.be\/)/i,
@@ -665,7 +695,6 @@ export class ReelDownloaderComponent {
     {
       id: 'facebook',
       name: 'Facebook',
-      icon: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>`,
       gradient: 'linear-gradient(135deg, #1877F2 0%, #42B72A 100%)',
       placeholder: 'https://www.facebook.com/reel/123... o share/r/...',
       urlPattern: /^https?:\/\/(www\.|m\.|web\.)?(facebook\.com|fb\.watch)\/(reel|watch|video|share\/[rv]|.*\/videos)\/[\w\d\-\/?=&]+/i,
@@ -697,6 +726,11 @@ export class ReelDownloaderComponent {
   toggleHistory() {
     this.isHistoryOpen = !this.isHistoryOpen;
     if (this.isHistoryOpen) this.refreshZyHistory();
+  }
+
+  openGridModal() {
+    if (!this.isZyLoggedIn || this.zyHistory.length === 0) return;
+    this.isGridModalOpen = true;
   }
 
   onZyLoggedIn() {
@@ -828,6 +862,11 @@ export class ReelDownloaderComponent {
     }
   }
 
+  openInNewTab(url: string) {
+    if (!url?.trim()) return;
+    window.open(url.trim(), '_blank', 'noopener,noreferrer');
+  }
+
   confirmDeleteItem(item: ZonayummyReelHistoryItem) {
     this.deleteConfirmItem = item;
     this.deleteError = '';
@@ -898,11 +937,6 @@ export class ReelDownloaderComponent {
   getPlatformGradient(platformId: string): string {
     const platform = this.platforms.find(p => p.id === platformId);
     return platform?.gradient || this.platforms[0].gradient;
-  }
-
-  getPlatformIcon(platformId: string): string {
-    const platform = this.platforms.find(p => p.id === platformId);
-    return platform?.icon || this.platforms[0].icon;
   }
 
   getPlatformName(platformId: string): string {
