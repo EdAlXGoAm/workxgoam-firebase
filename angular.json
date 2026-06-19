@@ -77,7 +77,7 @@
           },
           "defaultConfiguration": "development",
           "options": {
-            "allowedHosts": ["work.aixgoam.com", "localhost", "0.0.0.0", "192.168.1.*"]
+            "allowedHosts": ["apps.zonayummy.com", "work.aixgoam.com", "localhost", "0.0.0.0", "192.168.1.*"]
           }
         },
         "extract-i18n": {
