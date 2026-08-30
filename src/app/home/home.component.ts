@@ -16,6 +16,6 @@ export class HomeComponent {
 
   getUserName(): string {
     const user = this.authService.getCurrentUser();
-    return user?.displayName?.split(' ')[0] || 'Usuario';
+    return user?.displayName?.split(' ')[0] || 'Invitado';
   }
 } 

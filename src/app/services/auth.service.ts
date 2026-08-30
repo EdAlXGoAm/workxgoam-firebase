@@ -22,33 +22,14 @@ export class AuthService {
       this.authStateResolver = resolve;
     });
 
-    // Observar cambios en el estado de autenticación
+    // Observe auth state only (no forced redirects; app runs in public mode).
     this.auth.onAuthStateChanged(user => {
       this.user.next(user);
       this.authStateReady = true;
-      this.authStateResolver(); // Resolver la promesa cuando el estado esté listo
-      
-      // Evitar redirecciones automáticas para rutas específicas
-      const currentPath = window.location.pathname;
-      
-      // Redirigir según el estado de autenticación
-      if (user) {
-        // Solo redirigir a home si estamos explícitamente en la página de login
-        if (currentPath === '/login') {
-          this.router.navigate(['/home']);
-        }
-        // No hacer ninguna redirección para otras rutas cuando el usuario está autenticado
-      } else {
-        // Si estamos en una ruta protegida, redirigir a login
-        // Excluir las rutas específicas y las rutas de apps
-        const isProtectedRoute = 
-          currentPath !== '/login' && 
-          currentPath !== '/' && 
-          !currentPath.startsWith('/apps/');
+      this.authStateResolver();
 
-        if (isProtectedRoute) {
-          this.router.navigate(['/login']);
-        }
+      if (user && window.location.pathname === '/login') {
+        this.router.navigate(['/home']);
       }
     });
   }
@@ -69,7 +50,7 @@ export class AuthService {
   async logout(): Promise<void> {
     try {
       await signOut(this.auth);
-      this.router.navigate(['/login']);
+      this.router.navigate(['/home']);
     } catch (error) {
       console.error('Error durante el cierre de sesión:', error);
     }
