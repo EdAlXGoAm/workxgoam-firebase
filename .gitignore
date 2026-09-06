@@ -10,8 +10,6 @@
 /node_modules
 npm-debug.log
 yarn-error.log
-package-lock.json
-
 # IDEs and editors
 .idea/
 .project
@@ -43,3 +41,10 @@ testem.log
 Thumbs.db
 
 dist-bkp*
+__pycache__/
+
+*.tsbuildinfo
+
+/public/**/*.apk
+
+/public/*.apk

@@ -1,0 +1,8 @@
+{
+  "localProjects": [],
+  "requiredPublic": [],
+  "keepReleases": 2,
+  "outputDir": "dist/myapp/browser",
+  "webRoot": "/var/www/workxgoam-firebase",
+  "publicMode": "native"
+}
